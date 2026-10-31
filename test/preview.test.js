@@ -75,6 +75,38 @@ test("an edited preview replaces an obsolete render that moved audio forward", a
   assert.equal((await reopened.prepare(video)).url, preview.url);
 });
 
+test("a preview from the render before the exact output clock is not reused", async () => {
+  await mkdir(".local", { recursive: true });
+  const root = await mkdtemp(path.resolve(".local", "preview-clock-"));
+  const source = createDelayedAudioSource(root);
+  const media = new Media();
+  const metadata = await media.probe(source);
+  const timeline = cut(createTimeline(metadata.duration), 0.5, 1.2);
+  const video = { id: "old-clock", path: source, metadata, timeline };
+  const cache = new PreviewCache(root, media);
+  const { segments, speed, muted } = timeline;
+  // The key that the previous renderer (render version 2) used.
+  const oldKey = createHash("sha256")
+    .update(
+      JSON.stringify({
+        renderVersion: 2,
+        id: video.id,
+        path: source,
+        metadata,
+        segments,
+        speed,
+        muted,
+      }),
+    )
+    .digest("hex");
+  const oldOutput = path.join(cache.directory(video.id), oldKey + ".mp4");
+  await mkdir(cache.directory(video.id), { recursive: true });
+  execFileSync("ffmpeg", ["-v", "error", "-i", source, "-t", "1", oldOutput]);
+  const preview = await cache.prepare(video);
+  assert.notEqual(preview.path, oldOutput);
+  assert.ok(Math.abs(preview.metadata.duration - 2.3) < 0.04);
+});
+
 test("an edited preview removes boundary content and reuses the cached file", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "preview-"));

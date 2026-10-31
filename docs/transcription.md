@@ -36,7 +36,7 @@ Wait for `state: complete`. The outcome is `ready`, `no_audio`, or `no_speech`. 
 
 Reads default to segments in a 30-second window. Use `detail: words` for word times, source times, model probability, and cut flags. A read can cover at most 120 seconds and 500 words. Use `nextOffset` as `offset` with the same window to continue. Search returns at most 20 matches. Use its `nextOffset` with the same query to continue. Search matches words without case or punctuation. It is not semantic search.
 
-Each edited search match gives three `inspectionTimestamps`. Pass these to `inspect.start`, with the transcript's `videoId` and `revision`. Poll `export.status`, then use `inspect.result`. MCP returns image blocks. The images show the video before, during, and after the phrase. Inspect more frames if a control moves quickly.
+Each edited search match gives three `inspectionTimestamps`. Pass these to `inspect.start`, with the transcript's `videoId` and `revision`. The transcript revision checks trim, cut, speed, and mute. It does not change when you add or change text elements. Poll `export.status`, then use `inspect.result`. MCP returns image blocks. The images show the video before, during, and after the phrase. Inspect more frames if a control moves quickly.
 
 Check the returned fields before using speech to edit a video:
 

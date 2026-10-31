@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Service, commands } from "../src/application/service.js";
 import { Library } from "../src/adapters/library.js";
+import { createTimeline } from "../src/domain/timeline.js";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -336,7 +337,8 @@ test("agents can open videos, control playback, and select the app view", async 
 test("preview rendering runs as a background job and keeps recording controls available", async () => {
   let finish;
   const service = new Service({
-    library: { get: async (id) => ({ id }) },
+    // Library records always have a timeline. Jobs record its revision.
+    library: { get: async (id) => ({ id, timeline: createTimeline(2) }) },
     previews: {
       prepare: async () =>
         new Promise((resolve) => {
@@ -375,7 +377,7 @@ test("deleting a video removes cached previews and their job results", async () 
   let removed = false;
   const service = new Service({
     library: {
-      get: async (id) => ({ id }),
+      get: async (id) => ({ id, timeline: createTimeline(2) }),
       remove: async (id) => ({ deleted: id }),
     },
     previews: {

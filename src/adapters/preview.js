@@ -16,17 +16,22 @@ export class PreviewCache {
     await rm(this.directory(id), { recursive: true, force: true });
   }
   prepare(video) {
-    const { segments, speed, muted } = video.timeline;
+    const { segments, speed, muted, elements = [] } = video.timeline;
+    // Render version 3 has the exact 30 fps output clock, so previews from
+    // older renders are not used again. Elements and the overlay renderer
+    // version are part of the key, so a cached preview cannot hide changed
+    // elements.
     const key = createHash("sha256")
       .update(
         JSON.stringify({
-          renderVersion: 2,
+          renderVersion: 3,
           id: video.id,
           path: video.path,
           metadata: video.metadata,
           segments,
           speed,
           muted,
+          ...(elements.length ? { overlayVersion: 1, elements } : {}),
         }),
       )
       .digest("hex");

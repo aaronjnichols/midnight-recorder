@@ -1,4 +1,5 @@
 import { duration, isEdited } from "../domain/timeline.js";
+import { editRevision } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import {
   clock,
@@ -290,8 +291,8 @@ function renderVideo(video) {
   $("#delete-name").textContent = video.title;
   renderVideoInfo(video);
   const player = $("#player");
-  const { segments, speed, muted } = video.timeline;
-  const key = id + JSON.stringify({ segments, speed, muted });
+  // The revision includes elements, so an element change loads a new preview.
+  const key = id + editRevision(video);
   if (previewKey !== key) {
     previewKey = key;
     previewReady = false;
@@ -351,10 +352,9 @@ function setPreview(url, original = false) {
 }
 async function preparePreview(video, key) {
   try {
-    const { segments, speed, muted } = video.timeline;
     const started = await call("preview.start", {
       id: video.id,
-      revision: JSON.stringify({ segments, speed, muted }),
+      revision: editRevision(video),
     });
     let job = started;
     while (job.state === "running") {

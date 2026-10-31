@@ -1,8 +1,17 @@
 import * as timeline from "../domain/timeline.js";
 import { randomUUID } from "node:crypto";
-import { inspectionPlan, editRevision } from "../domain/inspection.js";
+import {
+  inspectionPlan,
+  editRevision,
+  revisionMatches,
+} from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
+import {
+  elementCommands,
+  executeElement,
+  elementPlacement,
+} from "./elements.js";
 
 const field = (type, description, extra = {}) => ({
   type,
@@ -51,7 +60,7 @@ export const commands = [
       ),
       grid: boolean("Show a grid with 10 rows and 10 columns. Default false."),
       revision: string(
-        "Optional revision from an earlier inspection. Reject changed edits.",
+        "Optional revision from element.list or inspect.result: reject any changed edit. A transcript revision rejects only changed trim, cut, speed, or mute.",
       ),
     },
     ["id", "timestamps"],
@@ -141,18 +150,38 @@ export const commands = [
     },
     ["id"],
   ),
-  ...["undo", "redo", "reset"].map((action) =>
+  ...["undo", "redo"].map((action) =>
     define(
       `edit.${action}`,
-      `${action} video edits.`,
+      `${action} video edits. Trim, cut, speed, mute, and element changes use one history.`,
       { id: string("Video ID.") },
       ["id"],
     ),
   ),
   define(
+    "edit.reset",
+    "Return to the original video. Undo with edit.undo.",
+    {
+      id: string("Video ID."),
+      scope: field(
+        "string",
+        "Default all. timeline resets trim, cut, speed, and mute. elements removes all elements.",
+        { enum: ["all", "timeline", "elements"] },
+      ),
+    },
+    ["id"],
+  ),
+  ...elementCommands,
+  define(
     "export.start",
-    "Export an edited MP4. Returns a job ID.",
-    { id: string("Video ID."), path: string("New absolute MP4 path.") },
+    "Export an edited MP4 with its elements. Returns a job ID. The export uses the edits at the time of this command. Later edits do not change it.",
+    {
+      id: string("Video ID."),
+      path: string("New absolute MP4 path."),
+      revision: string(
+        "Optional revision from element.list or inspect.result. Reject changed edits.",
+      ),
+    },
     ["id", "path"],
   ),
   define(
@@ -163,11 +192,11 @@ export const commands = [
   ),
   define(
     "preview.start",
-    "Prepare an exact edited preview. Poll export.status with the returned job ID.",
+    "Prepare an exact edited preview with its elements. Poll export.status with the returned job ID.",
     {
       id: string("Video ID."),
       revision: string(
-        "Optional JSON of segments, speed, and muted. Reject a stale edit state.",
+        "Optional edit revision from element.list. Reject a stale edit state.",
       ),
     },
     ["id"],
@@ -391,6 +420,7 @@ export class Service {
         ? result
         : this.inspection.images(result);
     }
+    if (name.startsWith("element.")) return executeElement(this, name, args);
     if (name.startsWith("edit.")) {
       const video = await this.library.get(args.id);
       const action = name.slice(5);
@@ -401,35 +431,37 @@ export class Service {
         edited = timeline.configure(video.timeline, args);
       if (action === "undo" || action === "redo")
         edited = timeline[action](video.timeline);
-      if (action === "reset") {
-        const fresh = timeline.createTimeline(video.metadata.duration);
-        edited = {
-          ...fresh,
-          past: [
-            ...video.timeline.past,
-            {
-              segments: video.timeline.segments,
-              speed: video.timeline.speed,
-              muted: video.timeline.muted,
-            },
-          ],
-        };
-      }
-      return this.library.update(args.id, { timeline: edited });
+      if (action === "reset")
+        edited = timeline.reset(
+          video.timeline,
+          video.metadata.duration,
+          args.scope,
+        );
+      const saved = await this.library.update(args.id, { timeline: edited });
+      // Report where elements show after this edit. This is not stored.
+      return { ...saved, elementPlacement: elementPlacement(saved) };
     }
     if (
       name === "export.start" ||
       name === "preview.start" ||
       name === "inspect.start"
     ) {
-      const video = await this.library.get(args.id);
+      // A deep copy of the edit state at this command. Later edits do not
+      // change the running job.
+      const video = structuredClone(await this.library.get(args.id));
+      const revision = editRevision(video);
       const plan =
         name === "inspect.start" ? inspectionPlan(video, args) : undefined;
-      if (name === "preview.start" && args.revision) {
-        const { segments, speed, muted } = video.timeline;
-        if (args.revision !== JSON.stringify({ segments, speed, muted }))
-          throw new Error("The video edits changed. Open the video again.");
-      }
+      if (
+        name !== "inspect.start" &&
+        args.revision &&
+        !revisionMatches(video, args.revision)
+      )
+        throw new Error(
+          name === "preview.start"
+            ? "The video edits changed. Open the video again."
+            : "The video edits changed. Read element.list or inspect the video again.",
+        );
       const job = {
         id: randomUUID(),
         videoId: args.id,
@@ -440,6 +472,7 @@ export class Service {
               ? "preview"
               : "export",
         path: args.path,
+        revision,
         state: "running",
         startedAt: new Date().toISOString(),
       };

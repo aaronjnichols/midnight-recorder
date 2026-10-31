@@ -142,13 +142,26 @@ Each frame has these fields:
 - `width` and `height` are the image dimensions. `videoSize` gives the edited video's full dimensions.
 - `path` is the local PNG file. `data` contains base64 PNG data when requested through the CLI.
 
+The edited preview and export have 30 frames per second at all speeds. Frame n starts at exactly n ÷ 30 seconds, also after many cuts. See [output clock](docs/editing.md#output-clock).
+
 The origin is the top left corner. The x coordinate increases to the right. The y coordinate increases down. Divide image x by image width, and image y by image height, to get coordinates from 0 to 1. Multiply those values by `videoSize.width` and `videoSize.height` to get full-size video coordinates. The optional grid has 10 rows and 10 columns. It appears only on inspection images.
 
 The width defaults to 960 pixels. The allowed width is 160 to 1920 pixels. The height is at most 1080 pixels. Small images do not enlarge. Timestamps must be at least zero and strictly before the edited duration. Results keep the request order, including duplicate timestamps.
 
 Check `stale` before using a result to place elements. It becomes `true` if the current edits differ from the inspected edits. Pass the returned `revision` to `inspect.start` to reject a request based on changed edits. Jobs last until the app closes. Deleting a library video also deletes its inspection images.
 
-For label placement, inspect the start, middle, and end of the proposed interval. Inspect more frames near a visible change. Sampling can miss motion between frames. These commands provide visual input and coordinates. Text, shape, and transition editing are not yet app commands.
+For label placement, inspect the start, middle, and end of the proposed interval. Inspect more frames near a visible change. Sampling can miss motion between frames. Timed text elements use the same coordinates and edited times. Shape and transition editing are not yet app commands.
+
+## Timed text
+
+Agents can add timed text and labels to the edited video with `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, and `element.list`. The preview, the export, and frame inspection show the text. The original file does not change. The desktop editor shows text elements in the preview, but it does not have controls to add or change them yet.
+
+```powershell
+node src/agent/cli.js element.add '{"id":"VIDEO_ID","type":"text","text":"Click Save","start":1.5,"end":4,"x":0.1,"y":0.45,"width":0.2,"height":0.12,"background":"#5E81AC"}'
+node src/agent/cli.js element.list '{"id":"VIDEO_ID"}'
+```
+
+See [timed text elements](docs/editing.md) for coordinates, time rules, properties, limits, and revisions.
 
 Run `npm run practice:inspection` to test the workflow. It opens a separate app with a test library, makes a sample video, calls the CLI and MCP, and saves images and a JSON report under `.local`. The sample Save button changes position at source time 3. The practice then cuts source time 1 to 2 and sets speed to 0.5. The button changes position at edited time 4. The normal library stays unchanged.
 
@@ -156,7 +169,7 @@ Run `npm run practice:inspection` to test the workflow. It opens a separate app 
 
 Run `npm run setup:transcription` once to install local English speech recognition. Start the app, then use `transcript.start`, `transcript.status`, `transcript.read`, and `transcript.search`. Search results include edited timestamps for frame inspection. Speech jobs support cancellation, bounded reads, cached results, and cut-word warnings.
 
-See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. Text, shape, and transition editing remain separate work.
+See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. Captions from transcripts, shapes, and transitions are not yet available.
 
 ## MCP
 
@@ -189,6 +202,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | Recording          | `recording.countdown`, `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail` |
 | Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                     |
 | Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                       |
+| Timed text         | `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`                                 |
 | Export             | `export.start`, `export.status`                                                                                                         |
 | Preview rendering  | `preview.start`, with job state from `export.status`                                                                                    |
 | Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                  |
@@ -197,7 +211,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 
 ## Code structure
 
-- `src/domain` has time-range edits and time conversion. It has no Electron or file-system dependencies.
+- `src/domain` has time-range edits, time conversion, timed elements, and the element render plan. It has no Electron or file-system dependencies.
 - `src/application` has command schemas, validation, and workflow state. It uses injected adapters.
 - `src/adapters` has file storage and FFmpeg operations.
 - `src/desktop` has Electron setup, capture, permissions, and IPC.

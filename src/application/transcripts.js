@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { editRevision } from "../domain/inspection.js";
+// Elements do not change speech times, so transcripts use the timing revision.
+import { timingRevision } from "../domain/inspection.js";
 import { readTranscript, searchTranscript } from "../domain/transcript.js";
 
 const number = (description, minimum, maximum) => ({
@@ -48,7 +49,9 @@ export const transcriptCommands = [
         maxItems: 50,
         items: { type: "string", minLength: 1, maxLength: 80 },
       },
-      revision: string("Optional edit revision. Reject changed edits."),
+      revision: string(
+        "Optional revision from transcript.read or transcript.search. Reject changed trim, cut, speed, or mute. Elements do not change it.",
+      ),
     },
     ["id"],
   ),
@@ -150,7 +153,7 @@ export class TranscriptJobs {
           "Invalid vocabulary. Use at most 50 terms, 80 characters per term, and 1000 total characters.",
         );
       const video = await library.get(args.id),
-        revision = editRevision(video);
+        revision = timingRevision(video);
       if (video.metadata.duration > 3600)
         throw new Error(
           "Speech input must be at most 3600 seconds. Import a shorter source video.",
@@ -255,7 +258,7 @@ export class TranscriptJobs {
       jobId: job.id,
       videoId: job.videoId,
       revision: job.revision,
-      stale: job.revision !== editRevision(video),
+      stale: job.revision !== timingRevision(video),
       outcome: entry.result.outcome,
       timing: "estimated",
       provenance: {

@@ -99,7 +99,7 @@ export class FrameInspection {
         duration: plan.duration,
         videoSize: { width: info.width, height: info.height },
         coordinates:
-          "Origin is top left. x increases right. y increases down. Divide image x by image width and image y by image height for coordinates from 0 to 1.",
+          "Origin is top left. x increases right. y increases down. Divide image x by image width and image y by image height for coordinates from 0 to 1. Element x, y, width, and height use these coordinates.",
         grid: plan.grid ? { columns: 10, rows: 10 } : null,
         frames: indices.map((n, i) => ({
           requestedSeconds: plan.timestamps[i],

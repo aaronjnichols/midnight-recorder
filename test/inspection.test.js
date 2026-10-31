@@ -121,7 +121,9 @@ test("inspection selects an exact frame boundary without decimal rounding", asyn
   });
   const result = await complete(service, job);
   assert.ok(Math.abs(result.frames[0].seconds - 1 / 15) < 1e-9);
-  assert.equal(result.frames[1].seconds, 0);
+  // The output has 30 frames per second at every speed. The frame before
+  // 1/15 is at 1/30.
+  assert.ok(Math.abs(result.frames[1].seconds - 1 / 30) < 1e-9);
 });
 
 test("multiple frames keep request order, report stale edits, and return image data", async () => {
