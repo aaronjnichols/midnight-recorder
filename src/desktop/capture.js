@@ -68,6 +68,7 @@ async function start(options) {
       if (event.data.size) queue = queue.then(async () => window.captureBridge.chunk(await event.data.arrayBuffer())).catch(error => { chunkError = error; });
     };
     recorder.start(1000);
+    streams.forEach(stream => stream.getTracks().forEach(track => track.addEventListener('ended', () => window.captureBridge.ended(), { once: true })));
     return { mimeType };
   } catch (error) { await cleanup(); throw error; }
 }
@@ -93,7 +94,11 @@ window.captureBridge.listen(async ({ id, action, args }) => {
     if (action === 'start') result = await start(args);
     if (action === 'pause') recorder.pause();
     if (action === 'resume') recorder.resume();
-    if (action === 'stop' || action === 'cancel') result = await stop();
+    if (action === 'stop') result = await stop();
+    if (action === 'cancel') {
+      try { await stop(); } catch { /* Cancel must release a failed recording. */ }
+      await cleanup(); recorder = null; chunkError = null; queue = Promise.resolve();
+    }
     window.captureBridge.reply({ id, result });
   } catch (error) { window.captureBridge.reply({ id, error: error.message }); }
 });

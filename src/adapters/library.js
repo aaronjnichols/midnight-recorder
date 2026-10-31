@@ -1,12 +1,13 @@
 import { mkdir, readFile, writeFile, rename, copyFile, rm, link } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { createTimeline } from '../domain/timeline.js';
 
 export class Library {
   constructor(root, { removeFile = file => rm(file, { force: true }) } = {}) { this.root = root; this.index = path.join(root, 'library.json'); this.removeFile = removeFile; }
   async load() {
-    try { return JSON.parse(await readFile(this.index, 'utf8')); }
+    try { return JSON.parse(await readFile(this.index, 'utf8')).map(video => ({ ...video, url: pathToFileURL(video.path).href })); }
     catch (error) { if (error.code === 'ENOENT') return []; throw error; }
   }
   async save(records) {
@@ -24,11 +25,13 @@ export class Library {
   }
   async import(source, metadata, title = path.basename(source, path.extname(source))) {
     const id = randomUUID();
+    const timeline = createTimeline(metadata.duration);
     const target = path.join(this.root, 'media', id + path.extname(source));
     await mkdir(path.dirname(target), { recursive: true });
     await copyFile(source, target);
-    const video = { id, title, path: target, createdAt: new Date().toISOString(), metadata, timeline: createTimeline(metadata.duration) };
-    await this.save([video, ...await this.load()]);
+    const video = { id, title, path: target, url: pathToFileURL(target).href, createdAt: new Date().toISOString(), metadata, timeline };
+    try { await this.save([video, ...await this.load()]); }
+    catch (error) { await rm(target, { force: true }); throw error; }
     return video;
   }
   async update(id, patch) {

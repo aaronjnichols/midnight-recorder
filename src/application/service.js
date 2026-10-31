@@ -33,7 +33,9 @@ export const commands = [
   define('app.view', 'Select the library or recorder view.', { view: field('string', 'App view.', { enum: ['library', 'recorder'] }) }, ['view']),
   define('playback.open', 'Open a video in the editor.', { id: string('Video ID.') }, ['id']),
   ...['play', 'pause', 'status'].map(action => define(`playback.${action}`, `${action} the video preview.`)),
-  define('playback.seek', 'Seek to a time in the edited video.', { seconds: number('Edited time in seconds.') }, ['seconds'])
+  define('playback.seek', 'Seek to a time in the edited video.', { seconds: number('Edited time in seconds.') }, ['seconds']),
+  define('playback.configure', 'Set preview volume. This does not change exports.', { volume: number('Volume from 0 to 1.') }, ['volume']),
+  define('playback.fullscreen', 'Enter or leave fullscreen video preview.', { enabled: boolean('Fullscreen state.') }, ['enabled'])
 ];
 
 function validate(command, args) {
@@ -69,6 +71,7 @@ export class Service {
     if (name === 'playback.open') return this.playback.request('open', { video: await this.library.get(args.id) });
     if (name.startsWith('playback.')) {
       if (name === 'playback.seek' && args.seconds < 0) throw new Error('Seek time must not be negative.');
+      if (name === 'playback.configure' && (args.volume < 0 || args.volume > 1)) throw new Error('Volume must be between 0 and 1.');
       return this.playback.request(name.slice(9), args);
     }
     if (name === 'capture.sources') return this.capture.sources();

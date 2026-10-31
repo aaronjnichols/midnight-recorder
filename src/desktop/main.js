@@ -72,21 +72,32 @@ else app.whenReady().then(async () => {
       return file;
     },
     cancel: async () => {
-      await rpc('cancel');
-      await closeStream().catch(() => {});
-      if (file) await rm(file, { force: true });
-      file = null; stopped = false;
+      try { await rpc('cancel'); }
+      finally {
+        await closeStream().catch(() => {});
+        if (file) await rm(file, { force: true });
+        file = null; stopped = false;
+      }
     }
   };
   await worker.loadFile(path.join(here, 'capture.html'));
   const playbackPending = new Map();
-  const playback = { request: (action, args) => new Promise((resolve, reject) => {
+  const playback = { request: async (action, args) => {
+    if (action === 'fullscreen') ui.setFullScreen(args.enabled);
+    return new Promise((resolve, reject) => {
     const id = randomUUID();
     const timer = setTimeout(() => { playbackPending.delete(id); reject(new Error('The video preview did not respond.')); }, 20000);
     playbackPending.set(id, { resolve, reject, timer });
     ui.webContents.send('playback:request', { id, action, args });
-  }) };
+  }); } };
   const service = new Service({ library: new Library(root), media: new Media({ ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg', ffprobe: process.env.FFPROBE_PATH || 'ffprobe' }), capture, playback });
+  ipcMain.on('capture:ended', event => {
+    if (event.sender !== worker.webContents || !['recording', 'paused'].includes(service.recording.state)) return;
+    service.execute('recording.stop').then(
+      () => ui.webContents.send('notice', 'The recording input ended. The app saved your video.'),
+      error => ui.webContents.send('notice', `The recording input ended. Select Stop and save to retry. ${error.message}`)
+    );
+  });
   const server = await serve(service, root);
   ui = new BrowserWindow({ width: 1440, height: 940, minWidth: 1000, minHeight: 720, backgroundColor: '#1e2127', title: 'Midnight Recorder', webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   ui.setMenuBarVisibility(false);

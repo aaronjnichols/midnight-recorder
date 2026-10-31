@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, stat, copyFile, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 export function run(executable, args) {
   return new Promise((resolve, reject) => {
@@ -33,6 +35,7 @@ export class Media {
     try { await stat(output); throw new Error('Export file already exists. Select a new path.'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     await mkdir(path.dirname(path.resolve(output)), { recursive: true });
+    const temporary = path.join(path.dirname(path.resolve(output)), `.midnight-${randomUUID()}.mp4`);
     const { segments, speed, muted } = video.timeline;
     const audio = video.metadata.hasAudio && !muted;
     const filters = [], labels = [];
@@ -47,8 +50,12 @@ export class Media {
     filters.push(`${labels.join('')}concat=n=${segments.length}:v=1:a=${audio ? 1 : 0}[v]${audio ? '[a]' : ''}`);
     const args = ['-v', 'error', '-n', '-i', video.path, '-filter_complex', filters.join(';'), '-map', '[v]'];
     if (audio) args.push('-map', '[a]', '-c:a', 'aac');
-    args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output);
-    await run(this.ffmpeg, args);
-    return { path: path.resolve(output), metadata: await this.probe(output) };
+    args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', temporary);
+    try {
+      await run(this.ffmpeg, args);
+      const metadata = await this.probe(temporary);
+      await copyFile(temporary, output, constants.COPYFILE_EXCL);
+      return { path: path.resolve(output), metadata };
+    } finally { await rm(temporary, { force: true }).catch(() => {}); }
   }
 }

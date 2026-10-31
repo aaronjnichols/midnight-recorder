@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { _electron } from 'playwright';
 import { mkdir, mkdtemp, access } from 'node:fs/promises';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { Media } from '../src/adapters/media.js';
 
-test('desktop records a real screen, pauses, saves, edits, and exports', { timeout: 90000 }, async t => {
+test('desktop screen recorder lifecycle saves media, edits, and exports', { timeout: 90000 }, async t => {
   await access('src/desktop/main.js');
   await mkdir('.local', { recursive: true });
   const root = await mkdtemp(path.resolve('.local', 'desktop-'));
   const app = await _electron.launch({ args: ['.', '--disable-features=AllowWgcScreenCapturer,AllowWgcWindowCapturer'], env: { ...process.env, MIDNIGHT_DATA: root } });
-  t.after(() => app.close());
+  t.after(async () => { await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {}); });
   app.process().stderr.on('data', chunk => process.stderr.write(chunk));
   const page = app.windows().find(page => page.url().endsWith('/ui/index.html')) || await app.waitForEvent('window', { predicate: async page => { await page.waitForLoadState(); return page.url().endsWith('/ui/index.html'); } });
   page.on('pageerror', error => process.stderr.write(error.message + '\n'));
@@ -47,8 +49,81 @@ test('desktop records a real screen, pauses, saves, edits, and exports', { timeo
   assert.ok(Math.abs((await call('playback.status')).seconds - 0.5) < 0.05);
   await call('playback.play');
   await call('playback.pause');
+  await page.locator('#preview-seek').fill('0.6');
+  await page.locator('#preview-seek').dispatchEvent('change');
+  assert.ok(Math.abs((await call('playback.status')).seconds - 0.6) < 0.05);
+  await call('playback.configure', { volume: 0.25 });
+  assert.equal((await call('playback.status')).volume, 0.25);
+  await call('playback.fullscreen', { enabled: true });
+  assert.equal(await page.locator('.player-shell').evaluate(element => element.classList.contains('fullscreen')), true);
+  await call('playback.fullscreen', { enabled: false });
   await call('app.view', { view: 'library' });
   assert.equal(await page.locator('#library-view').isVisible(), true);
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/desktop.png' });
+});
+
+test('camera and microphone test devices record visible frames and audio', { timeout: 60000 }, async t => {
+  await mkdir('.local', { recursive: true });
+  const root = await mkdtemp(path.resolve('.local', 'devices-'));
+  const app = await _electron.launch({ args: ['.', '--use-fake-device-for-media-stream'], env: { ...process.env, MIDNIGHT_DATA: root } });
+  t.after(async () => { await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {}); });
+  const page = app.windows().find(page => page.url().endsWith('/ui/index.html')) || await app.waitForEvent('window', { predicate: async page => { await page.waitForLoadState(); return page.url().endsWith('/ui/index.html'); } });
+  const call = (name, args = {}) => page.evaluate(([name, args]) => window.midnight.execute(name, args), [name, args]);
+  const devices = await call('capture.devices');
+  assert.ok(devices.some(d => d.kind === 'videoinput'));
+  await call('recording.start', { cameraOnly: true, microphoneId: 'default', title: 'Camera test' });
+  await new Promise(resolve => setTimeout(resolve, 1800));
+  const video = await call('recording.stop');
+  assert.equal(video.metadata.hasAudio, true);
+  assert.ok(video.metadata.duration > 1);
+  const frame = execFileSync('ffmpeg', ['-v', 'error', '-ss', '0.5', '-i', video.path, '-vf', 'scale=1:1,format=gray', '-frames:v', '1', '-f', 'rawvideo', 'pipe:1']);
+  assert.ok(frame[0] > 15, `Frame is too dark: ${frame[0]}`);
+  const job = await call('export.start', { id: video.id, path: path.join(root, 'camera.mp4') });
+  let result;
+  do { await new Promise(resolve => setTimeout(resolve, 100)); result = await call('export.status', { jobId: job.id }); } while (result.state === 'running');
+  assert.equal(result.state, 'complete', result.error);
+  assert.equal((await new Media().probe(result.result.path)).hasAudio, true);
+  await call('playback.open', { id: video.id });
+  await app.evaluate(({ ipcMain }) => { ipcMain.removeHandler('command'); ipcMain.handle('command', () => { throw new Error('Cannot delete during export'); }); });
+  await page.locator('#delete').click();
+  await page.locator('#confirm-delete-button').click();
+  await page.waitForFunction(() => document.querySelector('#message').textContent.includes('Cannot delete'));
+  assert.ok(await page.locator('#player').getAttribute('src'));
+});
+
+test('cancel releases the recorder after a disk write fails', { timeout: 60000 }, async t => {
+  await mkdir('.local', { recursive: true });
+  const root = await mkdtemp(path.resolve('.local', 'disk-error-'));
+  const app = await _electron.launch({ args: ['.', '--use-fake-device-for-media-stream'], env: { ...process.env, MIDNIGHT_DATA: root } });
+  t.after(async () => { await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {}); });
+  const page = app.windows().find(page => page.url().endsWith('/ui/index.html')) || await app.waitForEvent('window', { predicate: async page => { await page.waitForLoadState(); return page.url().endsWith('/ui/index.html'); } });
+  const call = (name, args = {}) => page.evaluate(([name, args]) => window.midnight.execute(name, args), [name, args]);
+  await app.evaluate(({ ipcMain }) => { ipcMain.removeHandler('capture:chunk'); ipcMain.handle('capture:chunk', () => { throw new Error('Disk full'); }); });
+  await call('recording.start', { cameraOnly: true });
+  await new Promise(resolve => setTimeout(resolve, 1400));
+  await assert.rejects(() => call('recording.stop'), /Disk full/);
+  await call('recording.cancel');
+  assert.equal((await call('app.status')).recording.state, 'idle');
+});
+
+test('an ended input saves the recording and releases its devices', { timeout: 30000 }, async t => {
+  await mkdir('.local', { recursive: true });
+  const root = await mkdtemp(path.resolve('.local', 'ended-'));
+  const app = await _electron.launch({ args: ['.', '--use-fake-device-for-media-stream'], env: { ...process.env, MIDNIGHT_DATA: root } });
+  t.after(async () => { await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {}); });
+  const page = app.windows().find(page => page.url().endsWith('/ui/index.html')) || await app.waitForEvent('window', { predicate: async page => { await page.waitForLoadState(); return page.url().endsWith('/ui/index.html'); } });
+  const call = (name, args = {}) => page.evaluate(([name, args]) => window.midnight.execute(name, args), [name, args]);
+  await call('recording.start', { cameraOnly: true });
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  const worker = app.windows().find(page => page.url().endsWith('/capture.html'));
+  await worker.evaluate(() => streams[0].getVideoTracks()[0].dispatchEvent(new Event('ended')));
+  let status;
+  for (let i = 0; i < 40; i++) {
+    status = await call('app.status');
+    if (status.recording.state === 'idle') break;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(status.recording.state, 'idle');
+  assert.equal((await call('library.list')).length, 1);
 });

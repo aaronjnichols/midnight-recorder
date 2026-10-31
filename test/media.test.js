@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -22,6 +22,9 @@ test('real FFmpeg export applies cuts and speed to video and audio', async () =>
   assert.ok(Math.abs(result.duration - 1.5) < 0.15, JSON.stringify(result));
   assert.equal(result.hasAudio, true);
   await assert.rejects(() => media.export({ path: source, metadata, timeline }, output), /exist/i);
+  const invalidOutput = path.join(root, 'invalid.mp4');
+  await assert.rejects(() => media.export({ path: source, metadata, timeline: { ...timeline, segments: [{ start: 100, end: 101 }] } }, invalidOutput));
+  await assert.rejects(() => access(invalidOutput), /ENOENT/);
 });
 
 test('export keeps the selected duration for a video with sparse frames', async () => {

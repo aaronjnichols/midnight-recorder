@@ -4,7 +4,6 @@ const call = (name, args = {}) => window.midnight.execute(name, args);
 let selectedVideo, sources = [], currentRecording = 'idle', busy = false, lastLibrary = '', statusTimer;
 const seconds = video => duration(video.timeline);
 const time = value => `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`;
-const fileURL = file => new URL('file:///' + file.replaceAll('\\', '/')).href;
 function notice(message, error = false) { $('#message').textContent = message; $('#message').classList.toggle('error', error); $('#message').hidden = false; clearTimeout(statusTimer); statusTimer = setTimeout(() => { $('#message').hidden = true; }, 9000); }
 window.midnight.onNotice(message => notice(message));
 function handle(selector, event, action) {
@@ -43,7 +42,7 @@ async function refreshLibrary() {
   for (const video of videos) {
     const card = document.createElement('button'); card.className = 'video-card';
     const cover = document.createElement('div'); cover.className = 'video-cover';
-    const preview = document.createElement('video'); preview.src = fileURL(video.path); preview.muted = true; preview.preload = 'metadata';
+    const preview = document.createElement('video'); preview.src = video.url; preview.muted = true; preview.preload = 'metadata';
     const length = document.createElement('span'); length.textContent = time(seconds(video));
     cover.append(preview, length);
     const body = document.createElement('div'); body.className = 'card-body';
@@ -64,13 +63,15 @@ function renderVideo(video) {
   $('#video-title').textContent = selectedVideo.title; $('#rename-title').value = selectedVideo.title;
   $('#video-info').textContent = `${time(seconds(selectedVideo))} · ${selectedVideo.metadata.width} × ${selectedVideo.metadata.height} · Local video`;
   const player = $('#player');
-  if (player.dataset.videoId !== id) { player.src = fileURL(selectedVideo.path); player.dataset.videoId = id; }
+  if (player.dataset.videoId !== id) { player.src = selectedVideo.url; player.dataset.videoId = id; }
   player.playbackRate = selectedVideo.timeline.speed; player.muted = selectedVideo.timeline.muted;
   player.currentTime = selectedVideo.timeline.segments[0].start;
   $('#range-start').value = 0; $('#range-end').value = seconds(selectedVideo).toFixed(3);
   $('#speed').value = selectedVideo.timeline.speed; $('#mute').checked = selectedVideo.timeline.muted;
   $('#undo').disabled = !selectedVideo.timeline.past.length; $('#redo').disabled = !selectedVideo.timeline.future.length;
   $('#duration').textContent = time(seconds(selectedVideo));
+  $('#preview-seek').max = seconds(selectedVideo);
+  syncPreview();
   $('#timeline-bars').replaceChildren(...selectedVideo.timeline.segments.map(s => { const bar = document.createElement('i'); bar.style.flex = s.end - s.start; return bar; }));
 }
 window.midnight.onPlayback(async ({ id, action, args }) => {
@@ -83,18 +84,36 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
       if (action === 'seek') player.currentTime = sourceTime(selectedVideo.timeline, args.seconds);
       if (action === 'play') await player.play();
       if (action === 'pause') player.pause();
+      if (action === 'configure') player.volume = args.volume;
+      if (action === 'fullscreen') $('.player-shell').classList.toggle('fullscreen', args.enabled);
     }
-    window.midnight.playbackReply({ id, result: { videoId: selectedVideo?.id || null, paused: player.paused, seconds: selectedVideo ? editedTime(selectedVideo.timeline, player.currentTime) : 0, duration: selectedVideo ? seconds(selectedVideo) : 0 } });
+    window.midnight.playbackReply({ id, result: { videoId: selectedVideo?.id || null, paused: player.paused, volume: player.volume, muted: player.muted, seconds: selectedVideo ? editedTime(selectedVideo.timeline, player.currentTime) : 0, duration: selectedVideo ? seconds(selectedVideo) : 0 } });
   } catch (error) { window.midnight.playbackReply({ id, error: error.message }); }
 });
+function syncPreview() {
+  if (!selectedVideo) return;
+  const player = $('#player');
+  $('#preview-play').textContent = player.paused ? 'Play' : 'Pause';
+  $('#preview-seek').value = editedTime(selectedVideo.timeline, player.currentTime);
+  $('#preview-time').textContent = `${time(editedTime(selectedVideo.timeline, player.currentTime))} / ${time(seconds(selectedVideo))}`;
+  $('#preview-volume').value = player.volume;
+}
+for (const event of ['play', 'pause', 'volumechange']) $('#player').addEventListener(event, syncPreview);
 $('#player').addEventListener('timeupdate', () => {
   if (!selectedVideo) return;
   const player = $('#player'), segments = selectedVideo.timeline.segments;
-  if (segments.some(s => player.currentTime >= s.start && player.currentTime < s.end)) return;
-  const next = segments.find(s => s.start > player.currentTime);
-  if (next) player.currentTime = next.start;
-  else { player.pause(); player.currentTime = segments[0].start; }
+  if (!segments.some(s => player.currentTime >= s.start && player.currentTime < s.end)) {
+    const next = segments.find(s => s.start > player.currentTime);
+    if (next) player.currentTime = next.start;
+    else if (!player.paused) { player.pause(); player.currentTime = segments[0].start; }
+  }
+  syncPreview();
 });
+handle('#preview-play', 'click', () => call($('#player').paused ? 'playback.play' : 'playback.pause'));
+handle('#preview-seek', 'change', () => call('playback.seek', { seconds: Number($('#preview-seek').value) }));
+handle('#preview-volume', 'change', () => call('playback.configure', { volume: Number($('#preview-volume').value) }));
+handle('#preview-fullscreen', 'click', () => call('playback.fullscreen', { enabled: !$('.player-shell').classList.contains('fullscreen') }));
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && $('.player-shell').classList.contains('fullscreen')) call('playback.fullscreen', { enabled: false }).catch(error => notice(error.message, true)); });
 async function edit(action, args = {}) { await call(`edit.${action}`, { id: selectedVideo.id, ...args }); await openVideo(selectedVideo.id); await refreshLibrary(); }
 handle('#start', 'click', async () => {
   const options = { sourceId: $('#source').value, cameraOnly: $('#camera-only').checked, systemAudio: $('#system-audio').checked, frameRate: Number($('#fps').value) };
@@ -120,7 +139,12 @@ handle('#rename', 'click', async () => { await call('library.rename', { id: sele
 handle('#export', 'click', async () => { const path = await window.midnight.pickExport(selectedVideo.title); if (path) { await call('export.start', { id: selectedVideo.id, path }); notice('Export started. You can continue to edit.'); } });
 $('#delete').addEventListener('click', () => $('#confirm-delete').showModal());
 $('#keep-video').addEventListener('click', () => $('#confirm-delete').close());
-handle('#confirm-delete-button', 'click', async () => { $('#player').removeAttribute('src'); $('#player').load(); await call('library.delete', { id: selectedVideo.id }); $('#confirm-delete').close(); showLibrary(); await refreshLibrary(); });
+handle('#confirm-delete-button', 'click', async () => {
+  $('#player').pause(); $('#player').removeAttribute('src'); $('#player').load(); $('#player').dataset.videoId = '';
+  try { await call('library.delete', { id: selectedVideo.id }); }
+  catch (error) { renderVideo(selectedVideo); throw error; }
+  $('#confirm-delete').close(); showLibrary(); await refreshLibrary();
+});
 $('#back').addEventListener('click', showLibrary); $('#library-nav').addEventListener('click', showLibrary);
 $('#new-nav').addEventListener('click', () => { showLibrary(); $('#record-title').focus(); });
 async function refreshStatus() {

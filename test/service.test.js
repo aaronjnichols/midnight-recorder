@@ -89,5 +89,8 @@ test('agents can open videos, control playback, and select the app view', async 
   await service.execute('playback.pause');
   await service.execute('app.view', { view: 'library' });
   assert.deepEqual(requests.map(r => r.action), ['open', 'play', 'seek', 'pause', 'view']);
+  await service.execute('playback.configure', { volume: 0.25 });
+  await service.execute('playback.fullscreen', { enabled: true });
+  await assert.rejects(() => service.execute('playback.configure', { volume: 2 }), /Volume/);
   await assert.rejects(() => service.execute('playback.seek', { seconds: -1 }), /positive|negative|range/);
 });
