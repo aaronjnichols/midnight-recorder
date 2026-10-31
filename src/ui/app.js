@@ -172,7 +172,7 @@ function renderVideo(video) {
     }
   }
   $("#range-start").value = 0;
-  $("#range-end").value = seconds(selectedVideo).toFixed(3);
+  $("#range-end").value = seconds(selectedVideo);
   $("#speed").value = selectedVideo.timeline.speed;
   $("#mute").checked = selectedVideo.timeline.muted;
   $("#undo").disabled = !selectedVideo.timeline.past.length;

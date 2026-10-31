@@ -1,9 +1,82 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { _electron } from "playwright";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { duration } from "../src/domain/timeline.js";
+
+for (const speed of [1.5, 0.75]) {
+  test(
+    `Keep range preserves the untouched full end at ${speed}x speed`,
+    { timeout: 30000 },
+    async (t) => {
+      await mkdir(".local", { recursive: true });
+      const root = await mkdtemp(path.resolve(".local", "trim-end-"));
+      const source = path.join(root, "source.mp4");
+      execFileSync("ffmpeg", [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=blue:size=320x240:duration=10",
+        "-c:v",
+        "libx264",
+        source,
+      ]);
+      const app = await _electron.launch({
+        args: ["."],
+        env: { ...process.env, MIDNIGHT_DATA: root },
+      });
+      t.after(async () => {
+        await app.evaluate(({ app }) => app.exit(0)).catch(() => {});
+        await app.close().catch(() => {});
+      });
+      const page =
+        app.windows().find((page) => page.url().endsWith("/ui/index.html")) ||
+        (await app.waitForEvent("window", {
+          predicate: async (page) => {
+            await page.waitForLoadState();
+            return page.url().endsWith("/ui/index.html");
+          },
+        }));
+      const call = (name, args = {}) =>
+        page.evaluate(
+          ([name, args]) => window.midnight.execute(name, args),
+          [name, args],
+        );
+      const video = await call("library.import", { path: source });
+      assert.equal(video.metadata.duration, 10);
+      await call("playback.open", { id: video.id });
+      await page.locator("#speed").selectOption(String(speed));
+      await page.waitForFunction(
+        () => Number(document.querySelector("#range-end").value) !== 10,
+      );
+      await page.locator("#range-start").fill("1");
+      await page
+        .getByRole("button", { name: "Keep range", exact: true })
+        .click();
+      await page.waitForFunction(async (id) => {
+        const video = await window.midnight.execute("library.get", { id });
+        return (
+          video.timeline.past.length === 2 ||
+          document.querySelector("#message.error:not([hidden])") !== null
+        );
+      }, video.id);
+      await page.screenshot({
+        path: path.join(root, "trim-end.png"),
+      });
+      const stored = JSON.parse(
+        await readFile(path.join(root, "library.json"), "utf8"),
+      ).find((item) => item.id === video.id);
+      assert.deepEqual(stored.timeline.segments, [{ start: speed, end: 10 }]);
+      assert.equal(stored.timeline.speed, speed);
+      assert.equal(stored.timeline.past.length, 2);
+      assert.equal(duration(stored.timeline), (10 - speed) / speed);
+    },
+  );
+}
 
 test(
   "missing capture thumbnails show a clear fallback",
