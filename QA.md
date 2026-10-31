@@ -35,7 +35,7 @@ The normal desktop check is pending. Use `npm run verify:desktop` from a normal 
 
 ## Latest regression result
 
-`npm test` passes all 31 tests. The current run includes the audio option, layout, and default data-path changes. Library and editor screenshots were inspected at the minimum window width. There is no horizontal overflow.
+`npm test` passes all 40 tests. The current run includes the three review fixes below. Library and editor screenshots were inspected at the minimum window width. There is no horizontal overflow.
 
 The camera-only plus system-audio check passes. The app reports a clear error if the requested system audio track is missing.
 
@@ -67,3 +67,15 @@ The agent ran `npm run verify:desktop` after the user requested the check. Two c
 Computer Use selected the open Midnight Recorder window. Its screenshot was black, and its accessibility state was unavailable. A separate FFmpeg GDI capture failed with Windows error 5, access denied. Windows reported an active Remote Desktop session. These results do not establish the cause of the capture failure.
 
 The app remains open and idle. The device list contains Remote Audio inputs and no camera. No Windows security or privacy settings were changed. Visible desktop capture and physical device checks remain open.
+
+## Review fixes
+
+Three GPT-6.1-SOL agents at high reasoning effort made these fixes in sequence:
+
+- `45b4ecc`: The first recording write error pauses capture. The shared service reports `failed` and the error text to the app, CLI, and MCP. Pending data remains after a failed Stop. Tests cover duplicate reports, old recording IDs, and reports during Stop or Cancel. The disk test injects a rejected write. It does not exhaust a real disk.
+- `881958f`: Export and edited preview keep delayed audio through cuts and speed changes. Selections before the first audio frame remain silent. A new preview cache version prevents reuse of old renders. Real FFmpeg tests measure the decoded sound timing and check that source bytes stay unchanged.
+- `590e403`: The default trim end keeps the exact timeline duration. UI tests use Keep range at 1.5x and 0.75x speed and check that the full source endpoint remains. The domain still rejects times past the real end.
+
+Each regression failed before its production fix and passed after it. Independent reviews of the stages and the combined change found no defects. The final `npm test` run passed 40 tests with no failures or skipped tests. Its log is `.local/review-fixes-regression.log`.
+
+These fixes do not close the visible desktop capture or physical device checks. Those acceptance limits remain as described above.
