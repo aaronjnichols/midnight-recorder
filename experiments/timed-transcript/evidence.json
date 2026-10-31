@@ -1,0 +1,963 @@
+{
+  "scope": "Research only. No speech commands were added to the app, CLI, or MCP.",
+  "baseline": {
+    "settings": {
+      "model": "faster-whisper-small.en",
+      "modelRevision": "d1d751a5f8271d482d14ca55d9e2deeebbae577f",
+      "modelConfigSha256": "666a9605530ac1f61fa8177f3702b4dacec9966749e42610839fcc32661d5fae",
+      "packages": {
+        "faster-whisper": "1.2.1",
+        "ctranslate2": "4.8.4",
+        "av": "16.1.0"
+      },
+      "device": "cpu",
+      "computeType": "int8",
+      "threads": 4,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "loadSeconds": 1.633,
+      "language": "en",
+      "languageIsForced": true,
+      "beamSize": 5,
+      "conditionOnPreviousText": false
+    },
+    "cases": [
+      {
+        "case": "clean-segments",
+        "duration": 54.0,
+        "elapsedSeconds": 4.926,
+        "realTimeFactor": 0.091,
+        "text": "Open the settings panel. Keep auto save off while you change the project name. Select the save button on the left. Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. Manning's End to 0.035."
+      },
+      {
+        "case": "clean-words",
+        "duration": 54.0,
+        "elapsedSeconds": 4.982,
+        "realTimeFactor": 0.092,
+        "text": "Open the settings panel. Keep auto save off while you change the project name. Select the save button on the left. Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. set manning's end to 0.035"
+      },
+      {
+        "case": "noisy-words",
+        "duration": 54.0,
+        "elapsedSeconds": 3.421,
+        "realTimeFactor": 0.063,
+        "text": "Open the Settings panel. Keep auto-save off while you change the project name. Select the Save button on the left. Do not select Cancel. We need to keep these changes. The Save button is now on the right. Select it to finish. Set the level to 15, not 50. Set Manning's End to 0.035."
+      },
+      {
+        "case": "silence-vad",
+        "duration": 12.0,
+        "elapsedSeconds": 0.059,
+        "realTimeFactor": 0.005,
+        "text": ""
+      },
+      {
+        "case": "silence-no-vad",
+        "duration": 12.0,
+        "elapsedSeconds": 1.704,
+        "realTimeFactor": 0.142,
+        "text": "You"
+      },
+      {
+        "case": "human-words",
+        "duration": 11.0,
+        "elapsedSeconds": 2.111,
+        "realTimeFactor": 0.192,
+        "limit": "No independent transcript or timing score was measured."
+      },
+      {
+        "case": "edited-words",
+        "duration": 34.048,
+        "elapsedSeconds": 3.244,
+        "realTimeFactor": 0.095,
+        "text": "Open the settings panel. Keep auto save off while you change the project name. Select the save button on the left. Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. Set manning's end to 0.035."
+      }
+    ]
+  },
+  "regional": {
+    "settings": {
+      "model": "faster-whisper-small.en",
+      "modelRevision": "d1d751a5f8271d482d14ca55d9e2deeebbae577f",
+      "modelConfigSha256": "666a9605530ac1f61fa8177f3702b4dacec9966749e42610839fcc32661d5fae",
+      "packages": {
+        "faster-whisper": "1.2.1",
+        "ctranslate2": "4.8.4",
+        "av": "16.1.0"
+      },
+      "device": "cpu",
+      "computeType": "int8",
+      "threads": 4,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "loadSeconds": 1.37,
+      "language": "en",
+      "languageIsForced": true,
+      "beamSize": 5,
+      "conditionOnPreviousText": false
+    },
+    "cases": [
+      {
+        "case": "clean-regions",
+        "duration": 54.0,
+        "elapsedSeconds": 16.229,
+        "realTimeFactor": 0.301,
+        "text": "Open the settings panel Keep auto-save off while you change the project name. Select the save button on the left Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. Set manning's end to 0.035"
+      },
+      {
+        "case": "noisy-regions",
+        "duration": 54.0,
+        "elapsedSeconds": 15.992,
+        "realTimeFactor": 0.296,
+        "text": "Open the settings panel. Keep auto-save off while you change the project name. Select the Save button on the left. Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. Set Manning's end to 0.035"
+      },
+      {
+        "case": "edited-regions",
+        "duration": 34.048,
+        "elapsedSeconds": 14.341,
+        "realTimeFactor": 0.421,
+        "text": "Open the settings panel Keep auto-save off while you change the project name. Select the save button on the left. Do not select cancel. We need to keep these changes. The save button is now on the right. Select it to finish. Set the level to 15, not 50. Set manning's end to 0.035"
+      },
+      {
+        "case": "silence-regions",
+        "duration": 12.0,
+        "elapsedSeconds": 0.039,
+        "realTimeFactor": 0.003,
+        "text": ""
+      }
+    ]
+  },
+  "measurements": {
+    "clean-words": {
+      "matchedWords": 48,
+      "referenceWords": 58,
+      "recognizedWords": 56,
+      "medianStartErrorAgainstSapiSeconds": 0.04999999999999716,
+      "maxStartErrorAgainstSapiSeconds": 5.550000000000004,
+      "p95StartErrorAgainstSapiSeconds": 0.14499999999999957,
+      "mismatches": [
+        {
+          "reference": ["autosave"],
+          "recognized": [
+            {
+              "start": 7.31,
+              "end": 7.59,
+              "word": " auto",
+              "probability": 0.44771715998649597
+            },
+            {
+              "start": 7.59,
+              "end": 7.85,
+              "word": " save",
+              "probability": 0.5337631702423096
+            }
+          ]
+        },
+        {
+          "reference": ["fifteen"],
+          "recognized": [
+            {
+              "start": 38.93,
+              "end": 39.43,
+              "word": " 15,",
+              "probability": 0.9632347226142883
+            }
+          ]
+        },
+        {
+          "reference": ["fifty"],
+          "recognized": [
+            {
+              "start": 40.13,
+              "end": 40.55,
+              "word": " 50.",
+              "probability": 0.9921028017997742
+            }
+          ]
+        },
+        {
+          "reference": ["Mannings", "n"],
+          "recognized": [
+            {
+              "start": 46.34,
+              "end": 46.86,
+              "word": " manning's",
+              "probability": 0.8472610910733541
+            },
+            {
+              "start": 46.86,
+              "end": 46.98,
+              "word": " end",
+              "probability": 0.8828509449958801
+            }
+          ]
+        },
+        {
+          "reference": ["zero", "point", "zero", "three", "five"],
+          "recognized": [
+            {
+              "start": 47.14,
+              "end": 47.46,
+              "word": " 0",
+              "probability": 0.9683042764663696
+            },
+            {
+              "start": 47.46,
+              "end": 48.5,
+              "word": ".035",
+              "probability": 0.9839344918727875
+            }
+          ]
+        }
+      ],
+      "outliers": [
+        {
+          "reference": {
+            "text": "Open",
+            "start": 1.1
+          },
+          "recognized": {
+            "start": 0.72,
+            "end": 1.32,
+            "word": " Open",
+            "probability": 0.8760858774185181
+          },
+          "errorSeconds": 0.3800000000000001
+        },
+        {
+          "reference": {
+            "text": "Set",
+            "start": 46.1
+          },
+          "recognized": {
+            "start": 40.55,
+            "end": 41.57,
+            "word": " set",
+            "probability": 0.14973199367523193
+          },
+          "errorSeconds": 5.550000000000004
+        }
+      ]
+    },
+    "noisy-words": {
+      "matchedWords": 48,
+      "referenceWords": 58,
+      "recognizedWords": 56,
+      "medianStartErrorAgainstSapiSeconds": 0.04749999999999854,
+      "maxStartErrorAgainstSapiSeconds": 0.3800000000000001,
+      "p95StartErrorAgainstSapiSeconds": 0.11000000000000121,
+      "mismatches": [
+        {
+          "reference": ["autosave"],
+          "recognized": [
+            {
+              "start": 7.29,
+              "end": 7.63,
+              "word": " auto",
+              "probability": 0.4754401445388794
+            },
+            {
+              "start": 7.63,
+              "end": 7.83,
+              "word": "-save",
+              "probability": 0.8001787960529327
+            }
+          ]
+        },
+        {
+          "reference": ["fifteen"],
+          "recognized": [
+            {
+              "start": 38.96,
+              "end": 39.42,
+              "word": " 15,",
+              "probability": 0.9636986255645752
+            }
+          ]
+        },
+        {
+          "reference": ["fifty"],
+          "recognized": [
+            {
+              "start": 40.14,
+              "end": 40.54,
+              "word": " 50.",
+              "probability": 0.9938978552818298
+            }
+          ]
+        },
+        {
+          "reference": ["Mannings", "n"],
+          "recognized": [
+            {
+              "start": 46.35,
+              "end": 46.83,
+              "word": " Manning's",
+              "probability": 0.9436030387878418
+            },
+            {
+              "start": 46.83,
+              "end": 46.97,
+              "word": " End",
+              "probability": 0.5380850434303284
+            }
+          ]
+        },
+        {
+          "reference": ["zero", "point", "zero", "three", "five"],
+          "recognized": [
+            {
+              "start": 47.13,
+              "end": 47.45,
+              "word": " 0",
+              "probability": 0.9929755926132202
+            },
+            {
+              "start": 47.45,
+              "end": 48.41,
+              "word": ".035.",
+              "probability": 0.9831834733486176
+            }
+          ]
+        }
+      ],
+      "outliers": [
+        {
+          "reference": {
+            "text": "Open",
+            "start": 1.1
+          },
+          "recognized": {
+            "start": 0.72,
+            "end": 1.32,
+            "word": " Open",
+            "probability": 0.8179585933685303
+          },
+          "errorSeconds": 0.3800000000000001
+        }
+      ]
+    },
+    "clean-regions": {
+      "matchedWords": 48,
+      "referenceWords": 58,
+      "recognizedWords": 56,
+      "medianStartErrorAgainstSapiSeconds": 0.05999999999999872,
+      "maxStartErrorAgainstSapiSeconds": 0.18000000000000005,
+      "p95StartErrorAgainstSapiSeconds": 0.1720000000000006,
+      "mismatches": [
+        {
+          "reference": ["autosave"],
+          "recognized": [
+            {
+              "start": 7.308,
+              "end": 7.608,
+              "word": " auto",
+              "probability": 0.4755838215351105
+            },
+            {
+              "start": 7.608,
+              "end": 7.848,
+              "word": "-save",
+              "probability": 0.7460242509841919
+            }
+          ]
+        },
+        {
+          "reference": ["fifteen"],
+          "recognized": [
+            {
+              "start": 38.94,
+              "end": 39.42,
+              "word": " 15,",
+              "probability": 0.9609824419021606
+            }
+          ]
+        },
+        {
+          "reference": ["fifty"],
+          "recognized": [
+            {
+              "start": 40.12,
+              "end": 40.519999999999996,
+              "word": " 50.",
+              "probability": 0.9912294149398804
+            }
+          ]
+        },
+        {
+          "reference": ["Mannings", "n"],
+          "recognized": [
+            {
+              "start": 46.339999999999996,
+              "end": 46.86,
+              "word": " manning's",
+              "probability": 0.8076448738574982
+            },
+            {
+              "start": 46.86,
+              "end": 46.98,
+              "word": " end",
+              "probability": 0.9269647002220154
+            }
+          ]
+        },
+        {
+          "reference": ["zero", "point", "zero", "three", "five"],
+          "recognized": [
+            {
+              "start": 47.14,
+              "end": 47.46,
+              "word": " 0",
+              "probability": 0.9854680895805359
+            },
+            {
+              "start": 47.46,
+              "end": 48.519999999999996,
+              "word": ".035",
+              "probability": 0.9881647229194641
+            }
+          ]
+        }
+      ],
+      "outliers": []
+    },
+    "noisy-regions": {
+      "matchedWords": 48,
+      "referenceWords": 58,
+      "recognizedWords": 56,
+      "medianStartErrorAgainstSapiSeconds": 0.05799999999999805,
+      "maxStartErrorAgainstSapiSeconds": 0.20400000000000063,
+      "p95StartErrorAgainstSapiSeconds": 0.17999999999999972,
+      "mismatches": [
+        {
+          "reference": ["autosave"],
+          "recognized": [
+            {
+              "start": 7.288,
+              "end": 7.608,
+              "word": " auto",
+              "probability": 0.42500025033950806
+            },
+            {
+              "start": 7.608,
+              "end": 7.828,
+              "word": "-save",
+              "probability": 0.8016431033611298
+            }
+          ]
+        },
+        {
+          "reference": ["fifteen"],
+          "recognized": [
+            {
+              "start": 38.92,
+              "end": 39.44,
+              "word": " 15,",
+              "probability": 0.9684043526649475
+            }
+          ]
+        },
+        {
+          "reference": ["fifty"],
+          "recognized": [
+            {
+              "start": 40.14,
+              "end": 40.519999999999996,
+              "word": " 50.",
+              "probability": 0.9897378087043762
+            }
+          ]
+        },
+        {
+          "reference": ["Mannings", "n"],
+          "recognized": [
+            {
+              "start": 46.339999999999996,
+              "end": 46.839999999999996,
+              "word": " Manning's",
+              "probability": 0.7956898808479309
+            },
+            {
+              "start": 46.839999999999996,
+              "end": 46.98,
+              "word": " end",
+              "probability": 0.6099787354469299
+            }
+          ]
+        },
+        {
+          "reference": ["zero", "point", "zero", "three", "five"],
+          "recognized": [
+            {
+              "start": 47.14,
+              "end": 47.46,
+              "word": " 0",
+              "probability": 0.9846797585487366
+            },
+            {
+              "start": 47.46,
+              "end": 48.42,
+              "word": ".035",
+              "probability": 0.9726830124855042
+            }
+          ]
+        }
+      ],
+      "outliers": []
+    },
+    "payloadBytes": {
+      "segments": 669,
+      "withWords": 5436
+    },
+    "timingLimit": "SAPI SpeakProgress events. These are synthesis timing references, not manually measured phonetic boundaries. Timing metrics include exact matched tokens only, not all words."
+  },
+  "context": {
+    "method": "regions",
+    "sourceDuration": 54,
+    "editedDuration": 34,
+    "sourceSegments": [
+      {
+        "start": 0,
+        "end": 2
+      },
+      {
+        "start": 5,
+        "end": 54
+      }
+    ],
+    "speed": 1.5,
+    "hits": [
+      {
+        "start": 7.799999999999999,
+        "end": 8.12,
+        "text": "save button",
+        "context": [
+          {
+            "start": 7.359999999999999,
+            "end": 7.639999999999999,
+            "word": " Select",
+            "probability": 0.6229140758514404,
+            "sourceStart": 14.04,
+            "sourceEnd": 14.459999999999999,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 7.639999999999999,
+            "end": 7.799999999999999,
+            "word": " the",
+            "probability": 0.9881504774093628,
+            "sourceStart": 14.459999999999999,
+            "sourceEnd": 14.7,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 7.799999999999999,
+            "end": 7.933333333333332,
+            "word": " save",
+            "probability": 0.4166880249977112,
+            "sourceStart": 14.7,
+            "sourceEnd": 14.899999999999999,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 7.933333333333332,
+            "end": 8.12,
+            "word": " button",
+            "probability": 0.9989356398582458,
+            "sourceStart": 14.899999999999999,
+            "sourceEnd": 15.18,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 8.12,
+            "end": 8.253333333333332,
+            "word": " on",
+            "probability": 0.9945183396339417,
+            "sourceStart": 15.18,
+            "sourceEnd": 15.379999999999999,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 8.253333333333332,
+            "end": 8.346666666666666,
+            "word": " the",
+            "probability": 0.9981945157051086,
+            "sourceStart": 15.379999999999999,
+            "sourceEnd": 15.52,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 8.346666666666666,
+            "end": 8.493333333333332,
+            "word": " left",
+            "probability": 0.9828577041625977,
+            "sourceStart": 15.52,
+            "sourceEnd": 15.739999999999998,
+            "partial": false,
+            "cutBefore": false
+          }
+        ]
+      },
+      {
+        "start": 17.474666666666668,
+        "end": 17.821333333333335,
+        "text": "save button",
+        "context": [
+          {
+            "start": 17.301333333333336,
+            "end": 17.474666666666668,
+            "word": " The",
+            "probability": 0.638935387134552,
+            "sourceStart": 28.952,
+            "sourceEnd": 29.212000000000003,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 17.474666666666668,
+            "end": 17.621333333333332,
+            "word": " save",
+            "probability": 0.5859713554382324,
+            "sourceStart": 29.212000000000003,
+            "sourceEnd": 29.432000000000002,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 17.621333333333332,
+            "end": 17.821333333333335,
+            "word": " button",
+            "probability": 0.9984366297721863,
+            "sourceStart": 29.432000000000002,
+            "sourceEnd": 29.732000000000003,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 17.821333333333335,
+            "end": 17.954666666666668,
+            "word": " is",
+            "probability": 0.9947834610939026,
+            "sourceStart": 29.732000000000003,
+            "sourceEnd": 29.932000000000002,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 17.954666666666668,
+            "end": 18.101333333333333,
+            "word": " now",
+            "probability": 0.9929267764091492,
+            "sourceStart": 29.932000000000002,
+            "sourceEnd": 30.152,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 18.101333333333333,
+            "end": 18.234666666666666,
+            "word": " on",
+            "probability": 0.9954653382301331,
+            "sourceStart": 30.152,
+            "sourceEnd": 30.352,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 18.234666666666666,
+            "end": 18.314666666666668,
+            "word": " the",
+            "probability": 0.9988592863082886,
+            "sourceStart": 30.352,
+            "sourceEnd": 30.472,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 18.314666666666668,
+            "end": 18.488,
+            "word": " right.",
+            "probability": 0.9961932897567749,
+            "sourceStart": 30.472,
+            "sourceEnd": 30.732000000000003,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 19.093333333333334,
+            "end": 19.4,
+            "word": " Select",
+            "probability": 0.4463409185409546,
+            "sourceStart": 31.64,
+            "sourceEnd": 32.1,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 19.4,
+            "end": 19.546666666666667,
+            "word": " it",
+            "probability": 0.9889358878135681,
+            "sourceStart": 32.1,
+            "sourceEnd": 32.32,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 19.546666666666667,
+            "end": 19.653333333333336,
+            "word": " to",
+            "probability": 0.9978773593902588,
+            "sourceStart": 32.32,
+            "sourceEnd": 32.480000000000004,
+            "partial": false,
+            "cutBefore": false
+          },
+          {
+            "start": 19.653333333333336,
+            "end": 19.826666666666668,
+            "word": " finish.",
+            "probability": 0.9593193531036377,
+            "sourceStart": 32.480000000000004,
+            "sourceEnd": 32.74,
+            "partial": false,
+            "cutBefore": false
+          }
+        ]
+      }
+    ],
+    "directEditedHits": [
+      {
+        "start": 7.828,
+        "end": 8.148,
+        "text": "save button",
+        "context": [
+          {
+            "start": 7.288,
+            "end": 7.668,
+            "word": " Select",
+            "probability": 0.5961048603057861
+          },
+          {
+            "start": 7.668,
+            "end": 7.828,
+            "word": " the",
+            "probability": 0.9841933846473694
+          },
+          {
+            "start": 7.828,
+            "end": 7.948,
+            "word": " save",
+            "probability": 0.5609480142593384
+          },
+          {
+            "start": 7.948,
+            "end": 8.148,
+            "word": " button",
+            "probability": 0.9991833567619324
+          },
+          {
+            "start": 8.148,
+            "end": 8.288,
+            "word": " on",
+            "probability": 0.9933351278305054
+          },
+          {
+            "start": 8.288,
+            "end": 8.368,
+            "word": " the",
+            "probability": 0.998440682888031
+          },
+          {
+            "start": 8.368,
+            "end": 8.548,
+            "word": " left.",
+            "probability": 0.9866967797279358
+          }
+        ]
+      },
+      {
+        "start": 17.479999999999997,
+        "end": 17.86,
+        "text": "save button",
+        "context": [
+          {
+            "start": 17.24,
+            "end": 17.479999999999997,
+            "word": " The",
+            "probability": 0.6426224112510681
+          },
+          {
+            "start": 17.479999999999997,
+            "end": 17.639999999999997,
+            "word": " save",
+            "probability": 0.6366318464279175
+          },
+          {
+            "start": 17.639999999999997,
+            "end": 17.86,
+            "word": " button",
+            "probability": 0.9968137145042419
+          },
+          {
+            "start": 17.86,
+            "end": 17.979999999999997,
+            "word": " is",
+            "probability": 0.9923211932182312
+          },
+          {
+            "start": 17.979999999999997,
+            "end": 18.119999999999997,
+            "word": " now",
+            "probability": 0.9883024096488953
+          },
+          {
+            "start": 18.119999999999997,
+            "end": 18.259999999999998,
+            "word": " on",
+            "probability": 0.9947861433029175
+          },
+          {
+            "start": 18.259999999999998,
+            "end": 18.34,
+            "word": " the",
+            "probability": 0.9984495639801025
+          },
+          {
+            "start": 18.34,
+            "end": 18.52,
+            "word": " right.",
+            "probability": 0.9968895316123962
+          },
+          {
+            "start": 19,
+            "end": 19.42,
+            "word": " Select",
+            "probability": 0.5646852850914001
+          },
+          {
+            "start": 19.42,
+            "end": 19.58,
+            "word": " it",
+            "probability": 0.9868801832199097
+          },
+          {
+            "start": 19.58,
+            "end": 19.68,
+            "word": " to",
+            "probability": 0.9974631071090698
+          },
+          {
+            "start": 19.68,
+            "end": 19.86,
+            "word": " finish.",
+            "probability": 0.9709866642951965
+          }
+        ]
+      }
+    ],
+    "frameTimes": [
+      {
+        "requestedSeconds": 7.959999999999999,
+        "seconds": 7.933333333333334,
+        "sourceSeconds": 14.9,
+        "width": 960,
+        "height": 540
+      },
+      {
+        "requestedSeconds": 17.648000000000003,
+        "seconds": 17.633333333333333,
+        "sourceSeconds": 29.45,
+        "width": 960,
+        "height": 540
+      }
+    ],
+    "partialWords": [
+      {
+        "start": 1.1866666666666668,
+        "end": 1.3333333333333333,
+        "word": " panel",
+        "probability": 0.9967994689941406,
+        "sourceStart": 1.78,
+        "sourceEnd": 2.22,
+        "partial": true,
+        "cutBefore": false
+      }
+    ],
+    "noAudioStatus": "no_audio",
+    "payloadBytes": {
+      "fullWords": 9951,
+      "window": 2194
+    }
+  },
+  "glossary": {
+    "hotwords": "Manning's n",
+    "sourceOffset": 46.04,
+    "elapsedSeconds": 1.8350395001471043,
+    "text": "Set manning's n to 0.035",
+    "segments": [
+      {
+        "id": 1,
+        "seek": 0,
+        "start": 0.0,
+        "end": 2.48,
+        "text": " Set manning's n to 0.035",
+        "tokens": [50363, 5345, 582, 768, 338, 299, 284, 657, 13, 44215, 50503],
+        "avg_logprob": -0.3507612595955531,
+        "compression_ratio": 0.75,
+        "no_speech_prob": 0.0014522880082949996,
+        "words": [
+          {
+            "start": 0.0,
+            "end": 0.3,
+            "word": " Set",
+            "probability": 0.6564034819602966
+          },
+          {
+            "start": 0.3,
+            "end": 0.8,
+            "word": " manning's",
+            "probability": 0.8076448738574982
+          },
+          {
+            "start": 0.8,
+            "end": 0.94,
+            "word": " n",
+            "probability": 0.012061752378940582
+          },
+          {
+            "start": 0.94,
+            "end": 1.08,
+            "word": " to",
+            "probability": 0.9839296340942383
+          },
+          {
+            "start": 1.08,
+            "end": 1.42,
+            "word": " 0",
+            "probability": 0.9897365570068359
+          },
+          {
+            "start": 1.42,
+            "end": 2.48,
+            "word": ".035",
+            "probability": 0.9899900555610657
+          }
+        ],
+        "temperature": 0.0
+      }
+    ],
+    "limit": "The vocabulary hint uses the known test term. This is not an independent accuracy test. Segment and word times are relative to sourceOffset."
+  },
+  "inputHashes": {
+    "clean-words": "c0853f65921319019821bfa780f4f67e5f878c68f6405830214b7cae644eaef1",
+    "noisy-words": "3b8d12e872c7884abc935ff2fb9b504a0bed18519d55494da4decec291862bc0",
+    "silence-vad": "6e49db6ecc812f32cb043fb3c02e4aea55329fa8df27724c5b4e2a76ed57c360",
+    "human-words": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+    "edited-words": "92d7b8123a6d4c5d1954c972a02dadb0aa4156e6767173fe72d9ae45a2801602"
+  },
+  "humanSampleSource": "https://github.com/ggml-org/whisper.cpp/blob/master/samples/jfk.wav",
+  "review": "Independent GPT-6.1-SOL high review: no findings. Four deterministic context checks passed. The reviewer inspected both pairs of frame images."
+}
