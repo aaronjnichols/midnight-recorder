@@ -10,5 +10,10 @@
     "cli": "node src/agent/cli.js",
     "mcp": "node src/agent/mcp.js"
   },
-  "devDependencies": {"electron": "40.9.3"}
+  "devDependencies": {
+    "electron": "40.9.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2"
+  }
 }
