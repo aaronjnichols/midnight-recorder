@@ -23,3 +23,16 @@ test('real FFmpeg export applies cuts and speed to video and audio', async () =>
   assert.equal(result.hasAudio, true);
   await assert.rejects(() => media.export({ path: source, metadata, timeline }, output), /exist/i);
 });
+
+test('export keeps the selected duration for a video with sparse frames', async () => {
+  await mkdir('.local', { recursive: true });
+  const root = await mkdtemp(path.resolve('.local', 'sparse-'));
+  const source = path.join(root, 'source.webm');
+  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=30', '-t', '3', '-vf', "select='lt(n,14)+gte(n,84)'", '-fps_mode', 'vfr', '-c:v', 'libvpx-vp9', source]);
+  const media = new Media();
+  const metadata = await media.probe(source);
+  const timeline = (await import('../src/domain/timeline.js')).trim(createTimeline(metadata.duration), 0.25, 1.25);
+  const output = path.join(root, 'edited.mp4');
+  await media.export({ path: source, metadata, timeline }, output);
+  assert.ok(Math.abs((await media.probe(output)).duration - 1) < 0.1);
+});

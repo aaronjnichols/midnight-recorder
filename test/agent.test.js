@@ -17,6 +17,7 @@ test('authenticated HTTP, CLI, and MCP use the same service commands', async t =
   const connection = JSON.parse(await readFile(path.join(root, 'connection.json'), 'utf8'));
   const url = `http://127.0.0.1:${connection.port}/command`;
   assert.equal((await fetch(url, { method: 'POST', body: '{}' })).status, 401);
+  assert.equal((await fetch(url, { method: 'POST', headers: { authorization: 'Bearer ' + 'é'.repeat(64) }, body: '{}' })).status, 401);
   assert.equal((await fetch(url, { method: 'POST', headers: { authorization: `Bearer ${connection.token}`, origin: 'https://example.com' }, body: '{}' })).status, 403);
   const env = { ...process.env, MIDNIGHT_DATA: root };
   const { stdout } = await promisify(execFile)(process.execPath, ['src/agent/cli.js', 'app.status'], { env });

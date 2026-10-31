@@ -1,0 +1,54 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { _electron } from 'playwright';
+import { mkdir, mkdtemp, access } from 'node:fs/promises';
+import path from 'node:path';
+
+test('desktop records a real screen, pauses, saves, edits, and exports', { timeout: 90000 }, async t => {
+  await access('src/desktop/main.js');
+  await mkdir('.local', { recursive: true });
+  const root = await mkdtemp(path.resolve('.local', 'desktop-'));
+  const app = await _electron.launch({ args: ['.', '--disable-features=AllowWgcScreenCapturer,AllowWgcWindowCapturer'], env: { ...process.env, MIDNIGHT_DATA: root } });
+  t.after(() => app.close());
+  app.process().stderr.on('data', chunk => process.stderr.write(chunk));
+  const page = app.windows().find(page => page.url().endsWith('/ui/index.html')) || await app.waitForEvent('window', { predicate: async page => { await page.waitForLoadState(); return page.url().endsWith('/ui/index.html'); } });
+  page.on('pageerror', error => process.stderr.write(error.message + '\n'));
+  t.after(async () => { if (!page.isClosed()) process.stderr.write('App message: ' + await page.locator('#message').textContent() + '\n'); });
+  await page.waitForSelector('h1');
+  assert.match(await page.locator('#library-view h1').innerText(), /Your video workspace/);
+  const call = (name, args = {}) => page.evaluate(([name, args]) => window.midnight.execute(name, args), [name, args]);
+  const sources = await call('capture.sources');
+  assert.ok(sources.length > 0);
+  await page.locator('#source').selectOption(sources.find(s => s.id.startsWith('screen:')).id);
+  await page.getByRole('button', { name: 'Start recording', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#record-status').textContent.includes('Recording'));
+  await new Promise(resolve => setTimeout(resolve, 1400));
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#record-status').textContent.includes('Paused'));
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await new Promise(resolve => setTimeout(resolve, 1400));
+  await page.getByRole('button', { name: 'Stop and save', exact: true }).click();
+  await page.waitForSelector('#editor:not([hidden])');
+  const videos = await call('library.list');
+  assert.equal(videos.length, 1);
+  assert.ok(videos[0].metadata.duration > 1);
+  await call('edit.trim', { id: videos[0].id, start: 0.25, end: 1.25 });
+  const job = await call('export.start', { id: videos[0].id, path: path.join(root, 'result.mp4') });
+  let result;
+  for (let i = 0; i < 100; i++) {
+    result = await call('export.status', { jobId: job.id });
+    if (result.state !== 'running') break;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(result.state, 'complete', JSON.stringify(result));
+  assert.ok(Math.abs(result.result.metadata.duration - 1) < 0.2);
+  await call('playback.open', { id: videos[0].id });
+  await call('playback.seek', { seconds: 0.5 });
+  assert.ok(Math.abs((await call('playback.status')).seconds - 0.5) < 0.05);
+  await call('playback.play');
+  await call('playback.pause');
+  await call('app.view', { view: 'library' });
+  assert.equal(await page.locator('#library-view').isVisible(), true);
+  await mkdir('artifacts', { recursive: true });
+  await page.screenshot({ path: 'artifacts/desktop.png' });
+});

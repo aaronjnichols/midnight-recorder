@@ -28,3 +28,11 @@ test('rejects empty ranges beyond the end and invalid settings', () => {
   assert.throws(() => timeline.cut(createTimeline(20), 0, 20), /leave/);
   assert.throws(() => trim(createTimeline(20), -1, 4), /range/);
 });
+
+test('preview maps edited time through cuts and speed', () => {
+  const edited = timeline.configure(timeline.cut(createTimeline(20), 4, 8), { speed: 2 });
+  assert.equal(timeline.sourceTime(edited, 3), 10);
+  assert.equal(timeline.editedTime(edited, 10), 3);
+  assert.equal(timeline.sourceTime(edited, 8), 20);
+  assert.throws(() => timeline.sourceTime(edited, 9), /range/);
+});

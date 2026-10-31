@@ -57,3 +57,37 @@ test('shared commands import, edit, undo, export, rename, and delete a video', a
   await service.execute('library.delete', { id: video.id });
   assert.deepEqual(await service.execute('library.list'), []);
 });
+
+test('save retry keeps the stopped file and does not import twice after cleanup fails', async () => {
+  let stops = 0, imports = 0, failImport = true, failCleanup = true;
+  const service = new Service({ capture: {
+    start: async () => {}, stop: async () => { stops++; return 'pending.webm'; },
+    cancel: async () => { if (failCleanup) throw new Error('Cleanup failed'); }
+  }, media: { probe: async () => ({ duration: 2 }) }, library: {
+    import: async () => { imports++; if (failImport) throw new Error('Import failed'); return { id: 'saved' }; }
+  } });
+  await service.execute('recording.start', { sourceId: 'screen:1' });
+  await assert.rejects(() => service.execute('recording.stop'), /Import failed/);
+  assert.equal((await service.execute('app.status')).recording.state, 'stopped');
+  failImport = false;
+  await assert.rejects(() => service.execute('recording.stop'), /Cleanup failed/);
+  failCleanup = false;
+  assert.equal((await service.execute('recording.stop')).id, 'saved');
+  assert.equal(stops, 1);
+  assert.equal(imports, 2);
+});
+
+test('agents can open videos, control playback, and select the app view', async () => {
+  const requests = [];
+  const service = new Service({ library: { get: async id => ({ id, path: 'source.mp4' }) }, playback: {
+    request: async (action, args) => { requests.push({ action, args }); return { action, ...args }; }
+  } });
+  await service.execute('playback.open', { id: 'video' });
+  assert.equal(requests[0].args.video.id, 'video');
+  await service.execute('playback.play');
+  await service.execute('playback.seek', { seconds: 1.5 });
+  await service.execute('playback.pause');
+  await service.execute('app.view', { view: 'library' });
+  assert.deepEqual(requests.map(r => r.action), ['open', 'play', 'seek', 'pause', 'view']);
+  await assert.rejects(() => service.execute('playback.seek', { seconds: -1 }), /positive|negative|range/);
+});

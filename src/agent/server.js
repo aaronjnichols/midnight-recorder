@@ -9,8 +9,8 @@ export async function serve(service, root) {
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Cache-Control', 'no-store');
     const send = (code, result) => { response.writeHead(code); response.end(JSON.stringify(result)); };
-    const supplied = request.headers.authorization || '';
-    const expected = `Bearer ${token}`;
+    const supplied = Buffer.from(request.headers.authorization || '');
+    const expected = Buffer.from(`Bearer ${token}`);
     if (supplied.length !== expected.length || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) return send(401, { error: 'Authentication required.' });
     if (request.headers.origin || request.headers.host !== `127.0.0.1:${server.address().port}`) return send(403, { error: 'Remote origins are not allowed.' });
     if (request.method !== 'POST' || request.url !== '/command') return send(404, { error: 'Endpoint was not found.' });

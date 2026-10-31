@@ -1,10 +1,10 @@
-import { mkdir, readFile, writeFile, rename, copyFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, copyFile, rm, link } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createTimeline } from '../domain/timeline.js';
 
 export class Library {
-  constructor(root) { this.root = root; this.index = path.join(root, 'library.json'); }
+  constructor(root, { removeFile = file => rm(file, { force: true }) } = {}) { this.root = root; this.index = path.join(root, 'library.json'); this.removeFile = removeFile; }
   async load() {
     try { return JSON.parse(await readFile(this.index, 'utf8')); }
     catch (error) { if (error.code === 'ENOENT') return []; throw error; }
@@ -41,8 +41,13 @@ export class Library {
   }
   async remove(id) {
     const video = await this.get(id);
-    await this.save((await this.load()).filter(v => v.id !== id));
-    await rm(video.path, { force: true });
+    const backup = path.join(this.root, `${id}.delete-backup`);
+    await link(video.path, backup).catch(() => copyFile(video.path, backup));
+    try {
+      await this.removeFile(video.path);
+      try { await this.save((await this.load()).filter(v => v.id !== id)); }
+      catch (error) { await rename(backup, video.path); throw error; }
+    } finally { await rm(backup, { force: true }).catch(() => {}); }
     return { deleted: id };
   }
 }

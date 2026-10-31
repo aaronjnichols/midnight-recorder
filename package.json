@@ -11,7 +11,8 @@
     "mcp": "node src/agent/mcp.js"
   },
   "devDependencies": {
-    "electron": "40.9.3"
+    "electron": "40.9.3",
+    "playwright": "^1.64.1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2"

@@ -53,3 +53,23 @@ export function cut(timeline, start, end) {
   if (end < duration(timeline)) segments.push(...trim(timeline, end, duration(timeline)).segments);
   return change(timeline, { segments });
 }
+
+export function sourceTime(timeline, seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > duration(timeline)) throw new Error('Seek time is outside the edited range.');
+  let remaining = seconds * timeline.speed;
+  for (const segment of timeline.segments) {
+    const length = segment.end - segment.start;
+    if (remaining < length) return segment.start + remaining;
+    remaining -= length;
+  }
+  return timeline.segments.at(-1).end;
+}
+
+export function editedTime(timeline, seconds) {
+  let elapsed = 0;
+  for (const segment of timeline.segments) {
+    if (seconds <= segment.end) return (elapsed + Math.max(0, seconds - segment.start)) / timeline.speed;
+    elapsed += segment.end - segment.start;
+  }
+  return elapsed / timeline.speed;
+}

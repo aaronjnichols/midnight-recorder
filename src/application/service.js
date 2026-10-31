@@ -29,7 +29,11 @@ export const commands = [
   define('edit.configure', 'Set speed or mute audio.', { id: string('Video ID.'), speed: number('Speed from 0.5 to 2.'), muted: boolean('Mute audio.') }, ['id']),
   ...['undo', 'redo', 'reset'].map(action => define(`edit.${action}`, `${action} video edits.`, { id: string('Video ID.') }, ['id'])),
   define('export.start', 'Export an edited MP4. Returns a job ID.', { id: string('Video ID.'), path: string('New absolute MP4 path.') }, ['id', 'path']),
-  define('export.status', 'Read an export job.', { jobId: string('Export job ID.') }, ['jobId'])
+  define('export.status', 'Read an export job.', { jobId: string('Export job ID.') }, ['jobId']),
+  define('app.view', 'Select the library or recorder view.', { view: field('string', 'App view.', { enum: ['library', 'recorder'] }) }, ['view']),
+  define('playback.open', 'Open a video in the editor.', { id: string('Video ID.') }, ['id']),
+  ...['play', 'pause', 'status'].map(action => define(`playback.${action}`, `${action} the video preview.`)),
+  define('playback.seek', 'Seek to a time in the edited video.', { seconds: number('Edited time in seconds.') }, ['seconds'])
 ];
 
 function validate(command, args) {
@@ -61,6 +65,12 @@ export class Service {
   }
   async dispatch(name, args) {
     if (name === 'app.status') return { recording: this.recording, jobs: [...this.jobs.values()] };
+    if (name === 'app.view') return this.playback.request('view', args);
+    if (name === 'playback.open') return this.playback.request('open', { video: await this.library.get(args.id) });
+    if (name.startsWith('playback.')) {
+      if (name === 'playback.seek' && args.seconds < 0) throw new Error('Seek time must not be negative.');
+      return this.playback.request(name.slice(9), args);
+    }
     if (name === 'capture.sources') return this.capture.sources();
     if (name === 'capture.devices') return this.capture.devices();
     if (name === 'library.list') return this.library.list(args.query);
@@ -117,8 +127,16 @@ export class Service {
       }
       if (name === 'recording.cancel') { await this.capture.cancel(); this.recording = { state: 'idle' }; }
       if (name === 'recording.stop') {
-        const file = await this.capture.stop();
-        const video = await this.library.import(file, await this.media.probe(file), this.recording.options.title || 'Untitled recording');
+        if (!this.recording.file) {
+          const file = await this.capture.stop();
+          this.recording = { ...this.recording, state: 'stopped', file };
+        }
+        if (!this.recording.saved) {
+          const file = this.recording.file;
+          const video = await this.library.import(file, await this.media.probe(file), this.recording.options.title || 'Untitled recording');
+          this.recording = { ...this.recording, saved: video };
+        }
+        const video = this.recording.saved;
         await this.capture.cancel();
         this.recording = { state: 'idle' };
         return video;

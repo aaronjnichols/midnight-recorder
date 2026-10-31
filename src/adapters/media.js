@@ -37,7 +37,7 @@ export class Media {
     const audio = video.metadata.hasAudio && !muted;
     const filters = [], labels = [];
     segments.forEach((s, index) => {
-      filters.push(`[0:v]trim=start=${s.start}:end=${s.end},setpts=(PTS-STARTPTS)/${speed},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1[v${index}]`);
+      filters.push(`[0:v]fps=30,trim=start=${s.start}:end=${s.end},setpts=(PTS-STARTPTS)/${speed},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1[v${index}]`);
       labels.push(`[v${index}]`);
       if (audio) {
         filters.push(`[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS,atempo=${speed}[a${index}]`);
