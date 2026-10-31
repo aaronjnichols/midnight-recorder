@@ -10,6 +10,7 @@
     "cli": "node src/agent/cli.js",
     "mcp": "node src/agent/mcp.js",
     "verify:desktop": "node --test --test-concurrency=1 acceptance/desktop.mjs",
+    "practice:inspection": "node scripts/practice-inspection.mjs",
     "format": "prettier --write src test acceptance package.json README.md QA.md PLAN.md AGENTS.md"
   },
   "devDependencies": {

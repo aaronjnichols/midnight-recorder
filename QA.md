@@ -35,7 +35,7 @@ The normal desktop check is pending. Use `npm run verify:desktop` from a normal 
 
 ## Latest regression result
 
-`npm test` passes all 40 tests. The current run includes the three review fixes below. Library and editor screenshots were inspected at the minimum window width. There is no horizontal overflow.
+`npm test` passes all 49 tests. The current run includes frame inspection and the three review fixes below. Library and editor screenshots were inspected at the minimum window width. There is no horizontal overflow.
 
 The camera-only plus system-audio check passes. The app reports a clear error if the requested system audio track is missing.
 
@@ -79,3 +79,15 @@ Three GPT-6.1-SOL agents at high reasoning effort made these fixes in sequence:
 Each regression failed before its production fix and passed after it. Independent reviews of the stages and the combined change found no defects. The final `npm test` run passed 40 tests with no failures or skipped tests. Its log is `.local/review-fixes-regression.log`.
 
 These fixes do not close the visible desktop capture or physical device checks. Those acceptance limits remain as described above.
+
+## Frame inspection
+
+The shared service now has `inspect.start` and `inspect.result`. The CLI can start a job and read its PNG paths. MCP returns native image content. The full regression run passed 49 tests with no failures or skipped tests. The log is `.local/frame-inspection-regression.log`.
+
+New checks cover edited-time sampling after cuts and speed changes, exact frame boundaries, request order, duplicate timestamps, a coordinate grid, stale edit detection, image-size limits, portrait dimensions, failed-job cleanup, and library deletion. The CLI/MCP test checks the returned image bytes against the saved PNG file. Background job checks confirm that state commands remain available during inspection.
+
+The first inspection test failed because the command was absent. The MCP test then failed because the response contained no image blocks. Each test passed after its implementation. An independent core review found that a fixed 30 fps assumption selected the wrong frame at 0.5x speed. A second review found a decimal timestamp rounding error. Both defects have regressions that failed before their fixes. The final implementation reads integer frame presentation timestamps and the stream time base. The core re-review returned no findings. A separate review of the MCP response, CLI test, and desktop practice also returned no findings.
+
+`npm run practice:inspection` passed through the real Electron app with a separate library. It used the CLI to import and edit a generated sample, then an SDK MCP client to retrieve 11 PNG images. The agent inspected the images. The Save button is on the left before source time 3 and on the right from source time 3. After removing source time 1 to 2 and setting speed to 0.5, this change occurs at edited time 4. The final report is `.local/inspection-practice-aU7yzK/report.json`.
+
+This practice checks imported video inspection. It does not close the real desktop capture or physical device checks. It does not add text, shape, or transition editing commands. See `docs/inspection-practice.md` for the placement plan derived from the images.
