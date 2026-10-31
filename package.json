@@ -1,0 +1,14 @@
+{
+  "name": "midnight-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test --test-concurrency=1",
+    "cli": "node src/agent/cli.js",
+    "mcp": "node src/agent/mcp.js"
+  },
+  "devDependencies": {"electron": "40.9.3"}
+}
