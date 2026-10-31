@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { Service } from "../application/service.js";
 import { Library } from "../adapters/library.js";
 import { Media } from "../adapters/media.js";
+import { PreviewCache } from "../adapters/preview.js";
 import { serve } from "../agent/server.js";
 import { dataRoot } from "../agent/client.js";
 
@@ -178,8 +179,7 @@ else
       const playbackPending = new Map();
       const playback = {
         request: async (action, args) => {
-          if (action === "fullscreen") ui.setFullScreen(args.enabled);
-          return new Promise((resolve, reject) => {
+          const result = await new Promise((resolve, reject) => {
             const id = randomUUID();
             const timer = setTimeout(() => {
               playbackPending.delete(id);
@@ -188,14 +188,36 @@ else
             playbackPending.set(id, { resolve, reject, timer });
             ui.webContents.send("playback:request", { id, action, args });
           });
+          const enabled = action === "view" ? false : args.enabled;
+          if (
+            (action === "fullscreen" || action === "view") &&
+            ui.isFullScreen() !== enabled
+          ) {
+            await new Promise((resolve, reject) => {
+              const event = enabled ? "enter-full-screen" : "leave-full-screen";
+              const done = () => {
+                clearTimeout(timer);
+                resolve();
+              };
+              const timer = setTimeout(() => {
+                ui.removeListener(event, done);
+                reject(new Error("Fullscreen did not respond."));
+              }, 5000);
+              ui.once(event, done);
+              ui.setFullScreen(enabled);
+            });
+          }
+          return result;
         },
       };
+      const media = new Media({
+        ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
+        ffprobe: process.env.FFPROBE_PATH || "ffprobe",
+      });
       const service = new Service({
         library: new Library(root),
-        media: new Media({
-          ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
-          ffprobe: process.env.FFPROBE_PATH || "ffprobe",
-        }),
+        media,
+        previews: new PreviewCache(root, media),
         capture,
         playback,
       });

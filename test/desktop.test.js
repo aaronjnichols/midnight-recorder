@@ -50,6 +50,18 @@ test(
         [name, args],
       );
     const sources = await call("capture.sources");
+    await assert.rejects(
+      () => call("playback.fullscreen", { enabled: true }),
+      /Open a video/,
+    );
+    assert.equal(
+      await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().endsWith("/ui/index.html"))
+          .isFullScreen(),
+      ),
+      false,
+    );
     assert.ok(sources.length > 0);
     await page
       .locator("#source")
@@ -89,7 +101,14 @@ test(
     }
     assert.equal(result.state, "complete", JSON.stringify(result));
     assert.ok(Math.abs(result.result.metadata.duration - 1) < 0.2);
-    await call("playback.open", { id: videos[0].id });
+    const opened = await call("playback.open", { id: videos[0].id });
+    assert.equal(typeof opened.ready, "boolean");
+    for (let i = 0; i < 150; i++) {
+      if ((await call("playback.status")).ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal((await call("playback.status")).ready, true);
+    assert.match(await page.locator("#player").getAttribute("src"), /previews/);
     await call("playback.seek", { seconds: 0.5 });
     assert.ok(Math.abs((await call("playback.status")).seconds - 0.5) < 0.05);
     await call("playback.play");
@@ -106,8 +125,16 @@ test(
         .evaluate((element) => element.classList.contains("fullscreen")),
       true,
     );
-    await call("playback.fullscreen", { enabled: false });
     await call("app.view", { view: "library" });
+    assert.equal(
+      await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().endsWith("/ui/index.html"))
+          .isFullScreen(),
+      ),
+      false,
+    );
+    await call("playback.fullscreen", { enabled: false });
     assert.equal(await page.locator("#library-view").isVisible(), true);
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()

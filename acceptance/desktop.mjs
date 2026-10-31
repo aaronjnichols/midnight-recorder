@@ -36,6 +36,49 @@ async function launch(t) {
 }
 
 test(
+  "real screen capture contains visible desktop content",
+  { timeout: 30000 },
+  async (t) => {
+    const { page, call } = await launch(t);
+    await page.evaluate(() => {
+      const marker = document.createElement("div");
+      marker.textContent = "Screen capture check";
+      Object.assign(marker.style, {
+        position: "fixed",
+        inset: "0",
+        background: "white",
+        color: "black",
+        zIndex: "1000",
+        fontSize: "48px",
+      });
+      document.body.append(marker);
+    });
+    const sources = await call("capture.sources");
+    await call("recording.start", {
+      sourceId: sources.find((s) => s.id.startsWith("screen:")).id,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    const video = await call("recording.stop");
+    const frames = execFileSync("ffmpeg", [
+      "-v",
+      "error",
+      "-i",
+      video.path,
+      "-vf",
+      "scale=1:1,format=gray",
+      "-an",
+      "-f",
+      "rawvideo",
+      "pipe:1",
+    ]);
+    assert.ok(
+      [...frames].some((value) => value > 8),
+      "Screen capture is black. Run this check in a normal Windows desktop session.",
+    );
+  },
+);
+
+test(
   "real window capture contains visible app content",
   { timeout: 30000 },
   async (t) => {

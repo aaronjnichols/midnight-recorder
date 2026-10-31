@@ -114,6 +114,17 @@ export const commands = [
     ["jobId"],
   ),
   define(
+    "preview.start",
+    "Prepare an exact edited preview. Poll export.status with the returned job ID.",
+    {
+      id: string("Video ID."),
+      revision: string(
+        "Optional JSON of segments, speed, and muted. Reject a stale edit state.",
+      ),
+    },
+    ["id"],
+  ),
+  define(
     "app.view",
     "Select the library or recorder view.",
     { view: field("string", "App view.", { enum: ["library", "recorder"] }) },
@@ -169,8 +180,8 @@ function validate(command, args) {
 }
 
 export class Service {
-  constructor({ library, media, capture, playback }) {
-    Object.assign(this, { library, media, capture, playback });
+  constructor({ library, media, capture, playback, previews }) {
+    Object.assign(this, { library, media, capture, playback, previews });
     this.recording = { state: "idle" };
     this.jobs = new Map();
     this.queue = Promise.resolve();
@@ -221,7 +232,11 @@ export class Service {
         )
       )
         throw new Error("Wait for the export before deleting this video.");
-      return this.library.remove(args.id);
+      await this.previews?.remove(args.id);
+      const result = await this.library.remove(args.id);
+      for (const [id, job] of this.jobs)
+        if (job.videoId === args.id) this.jobs.delete(id);
+      return result;
     }
     if (name.startsWith("edit.")) {
       const video = await this.library.get(args.id);
@@ -249,18 +264,28 @@ export class Service {
       }
       return this.library.update(args.id, { timeline: edited });
     }
-    if (name === "export.start") {
+    if (name === "export.start" || name === "preview.start") {
       const video = await this.library.get(args.id);
+      if (name === "preview.start" && args.revision) {
+        const { segments, speed, muted } = video.timeline;
+        if (args.revision !== JSON.stringify({ segments, speed, muted }))
+          throw new Error("The video edits changed. Open the video again.");
+      }
       const job = {
         id: randomUUID(),
         videoId: args.id,
+        kind: name === "preview.start" ? "preview" : "export",
         path: args.path,
         state: "running",
         startedAt: new Date().toISOString(),
       };
       this.jobs.set(job.id, job);
       Promise.resolve()
-        .then(() => this.media.export(video, args.path))
+        .then(() =>
+          name === "preview.start"
+            ? this.previews.prepare(video)
+            : this.media.export(video, args.path),
+        )
         .then(
           (result) => {
             this.jobs.set(job.id, { ...job, state: "complete", result });

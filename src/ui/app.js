@@ -1,4 +1,4 @@
-import { duration, sourceTime, editedTime } from "../domain/timeline.js";
+import { duration } from "../domain/timeline.js";
 const $ = (selector) => document.querySelector(selector);
 const call = (name, args = {}) => window.midnight.execute(name, args);
 let selectedVideo,
@@ -6,7 +6,11 @@ let selectedVideo,
   currentRecording = "idle",
   busy = false,
   lastLibrary = "",
-  statusTimer;
+  statusTimer,
+  previewKey = "",
+  previewReady = false,
+  viewGeneration = 0,
+  previewError = null;
 const seconds = (video) => duration(video.timeline);
 const time = (value) =>
   `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
@@ -59,12 +63,22 @@ async function refreshSources() {
 }
 function updateSource() {
   const source = sources.find((s) => s.id === $("#source").value);
-  if (source) {
+  const fallback = () => {
+    const icon = document.createElement("span");
+    icon.textContent = "▣";
+    const label = document.createElement("p");
+    label.textContent = source
+      ? "Preview unavailable"
+      : "Select a screen or window";
+    $("#source-preview").replaceChildren(icon, label);
+  };
+  if (source?.thumbnail) {
     const image = document.createElement("img");
+    image.onerror = fallback;
     image.src = source.thumbnail;
     image.alt = source.name;
     $("#source-preview").replaceChildren(image);
-  }
+  } else fallback();
 }
 async function refreshLibrary() {
   const videos = await call(
@@ -108,14 +122,20 @@ async function refreshLibrary() {
   }
 }
 function showLibrary() {
+  viewGeneration++;
   $("#player").pause();
   $("#editor").hidden = true;
   $("#library-view").hidden = false;
   $("#crumb").textContent = "Video library";
   selectedVideo = null;
+  previewKey = "";
+  previewReady = false;
+  $(".player-shell").classList.remove("fullscreen");
 }
 async function openVideo(id) {
-  renderVideo(await call("library.get", { id }));
+  const generation = ++viewGeneration;
+  const video = await call("library.get", { id });
+  if (generation === viewGeneration) renderVideo(video);
 }
 function renderVideo(video) {
   selectedVideo = video;
@@ -128,13 +148,29 @@ function renderVideo(video) {
   $("#video-info").textContent =
     `${time(seconds(selectedVideo))} · ${selectedVideo.metadata.width} × ${selectedVideo.metadata.height} · Local video`;
   const player = $("#player");
-  if (player.dataset.videoId !== id) {
-    player.src = selectedVideo.url;
-    player.dataset.videoId = id;
+  const { segments, speed, muted } = video.timeline;
+  const key = id + JSON.stringify({ segments, speed, muted });
+  if (previewKey !== key) {
+    previewKey = key;
+    previewReady = false;
+    previewError = null;
+    player.dataset.original = "false";
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    const original =
+      segments.length === 1 &&
+      segments[0].start === 0 &&
+      segments[0].end === video.metadata.duration &&
+      speed === 1 &&
+      !muted;
+    if (original) setPreview(video.url, true);
+    else {
+      $("#preview-state").textContent =
+        "Preparing edited preview. You can continue to edit.";
+      Promise.resolve().then(() => preparePreview(video, key));
+    }
   }
-  player.playbackRate = selectedVideo.timeline.speed;
-  player.muted = selectedVideo.timeline.muted;
-  player.currentTime = selectedVideo.timeline.segments[0].start;
   $("#range-start").value = 0;
   $("#range-end").value = seconds(selectedVideo).toFixed(3);
   $("#speed").value = selectedVideo.timeline.speed;
@@ -152,18 +188,63 @@ function renderVideo(video) {
     }),
   );
 }
+function setPreview(url, original = false) {
+  const player = $("#player");
+  player.dataset.original = String(original);
+  player.src = url;
+  player.playbackRate = 1;
+  player.muted = selectedVideo.timeline.muted;
+  player.currentTime = 0;
+  previewReady = false;
+  $("#preview-state").textContent = "Loading preview.";
+  syncPreview();
+}
+async function preparePreview(video, key) {
+  try {
+    const { segments, speed, muted } = video.timeline;
+    const started = await call("preview.start", {
+      id: video.id,
+      revision: JSON.stringify({ segments, speed, muted }),
+    });
+    let job = started;
+    while (job.state === "running") {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      job = await call("export.status", { jobId: started.id });
+      if (!selectedVideo || previewKey !== key) return;
+    }
+    if (job.state === "failed") throw new Error(job.error);
+    if (selectedVideo && previewKey === key) setPreview(job.result.url);
+  } catch (error) {
+    if (selectedVideo && previewKey === key) {
+      previewError = error.message;
+      $("#preview-state").textContent = `Preview failed: ${error.message}`;
+      notice(error.message, true);
+    }
+  }
+}
 window.midnight.onPlayback(async ({ id, action, args }) => {
   try {
     const player = $("#player");
-    if (action === "open") renderVideo(args.video);
-    else if (action === "view") {
+    if (action === "open") {
+      viewGeneration++;
+      renderVideo(args.video);
+    } else if (action === "view") {
       showLibrary();
       if (args.view === "recorder") $("#record-title").focus();
+    } else if (action === "fullscreen" && !args.enabled) {
+      $(".player-shell").classList.remove("fullscreen");
     } else {
       if (!selectedVideo)
         throw new Error("Open a video before you control playback.");
-      if (action === "seek")
-        player.currentTime = sourceTime(selectedVideo.timeline, args.seconds);
+      if (["seek", "play"].includes(action) && !previewReady)
+        throw new Error(
+          "The edited preview is still being prepared. Poll playback.status until ready is true.",
+        );
+      if (action === "seek") {
+        if (args.seconds > seconds(selectedVideo))
+          throw new Error("Seek time is outside the edited range.");
+        player.currentTime = args.seconds;
+      }
       if (action === "play") await player.play();
       if (action === "pause") player.pause();
       if (action === "configure") player.volume = args.volume;
@@ -177,9 +258,9 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
         paused: player.paused,
         volume: player.volume,
         muted: player.muted,
-        seconds: selectedVideo
-          ? editedTime(selectedVideo.timeline, player.currentTime)
-          : 0,
+        ready: previewReady,
+        error: previewError,
+        seconds: selectedVideo ? player.currentTime : 0,
         duration: selectedVideo ? seconds(selectedVideo) : 0,
       },
     });
@@ -191,34 +272,39 @@ function syncPreview() {
   if (!selectedVideo) return;
   const player = $("#player");
   $("#preview-play").textContent = player.paused ? "Play" : "Pause";
-  $("#preview-seek").value = editedTime(
-    selectedVideo.timeline,
-    player.currentTime,
-  );
+  $("#preview-play").disabled = !previewReady;
+  $("#preview-seek").disabled = !previewReady;
+  $("#preview-seek").value = player.currentTime;
   $("#preview-time").textContent =
-    `${time(editedTime(selectedVideo.timeline, player.currentTime))} / ${time(seconds(selectedVideo))}`;
+    `${time(player.currentTime)} / ${time(seconds(selectedVideo))}`;
   $("#preview-volume").value = player.volume;
 }
 for (const event of ["play", "pause", "volumechange"])
   $("#player").addEventListener(event, syncPreview);
-$("#player").addEventListener("timeupdate", () => {
-  if (!selectedVideo) return;
-  const player = $("#player"),
-    segments = selectedVideo.timeline.segments;
-  if (
-    !segments.some(
-      (s) => player.currentTime >= s.start && player.currentTime < s.end,
-    )
-  ) {
-    const next = segments.find((s) => s.start > player.currentTime);
-    if (next) player.currentTime = next.start;
-    else if (!player.paused) {
-      player.pause();
-      player.currentTime = segments[0].start;
-    }
+$("#player").addEventListener("loadeddata", () => {
+  if (!selectedVideo || $("#player").readyState < 2) return;
+  previewReady = true;
+  previewError = null;
+  $("#preview-state").textContent =
+    "Preview ready. Your edits match the exported video.";
+  syncPreview();
+});
+$("#player").addEventListener("error", () => {
+  const player = $("#player");
+  if (!selectedVideo || !player.getAttribute("src")) return;
+  previewReady = false;
+  if (player.dataset.original === "true") {
+    player.dataset.original = "false";
+    $("#preview-state").textContent = "Preparing a compatible preview.";
+    preparePreview(selectedVideo, previewKey);
+  } else {
+    previewError =
+      "Cannot play this preview. Check the source file and FFmpeg.";
+    $("#preview-state").textContent = previewError;
   }
   syncPreview();
 });
+$("#player").addEventListener("timeupdate", syncPreview);
 handle("#preview-play", "click", () =>
   call($("#player").paused ? "playback.play" : "playback.pause"),
 );
@@ -243,8 +329,11 @@ document.addEventListener("keydown", (event) => {
     );
 });
 async function edit(action, args = {}) {
-  await call(`edit.${action}`, { id: selectedVideo.id, ...args });
-  await openVideo(selectedVideo.id);
+  const id = selectedVideo.id,
+    generation = viewGeneration;
+  const video = await call(`edit.${action}`, { id, ...args });
+  if (generation === viewGeneration && selectedVideo?.id === id)
+    renderVideo(video);
   await refreshLibrary();
 }
 handle("#start", "click", async () => {
@@ -336,6 +425,7 @@ handle("#confirm-delete-button", "click", async () => {
   try {
     await call("library.delete", { id: selectedVideo.id });
   } catch (error) {
+    previewKey = "";
     renderVideo(selectedVideo);
     throw error;
   }
@@ -363,22 +453,25 @@ async function refreshStatus() {
   $("#pause").disabled = currentRecording === "stopped";
   $("#pause").textContent = currentRecording === "paused" ? "Resume" : "Pause";
   $("#export-jobs").replaceChildren(
-    ...status.jobs.map((job) => {
-      const row = document.createElement("div");
-      row.textContent =
-        job.state === "failed"
-          ? `Export failed: ${job.error}`
-          : `Export ${job.state}: ${job.path}`;
-      return row;
-    }),
+    ...status.jobs
+      .filter((job) => job.kind !== "preview")
+      .map((job) => {
+        const row = document.createElement("div");
+        row.textContent =
+          job.state === "failed"
+            ? `Export failed: ${job.error}`
+            : `Export ${job.state}: ${job.path}`;
+        return row;
+      }),
   );
   if (selectedVideo) {
-    const latest = await call("library.get", { id: selectedVideo.id }).catch(
-      () => null,
-    );
+    const id = selectedVideo.id,
+      generation = viewGeneration;
+    const latest = await call("library.get", { id }).catch(() => null);
+    if (generation !== viewGeneration || selectedVideo?.id !== id) return;
     if (!latest) showLibrary();
     else if (JSON.stringify(latest) !== JSON.stringify(selectedVideo))
-      await openVideo(latest.id);
+      renderVideo(latest);
   }
 }
 try {

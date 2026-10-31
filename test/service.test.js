@@ -179,3 +179,65 @@ test("agents can open videos, control playback, and select the app view", async 
     /positive|negative|range/,
   );
 });
+
+test("preview rendering runs as a background job and keeps recording controls available", async () => {
+  let finish;
+  const service = new Service({
+    library: { get: async (id) => ({ id }) },
+    previews: {
+      prepare: async () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    },
+  });
+  const job = await service.execute("preview.start", { id: "video" });
+  assert.equal(job.state, "running");
+  assert.equal((await service.execute("app.status")).recording.state, "idle");
+  finish({ url: "file:///preview.mp4" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    (await service.execute("export.status", { jobId: job.id })).result.url,
+    "file:///preview.mp4",
+  );
+});
+
+test("a stale preview request cannot render a different edit state", async () => {
+  const service = new Service({
+    library: {
+      get: async (id) => ({
+        id,
+        timeline: { segments: [{ start: 0, end: 2 }], speed: 1, muted: false },
+      }),
+    },
+  });
+  await assert.rejects(
+    () =>
+      service.execute("preview.start", { id: "video", revision: "old-state" }),
+    /edits changed/,
+  );
+});
+
+test("deleting a video removes cached previews and their job results", async () => {
+  let removed = false;
+  const service = new Service({
+    library: {
+      get: async (id) => ({ id }),
+      remove: async (id) => ({ deleted: id }),
+    },
+    previews: {
+      prepare: async () => ({ url: "file:///cached.mp4" }),
+      remove: async () => {
+        removed = true;
+      },
+    },
+  });
+  const job = await service.execute("preview.start", { id: "video" });
+  await new Promise((resolve) => setImmediate(resolve));
+  await service.execute("library.delete", { id: "video" });
+  assert.equal(removed, true);
+  await assert.rejects(
+    () => service.execute("export.status", { jobId: job.id }),
+    /not found/,
+  );
+});
