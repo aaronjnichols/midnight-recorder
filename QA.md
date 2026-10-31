@@ -1,6 +1,6 @@
 # Acceptance evidence
 
-The goal is still active. This file records checks and open work.
+Desktop acceptance is blocked in this agent session. This file records checks and open work.
 
 | Requirement                    | Current evidence                                                                               | State                    |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------ |
@@ -48,3 +48,9 @@ The current app still reports an idle recorder. Device enumeration returns Remot
 The default data folder now stays in this project folder when a CLI or MCP client starts from another working folder. `MIDNIGHT_DATA` still selects another folder. The new default-path test failed before the fix and passes after it. A review agent found no code defect in this change. The README now explains the default path and how to retain a library created in another working folder.
 
 A live CLI client and a live MCP client started from another folder both reached the open app without a data-path override. Both returned the same idle recording state.
+
+## Blocked acceptance check
+
+The third goal turn rechecked the live app, capture devices, and direct FFmpeg GDI capture. The app remains idle. The device list still contains Remote Audio inputs and no camera. Desktop capture still fails with Windows error 5, access denied. The same desktop acceptance limit has persisted across three goal turns.
+
+Run `npm run verify:desktop` from this project folder in a normal Windows desktop session. Report the screen, window, and system-audio results. If physical camera or microphone inputs are available, check them in the app as well. This session cannot complete those remaining checks.
