@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { _electron } from "playwright";
-import { mkdir, mkdtemp, access } from "node:fs/promises";
+import { mkdir, mkdtemp, access, readdir } from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { Media } from "../src/adapters/media.js";
@@ -317,16 +317,41 @@ test(
         [name, args],
       );
     await app.evaluate(({ ipcMain }) => {
+      globalThis.failedWrites = 0;
       ipcMain.removeHandler("capture:chunk");
       ipcMain.handle("capture:chunk", () => {
+        globalThis.failedWrites++;
         throw new Error("Disk full");
       });
     });
     await call("recording.start", { cameraOnly: true });
     await new Promise((resolve) => setTimeout(resolve, 1400));
+    const failed = (await call("app.status")).recording;
+    assert.equal(failed.state, "failed");
+    assert.match(failed.error, /Disk full/);
+    const worker = app
+      .windows()
+      .find((page) => page.url().endsWith("/capture.html"));
+    assert.equal(await worker.evaluate(() => recorder.state), "paused");
+    await worker.evaluate(async () => {
+      recorder.ondataavailable({ data: new Blob(["later chunk"]) });
+      recorder.ondataavailable({ data: new Blob(["another chunk"]) });
+      await queue;
+    });
+    assert.equal(await app.evaluate(() => globalThis.failedWrites), 1);
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#record-status")
+        .textContent.includes("Disk full"),
+    );
+    assert.equal(await page.locator("#pause").isDisabled(), true);
+    assert.equal((await readdir(path.join(root, "pending"))).length, 1);
     await assert.rejects(() => call("recording.stop"), /Disk full/);
+    assert.equal((await call("app.status")).recording.state, "failed");
+    assert.equal((await readdir(path.join(root, "pending"))).length, 1);
     await call("recording.cancel");
     assert.equal((await call("app.status")).recording.state, "idle");
+    assert.deepEqual(await readdir(path.join(root, "pending")), []);
   },
 );
 

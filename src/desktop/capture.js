@@ -153,13 +153,21 @@ async function start(options) {
       videoBitsPerSecond: 6000000,
     });
     recorder.ondataavailable = (event) => {
-      if (event.data.size)
+      if (event.data.size && !chunkError)
         queue = queue
-          .then(async () =>
-            window.captureBridge.chunk(await event.data.arrayBuffer()),
-          )
+          .then(async () => {
+            if (!chunkError)
+              await window.captureBridge.chunk(await event.data.arrayBuffer());
+          })
           .catch((error) => {
+            if (chunkError) return;
             chunkError = error;
+            if (recorder.state === "recording") recorder.pause();
+            clearInterval(frame);
+            window.captureBridge.failed({
+              recordingId: options.recordingId,
+              error: error.message || "Cannot write the recording file.",
+            });
           });
     };
     recorder.start(1000);
@@ -197,7 +205,7 @@ window.captureBridge.listen(async ({ id, action, args }) => {
           name: d.label || (d.kind === "audioinput" ? "Microphone" : "Camera"),
         }));
     if (action === "start") result = await start(args);
-    if (action === "pause") recorder.pause();
+    if (action === "pause" && recorder?.state === "recording") recorder.pause();
     if (action === "resume") recorder.resume();
     if (action === "stop") result = await stop();
     if (action === "cancel") {

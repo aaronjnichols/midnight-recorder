@@ -39,6 +39,15 @@ export const commands = [
       }),
     },
   ),
+  define(
+    "recording.fail",
+    "Report a capture failure. Keep pending data for Stop or Cancel.",
+    {
+      recordingId: string("ID of the recording that failed."),
+      error: string("Capture error message."),
+    },
+    ["recordingId", "error"],
+  ),
   ...["pause", "resume", "stop", "cancel"].map((action) =>
     define(
       `recording.${action}`,
@@ -310,12 +319,28 @@ export class Service {
         throw new Error("A recording is already active.");
       if (!args.sourceId && !args.cameraOnly)
         throw new Error("Select a source or use cameraOnly.");
-      await this.capture.start(args);
+      const id = randomUUID();
+      await this.capture.start({ ...args, recordingId: id });
       this.recording = {
+        id,
         state: "recording",
         startedAt: new Date().toISOString(),
         options: args,
       };
+      return this.recording;
+    }
+    if (name === "recording.fail") {
+      if (
+        this.recording.id === args.recordingId &&
+        ["recording", "paused"].includes(this.recording.state)
+      ) {
+        this.recording = {
+          ...this.recording,
+          state: "failed",
+          error: args.error,
+        };
+        await this.capture.pause();
+      }
       return this.recording;
     }
     if (name.startsWith("recording.")) {

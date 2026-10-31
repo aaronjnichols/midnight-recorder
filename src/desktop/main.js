@@ -228,6 +228,26 @@ else
         capture,
         playback,
       });
+      let notifiedFailureId;
+      ipcMain.on("capture:failed", (event, failure) => {
+        if (event.sender !== worker.webContents) return;
+        service
+          .execute("recording.fail", failure)
+          .then((recording) => {
+            if (
+              recording.state !== "failed" ||
+              recording.id !== failure.recordingId ||
+              notifiedFailureId === recording.id
+            )
+              return;
+            notifiedFailureId = recording.id;
+            ui.webContents.send(
+              "notice",
+              `Recording failed. Select Stop and save to retry, or Cancel. ${recording.error}`,
+            );
+          })
+          .catch((error) => console.error(error));
+      });
       ipcMain.on("capture:ended", (event) => {
         if (
           event.sender !== worker.webContents ||

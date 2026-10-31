@@ -445,12 +445,14 @@ async function refreshStatus() {
   $("#start").hidden = currentRecording !== "idle";
   $("#record-controls").hidden = currentRecording === "idle";
   $("#record-status").textContent =
-    currentRecording === "paused"
-      ? "Paused"
-      : currentRecording === "stopped"
-        ? "Stopped. Select Stop and save to retry."
-        : "Recording";
-  $("#pause").disabled = currentRecording === "stopped";
+    currentRecording === "failed"
+      ? `Recording failed. Select Stop and save to retry, or Cancel. ${status.recording.error}`
+      : currentRecording === "paused"
+        ? "Paused"
+        : currentRecording === "stopped"
+          ? "Stopped. Select Stop and save to retry."
+          : "Recording";
+  $("#pause").disabled = ["stopped", "failed"].includes(currentRecording);
   $("#pause").textContent = currentRecording === "paused" ? "Resume" : "Pause";
   $("#export-jobs").replaceChildren(
     ...status.jobs

@@ -49,6 +49,8 @@ Set `FFMPEG_PATH` and `FFPROBE_PATH` if the programs are not on `PATH`.
 
 If a save fails, leave the app open. Select Stop and save to retry. Cancel recording removes the pending recording. If the app stops unexpectedly, keep files in `pending`. You can import a readable pending file through `library.import`. Automatic recovery after an app crash is not yet available. Cached previews use extra disk space.
 
+If a recording write fails, capture pauses and `app.status` reports a recording state of `failed` with an `error` message. The desktop app shows the same error. Stop and save and Cancel remain available. The app keeps the pending file after a failed Stop. It does not repeat a failed write because the file can contain part of that write. The pending file can be incomplete or unreadable. Copy it before you select Cancel if you want to attempt manual recovery.
+
 ## CLI
 
 Start the desktop app first. The examples use this project folder. From another folder, use the full path to `src/agent/cli.js`. Commands return JSON. Errors use standard error and a nonzero exit code.
@@ -75,6 +77,8 @@ node src/agent/cli.js export.status '{"jobId":"JOB_ID"}'
 ```
 
 Use IDs from command results. Source IDs can change when a window closes. Export commands return a job ID. Poll `export.status` until its state is `complete` or `failed`.
+
+`recording.start` returns a recording `id`. Capture adapters use `recording.fail` with this `recordingId` and an `error` message to report a failure through the shared service. This command pauses capture and retains the pending data. The service ignores duplicate failure reports and reports for an old recording ID.
 
 `help` returns the complete command catalog and argument schemas. It works when the desktop app is closed.
 
@@ -108,7 +112,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | App state and view | `app.status`, `app.view`                                                                                                            |
 | Capture selection  | `capture.sources`, `capture.devices`                                                                                                |
-| Recording          | `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`                                      |
+| Recording          | `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail`                    |
 | Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                 |
 | Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                   |
 | Export             | `export.start`, `export.status`                                                                                                     |

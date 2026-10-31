@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld("captureBridge", {
   reply: (response) => ipcRenderer.send("capture:reply", response),
   chunk: (bytes) => ipcRenderer.invoke("capture:chunk", bytes),
   ended: () => ipcRenderer.send("capture:ended"),
+  failed: (failure) => ipcRenderer.send("capture:failed", failure),
 });

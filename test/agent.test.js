@@ -13,7 +13,14 @@ import { Service, commands } from "../src/application/service.js";
 test("authenticated HTTP, CLI, and MCP use the same service commands", async (t) => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "agent-"));
-  const server = await serve(new Service({}), root);
+  const service = new Service({
+    capture: {
+      start: async () => {},
+      pause: async () => {},
+      cancel: async () => {},
+    },
+  });
+  const server = await serve(service, root);
   t.after(() => server.close());
   const connection = JSON.parse(
     await readFile(path.join(root, "connection.json"), "utf8"),
@@ -65,6 +72,31 @@ test("authenticated HTTP, CLI, and MCP use the same service commands", async (t)
   );
   const result = await client.callTool({ name: "app.status", arguments: {} });
   assert.equal(JSON.parse(result.content[0].text).recording.state, "idle");
+  const started = await client.callTool({
+    name: "recording.start",
+    arguments: { cameraOnly: true },
+  });
+  const { id } = JSON.parse(started.content[0].text);
+  await client.callTool({
+    name: "recording.fail",
+    arguments: { recordingId: id, error: "Disk full" },
+  });
+  const failed = await promisify(execFile)(
+    process.execPath,
+    ["src/agent/cli.js", "app.status"],
+    { env },
+  );
+  assert.equal(JSON.parse(failed.stdout).recording.state, "failed");
+  assert.equal(JSON.parse(failed.stdout).recording.error, "Disk full");
+  const mcpFailed = await client.callTool({
+    name: "app.status",
+    arguments: {},
+  });
+  assert.equal(
+    JSON.parse(mcpFailed.content[0].text).recording.error,
+    "Disk full",
+  );
+  await client.callTool({ name: "recording.cancel", arguments: {} });
 });
 
 test("agent requests preserve Unicode text across network chunks", async (t) => {

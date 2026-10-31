@@ -52,6 +52,100 @@ test("record commands enforce state and keep a failed stop available for retry",
   assert.ok(commands.every((command) => command.inputSchema.type === "object"));
 });
 
+test("a capture failure pauses the recording once and keeps Stop available", async () => {
+  let pauses = 0,
+    cancels = 0;
+  const service = new Service({
+    capture: {
+      start: async () => {},
+      pause: async () => pauses++,
+      stop: async () => "pending.webm",
+      cancel: async () => cancels++,
+    },
+    media: { probe: async () => ({ duration: 2 }) },
+    library: { import: async () => ({ id: "saved" }) },
+  });
+  const started = await service.execute("recording.start", {
+    cameraOnly: true,
+  });
+  await service.execute("recording.fail", {
+    recordingId: started.id,
+    error: "Disk full",
+  });
+  assert.equal(pauses, 1);
+  const failed = (await service.execute("app.status")).recording;
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.error, "Disk full");
+  await service.execute("recording.fail", {
+    recordingId: started.id,
+    error: "Later error",
+  });
+  assert.equal(pauses, 1);
+  assert.equal(
+    (await service.execute("app.status")).recording.error,
+    "Disk full",
+  );
+  assert.equal(cancels, 0);
+  await assert.rejects(() => service.execute("recording.resume"), /not paused/);
+  assert.equal((await service.execute("recording.stop")).id, "saved");
+  assert.equal(cancels, 1);
+  await service.execute("recording.fail", {
+    recordingId: started.id,
+    error: "Late error",
+  });
+  assert.equal((await service.execute("app.status")).recording.state, "idle");
+  const next = await service.execute("recording.start", { cameraOnly: true });
+  await service.execute("recording.fail", {
+    recordingId: started.id,
+    error: "Stale error",
+  });
+  assert.equal((await service.execute("app.status")).recording.id, next.id);
+  assert.equal(
+    (await service.execute("app.status")).recording.state,
+    "recording",
+  );
+});
+
+for (const action of ["stop", "cancel"])
+  test(`a failure received during ${action} cannot change a finished recording`, async () => {
+    let finish, entered;
+    const active = new Promise((resolve) => (entered = resolve));
+    const wait = async () => {
+      entered();
+      await new Promise((resolve) => (finish = resolve));
+    };
+    const service = new Service({
+      capture: {
+        start: async () => {},
+        stop: async () => {
+          if (action === "stop") await wait();
+          return "pending.webm";
+        },
+        cancel: async () => {
+          if (action === "cancel") await wait();
+        },
+        pause: async () => assert.fail("A finished recording must not pause."),
+      },
+      media: { probe: async () => ({ duration: 2 }) },
+      library: { import: async () => ({ id: "saved" }) },
+    });
+    const recording = await service.execute("recording.start", {
+      cameraOnly: true,
+    });
+    const done = service.execute(`recording.${action}`);
+    await active;
+    const failed = service.execute("recording.fail", {
+      recordingId: recording.id,
+      error: "Late write error",
+    });
+    finish();
+    await done;
+    await failed;
+    assert.deepEqual((await service.execute("app.status")).recording, {
+      state: "idle",
+    });
+  });
+
 test("shared commands import, edit, undo, export, rename, and delete a video", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "service-"));
