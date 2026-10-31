@@ -54,3 +54,16 @@ A live CLI client and a live MCP client started from another folder both reached
 The third goal turn rechecked the live app, capture devices, and direct FFmpeg GDI capture. The app remains idle. The device list still contains Remote Audio inputs and no camera. Desktop capture still fails with Windows error 5, access denied. The same desktop acceptance limit has persisted across three goal turns.
 
 Run `npm run verify:desktop` from this project folder in a normal Windows desktop session. Report the screen, window, and system-audio results. If physical camera or microphone inputs are available, check them in the app as well. This session cannot complete those remaining checks.
+
+## Requested desktop recheck
+
+The agent ran `npm run verify:desktop` after the user requested the check. Two checks passed and two failed:
+
+- Camera-only recording with a test camera and a real system-audio track passed. This check does not measure the track's sound level.
+- Real system audio with a test tone passed.
+- Screen recording failed because the saved video was black.
+- Window recording failed because the saved video was black.
+
+Computer Use selected the open Midnight Recorder window. Its screenshot was black, and its accessibility state was unavailable. A separate FFmpeg GDI capture failed with Windows error 5, access denied. Windows reported an active Remote Desktop session. These results do not establish the cause of the capture failure.
+
+The app remains open and idle. The device list contains Remote Audio inputs and no camera. No Windows security or privacy settings were changed. Visible desktop capture and physical device checks remain open.
