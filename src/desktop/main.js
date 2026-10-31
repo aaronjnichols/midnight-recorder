@@ -108,9 +108,16 @@ else
           try {
             if (request.frame !== worker.webContents.mainFrame)
               return callback({});
-            const source = (
-              await desktopCapturer.getSources({ types: ["screen", "window"] })
-            ).find((s) => s.id === selected?.sourceId);
+            const available = await desktopCapturer.getSources({
+              types: ["screen", "window"],
+            });
+            const source =
+              available.find((s) => s.id === selected?.sourceId) ||
+              (!selected?.sourceId &&
+              selected?.cameraOnly &&
+              selected?.systemAudio
+                ? available.find((s) => s.id.startsWith("screen:"))
+                : null);
             if (!source) return callback({});
             callback({
               video: source,
@@ -311,7 +318,9 @@ else
           event.preventDefault();
           ui.webContents.send(
             "notice",
-            "Stop or cancel the recording and wait for exports before closing.",
+            service.recording.state !== "idle"
+              ? "Stop or cancel the recording before closing."
+              : "Wait for video processing to finish before closing.",
           );
         }
       });

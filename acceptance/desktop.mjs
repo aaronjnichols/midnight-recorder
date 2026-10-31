@@ -7,11 +7,11 @@ import { execFileSync } from "node:child_process";
 
 // Run these checks in a normal Windows desktop session.
 // They require real window capture and a working audio output device.
-async function launch(t) {
+async function launch(t, { fakeCamera = false } = {}) {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "acceptance-"));
   const app = await _electron.launch({
-    args: ["."],
+    args: [".", ...(fakeCamera ? ["--use-fake-device-for-media-stream"] : [])],
     timeout: 20000,
     env: { ...process.env, MIDNIGHT_DATA: root },
   });
@@ -34,6 +34,34 @@ async function launch(t) {
     );
   return { app, page, call, root };
 }
+
+test(
+  "camera-only recording can include real system audio",
+  { timeout: 30000 },
+  async (t) => {
+    const { page, call } = await launch(t, { fakeCamera: true });
+    await page.evaluate(async () => {
+      window.testAudio = new AudioContext();
+      await window.testAudio.resume();
+      const oscillator = window.testAudio.createOscillator(),
+        gain = window.testAudio.createGain();
+      oscillator.frequency.value = 440;
+      gain.gain.value = 0.02;
+      oscillator.connect(gain).connect(window.testAudio.destination);
+      oscillator.start();
+    });
+    await call("recording.start", { cameraOnly: true, systemAudio: true });
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    const video = await call("recording.stop");
+    await page.evaluate(() => window.testAudio.close());
+    assert.equal(video.metadata.width, 640);
+    assert.equal(
+      video.metadata.hasAudio,
+      true,
+      "Camera-only recording lost system audio.",
+    );
+  },
+);
 
 test(
   "real screen capture contains visible desktop content",

@@ -7,6 +7,49 @@ import { execFileSync } from "node:child_process";
 import { Media } from "../src/adapters/media.js";
 
 test(
+  "missing requested system audio produces a clear error",
+  { timeout: 30000 },
+  async (t) => {
+    await mkdir(".local", { recursive: true });
+    const root = await mkdtemp(path.resolve(".local", "missing-audio-"));
+    const app = await _electron.launch({
+      args: [".", "--use-fake-device-for-media-stream"],
+      env: { ...process.env, MIDNIGHT_DATA: root },
+    });
+    t.after(async () => {
+      await app.evaluate(({ app }) => app.exit(0)).catch(() => {});
+      await app.close().catch(() => {});
+    });
+    const page =
+      app.windows().find((page) => page.url().endsWith("/ui/index.html")) ||
+      (await app.waitForEvent("window", {
+        predicate: async (page) => {
+          await page.waitForLoadState();
+          return page.url().endsWith("/ui/index.html");
+        },
+      }));
+    const worker = app
+      .windows()
+      .find((page) => page.url().endsWith("/capture.html"));
+    await worker.evaluate(() => {
+      navigator.mediaDevices.getDisplayMedia = () =>
+        navigator.mediaDevices.getUserMedia({ video: true });
+    });
+    const call = (name, args = {}) =>
+      page.evaluate(
+        ([name, args]) => window.midnight.execute(name, args),
+        [name, args],
+      );
+    await assert.rejects(
+      () =>
+        call("recording.start", { sourceId: "screen:test", systemAudio: true }),
+      /System audio is not available/,
+    );
+    assert.equal((await call("app.status")).recording.state, "idle");
+  },
+);
+
+test(
   "desktop screen recorder lifecycle saves media, edits, and exports",
   { timeout: 90000 },
   async (t) => {

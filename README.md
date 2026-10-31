@@ -21,7 +21,9 @@ Use Import video to add an existing MP4, WebM, MOV, or MKV file. The app copies 
 
 Open a video to edit it. Keep range trims the video to the specified range. Remove range cuts out that range. All times refer to the current edited video. Speed and mute settings also apply to export. Undo, Redo, and Reset all edits keep the source file unchanged.
 
-Export MP4 writes a new H.264 MP4 file. It does not replace an existing file. The app shows the export result below the editor.
+The app prepares edited previews in the background. The preview and export use the same FFmpeg renderer. The app also prepares a compatible preview if it cannot play an imported source codec. Preview controls become available when the preview is ready.
+
+Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not replace an existing file. The app shows the export result below the editor.
 
 ## Storage
 
@@ -30,6 +32,7 @@ The default data folder is `.local/data` in the working folder. It contains:
 - `library.json`, the video records and edit history.
 - `media`, the source video copies.
 - `pending`, recording files that the app has not yet imported.
+- `previews`, cached copies of edited videos. Deleting a library video also removes its previews.
 - `connection.json`, the local agent connection and token.
 - `electron`, the desktop session data.
 
@@ -42,7 +45,7 @@ npm start
 
 Set `FFMPEG_PATH` and `FFPROBE_PATH` if the programs are not on `PATH`.
 
-If a save fails, leave the app open. Select Stop and save to retry. Cancel recording removes the pending recording. If the app stops unexpectedly, keep files in `pending`. You can import a readable pending file through `library.import`. Automatic recovery after an app crash is not yet available.
+If a save fails, leave the app open. Select Stop and save to retry. Cancel recording removes the pending recording. If the app stops unexpectedly, keep files in `pending`. You can import a readable pending file through `library.import`. Automatic recovery after an app crash is not yet available. Cached previews use extra disk space.
 
 ## CLI
 
@@ -72,6 +75,8 @@ node src/agent/cli.js export.status '{"jobId":"JOB_ID"}'
 Use IDs from command results. Source IDs can change when a window closes. Export commands return a job ID. Poll `export.status` until its state is `complete` or `failed`.
 
 `help` returns the complete command catalog and argument schemas. It works when the desktop app is closed.
+
+After `playback.open`, poll `playback.status` until `ready` is `true`. If `error` has a value, preview preparation failed. `preview.start` prepares a cached preview without opening the editor. Use `export.status` to read its job state.
 
 ## MCP
 
@@ -105,6 +110,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                 |
 | Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                   |
 | Export             | `export.start`, `export.status`                                                                                                     |
+| Preview rendering  | `preview.start`, with job state from `export.status`                                                                                |
 | Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen` |
 
 ## Code structure
@@ -128,6 +134,10 @@ The suite includes real FFmpeg operations, authenticated CLI and MCP calls, and 
 
 Camera and microphone tests use Chromium test devices. They check visible video frames and an audio track. They do not verify physical devices.
 
-The current execution session reports Windows capture access errors and produces black screen video. The lifecycle test checks start, pause, resume, save, edit, and export. Visible screen content, physical devices, and system audio still require verification in a normal desktop session. Do not treat the lifecycle test as proof of visible screen capture.
+Run `npm run verify:desktop` in a normal Windows desktop session to check real screen video, window video, and system audio. This check plays a short, quiet test tone.
+
+The current agent execution session reports Windows capture access errors and produces black screen and window video. A direct FFmpeg GDI capture also fails with Windows error 5, access denied. System audio passes the tone check. Camera, microphone, and overlay tests use Chromium test devices. Visible desktop content and physical devices still require verification in a normal desktop session. Do not treat the lifecycle test as proof of visible screen capture.
+
+The app uses Electron 45.2.1. It disables the Windows D3D11 camera capture path because that path caused the video capture service to stop during the combined camera and screen test. GPU rendering remains enabled.
 
 There is no cloud upload, hosted share link, transcript, or account system. Share an exported MP4 through a file-sharing method of your choice.

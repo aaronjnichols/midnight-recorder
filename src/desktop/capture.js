@@ -56,12 +56,16 @@ async function start(options) {
   let screenStream, cameraStream;
   const fps = options.frameRate || 30;
   try {
-    if (!options.cameraOnly) {
+    if (!options.cameraOnly || options.systemAudio) {
       screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: fps },
         audio: !!options.systemAudio,
       });
       addInput(screenStream);
+      if (options.systemAudio && !screenStream.getAudioTracks().length)
+        throw new Error(
+          "System audio is not available. Check the Windows audio output or turn off System audio.",
+        );
     }
     if (options.cameraId || options.cameraOnly) {
       cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -75,9 +79,10 @@ async function start(options) {
     }
     const output = new MediaStream();
     {
-      const screen = await videoElement(screenStream || cameraStream);
+      const visibleScreen = options.cameraOnly ? null : screenStream;
+      const screen = await videoElement(visibleScreen || cameraStream);
       const camera =
-        screenStream && cameraStream ? await videoElement(cameraStream) : null;
+        visibleScreen && cameraStream ? await videoElement(cameraStream) : null;
       const canvas = document.createElement("canvas");
       document.body.append(canvas);
       canvas.width = screen.videoWidth;

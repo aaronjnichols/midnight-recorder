@@ -717,3 +717,31 @@ dialog p {
 .player-shell.fullscreen video {
   height: 100%;
 }
+.recorder {
+  padding: 18px;
+}
+.recorder label {
+  margin: 10px 0;
+}
+.recorder input,
+.recorder select {
+  padding: 8px 10px;
+}
+.recorder .source-preview {
+  height: 136px;
+  aspect-ratio: auto;
+}
+.recorder .panel-heading {
+  margin-bottom: 14px;
+}
+.recorder > .hint {
+  margin-top: 10px;
+}
+@media (max-width: 1150px) {
+  .nav {
+    font-size: 12px;
+    gap: 8px;
+    padding: 13px 8px;
+    white-space: nowrap;
+  }
+}

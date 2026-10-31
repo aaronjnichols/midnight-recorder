@@ -28,4 +28,9 @@ Build a local Windows desktop recorder and editor. Use the active Cursor Midnigh
 The workspace started empty. Node 22, Git, and FFmpeg 8.1.1 are installed.
 The active Obsidian theme is Cursor Midnight. Its palette source is
 `C:\_Obsidian\Second Brain\.obsidian\themes\Cursor Midnight\theme.css`.
-The app will use Electron 40.9.3, which has a cached Windows runtime on this computer.
+The app uses Electron 45.2.1. The initial implementation used the cached Electron 40.9.3 runtime.
+The current Windows camera configuration avoids a D3D11 capture service failure found by the overlay test.
+
+The app, CLI, MCP interface, local library, editor, and exact preview renderer are implemented.
+Desktop content verification remains open because this agent session cannot capture the Windows desktop.
+See QA.md for current test evidence and open checks.
