@@ -11,6 +11,7 @@ let selectedVideo,
   previewReady = false,
   viewGeneration = 0,
   previewError = null;
+let lastRecordingError;
 const seconds = (video) => duration(video.timeline);
 const time = (value) =>
   `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
@@ -24,6 +25,7 @@ function notice(message, error = false) {
   }, 9000);
 }
 window.midnight.onNotice((message) => notice(message));
+window.midnight.onRecording((recording) => renderRecording(recording));
 function handle(selector, event, action) {
   $(selector).addEventListener(event, async () => {
     if (busy) return;
@@ -348,7 +350,7 @@ handle("#start", "click", async () => {
     options.title = $("#record-title").value.trim();
   if ($("#microphone").value) options.microphoneId = $("#microphone").value;
   if ($("#camera").value) options.cameraId = $("#camera").value;
-  await call("recording.start", options);
+  await call("recording.countdown", options);
   await refreshStatus();
 });
 handle("#pause", "click", async () => {
@@ -439,21 +441,50 @@ $("#new-nav").addEventListener("click", () => {
   showLibrary();
   $("#record-title").focus();
 });
-async function refreshStatus() {
-  const status = await call("app.status");
-  currentRecording = status.recording.state;
+function renderRecording(recording) {
+  currentRecording = recording.state;
+  if (
+    recording.state === "idle" &&
+    recording.error &&
+    recording.error !== lastRecordingError
+  )
+    notice(`Cannot start recording. ${recording.error}`, true);
+  lastRecordingError = recording.error;
   $("#start").hidden = currentRecording !== "idle";
   $("#record-controls").hidden = currentRecording === "idle";
   $("#record-status").textContent =
     currentRecording === "failed"
-      ? `Recording failed. Select Stop and save to retry, or Cancel. ${status.recording.error}`
-      : currentRecording === "paused"
-        ? "Paused"
-        : currentRecording === "stopped"
-          ? "Stopped. Select Stop and save to retry."
-          : "Recording";
-  $("#pause").disabled = ["stopped", "failed"].includes(currentRecording);
+      ? `Recording failed. Select Stop and save to retry, or Cancel. ${recording.error}`
+      : currentRecording === "countdown"
+        ? `Recording starts in ${recording.remaining}…`
+        : currentRecording === "starting"
+          ? "Starting recording…"
+          : currentRecording === "paused"
+            ? "Paused"
+            : currentRecording === "stopped"
+              ? "Stopped. Select Stop and save to retry."
+              : "Recording";
+  $("#pause").disabled = !["recording", "paused"].includes(currentRecording);
+  $("#stop").disabled = ["countdown", "starting"].includes(currentRecording);
+  $("#cancel-recording").disabled = currentRecording === "starting";
+  $("#cancel-recording").textContent =
+    currentRecording === "countdown" ? "Cancel countdown" : "Cancel recording";
+  for (const selector of [
+    "#source",
+    "#camera",
+    "#microphone",
+    "#camera-only",
+    "#system-audio",
+    "#fps",
+    "#record-title",
+    "#refresh-sources",
+  ])
+    $(selector).disabled = currentRecording !== "idle";
   $("#pause").textContent = currentRecording === "paused" ? "Resume" : "Pause";
+}
+async function refreshStatus() {
+  const status = await call("app.status");
+  renderRecording(status.recording);
   $("#export-jobs").replaceChildren(
     ...status.jobs
       .filter((job) => job.kind !== "preview")

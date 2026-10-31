@@ -2,30 +2,32 @@
 
 Desktop acceptance is blocked in this agent session. This file records checks and open work.
 
-| Requirement                    | Current evidence                                                                               | State                    |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------ |
-| Source-preserving edits        | Domain tests cover trim, cut, speed, mute, undo, redo, and time mapping                        | Tested                   |
-| Local storage                  | Library tests cover copy, restart, search, rename, delete failure, and special path characters | Tested                   |
-| MP4 export                     | Real FFmpeg tests cover audio, cuts, speed, sparse frames, and existing output files           | Tested                   |
-| CLI and MCP parity             | Integration test calls the local service from the CLI and an SDK MCP client                    | Tested                   |
-| Recording state and save       | Electron test uses a screen source and checks pause, resume, save, trim, and export            | Tested                   |
-| Visible screen content         | This execution session records black screen video and reports Windows access errors            | Open                     |
-| Camera and microphone pipeline | Chromium test devices produce visible frames and an audio track                                | Tested with test devices |
-| Physical camera and microphone | No physical device test is complete                                                            | Open                     |
-| Camera overlay                 | Saved camera overlay frames have visible content in the Chromium test-device check             | Tested                   |
-| System audio                   | Acceptance test records a quiet tone through real Windows system audio capture                 | Tested                   |
-| Failed-save retry              | Service tests cover import failure and cleanup failure without duplicate import                | Tested                   |
-| Disk write failure             | Electron test checks that Cancel releases the failed recorder                                  | Tested                   |
-| Input disconnect               | Electron test dispatches an ended input event and checks automatic save                        | Tested                   |
-| Preview controls               | Desktop test covers edited-time seek, volume, fullscreen, and agent commands                   | Tested                   |
-| Cursor Midnight palette        | Values came from the active Obsidian theme. An editor screenshot was inspected                 | Checked                  |
-| Independent review             | Three review agents checked the code. Fixes have regression tests                              | Tested                   |
-| Git history                    | Requirements, domain, agent, and desktop stages have separate commits                          | Checked                  |
+| Requirement                    | Current evidence                                                                                                      | State                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| Source-preserving edits        | Domain tests cover trim, cut, speed, mute, undo, redo, and time mapping                                               | Tested                   |
+| Local storage                  | Library tests cover copy, restart, search, rename, delete failure, and special path characters                        | Tested                   |
+| MP4 export                     | Real FFmpeg tests cover audio, cuts, speed, sparse frames, and existing output files                                  | Tested                   |
+| CLI and MCP parity             | Integration test calls the local service from the CLI and an SDK MCP client                                           | Tested                   |
+| Recording state and save       | Electron test uses a screen source and checks pause, resume, save, trim, and export                                   | Tested                   |
+| Countdown and screen border    | Service tests cover cancellation and timing. Electron tests check countdown, border, pause, stop, and failure cleanup | Tested with test devices |
+| Visible screen content         | This execution session records black screen video and reports Windows access errors                                   | Open                     |
+| Camera and microphone pipeline | Chromium test devices produce visible frames and an audio track                                                       | Tested with test devices |
+| Physical camera and microphone | No physical device test is complete                                                                                   | Open                     |
+| Camera overlay                 | Saved camera overlay frames have visible content in the Chromium test-device check                                    | Tested                   |
+| System audio                   | Acceptance test records a quiet tone through real Windows system audio capture                                        | Tested                   |
+| Failed-save retry              | Service tests cover import failure and cleanup failure without duplicate import                                       | Tested                   |
+| Disk write failure             | Electron test checks that Cancel releases the failed recorder                                                         | Tested                   |
+| Input disconnect               | Electron test dispatches an ended input event and checks automatic save                                               | Tested                   |
+| Preview controls               | Desktop test covers edited-time seek, volume, fullscreen, and agent commands                                          | Tested                   |
+| Cursor Midnight palette        | Values came from the active Obsidian theme. An editor screenshot was inspected                                        | Checked                  |
+| Independent review             | Three review agents checked the code. Fixes have regression tests                                                     | Tested                   |
+| Git history                    | Requirements, domain, agent, and desktop stages have separate commits                                                 | Checked                  |
 
 ## Remaining checks
 
 - Verify visible screen and window capture in a normal desktop session.
 - Verify physical device selection and sound levels.
+- Verify indicator exclusion from saved screen video in a normal Windows desktop session.
 
 ## Desktop capture limit
 
@@ -33,7 +35,7 @@ The current Electron 45.2.1 acceptance run records black screen and window video
 
 The normal desktop check is pending. Use `npm run verify:desktop` from a normal Windows desktop session.
 
-## Latest regression result
+## Earlier frame-inspection regression result
 
 `npm test` passes all 49 tests. The current run includes frame inspection and the three review fixes below. Library and editor screenshots were inspected at the minimum window width. There is no horizontal overflow.
 
@@ -94,7 +96,7 @@ This practice checks imported video inspection. It does not close the real deskt
 
 ## Timed speech
 
-The final `npm test` run passed 67 tests with no failures or skipped tests. The log is `.local/transcription-verified-tests.log`. Three Python scoring tests also passed. The app now has 39 shared commands, including six transcript commands.
+The speech-stage `npm test` run passed 67 tests with no failures or skipped tests. The log is `.local/transcription-verified-tests.log`. Three Python scoring tests also passed. That stage had 39 shared commands, including six transcript commands.
 
 Three downloaded public videos passed the production engine check. A NASA caption comparison measured 13 word edits in 970 reference words, or 1.34%. This is one English file, not a general accuracy score. Two Blender videos supplied actual screen controls and spoken instructions. See [sources, measurements, and limits](docs/transcription-validation.md).
 
@@ -103,3 +105,17 @@ A fresh `npm run setup:transcription` passed. The actual desktop, CLI, and MCP w
 An independent agent found the requested Blender control through CLI and MCP and viewed its before, during, and after frames. Review fixes cover cancellation during startup, package changes in cache identity, cache deletion order, the no-audio flag, scoring with no matched words, and proof of speech progress before cancellation. The final reviews returned no findings.
 
 An existing test-camera check was intermittent because it used a fixed sleep before ending the input. It now waits for recorded bytes with a ten-second limit. The full suite passed after this test change. Production capture code did not change. The real desktop and physical-device limits above remain open.
+
+## Countdown and recording border
+
+The final `npm test` run passed all 73 tests with no failures or skipped tests. The run took 122 seconds. The log is `.local/countdown-verified-tests.log`.
+
+The Record button uses `recording.countdown`. CLI and MCP can use the same command. The app has 40 shared commands. Immediate `recording.start` remains available.
+
+Service tests check 3, 2, 1, no capture during the countdown, cancellation, stale timers, duplicate starts, and startup errors. The transport test calls the new command through CLI and MCP. The Electron test uses a test camera as its screen input. It checks the native countdown, protected and non-focusable indicator, display bounds, pause, resume, save, and failure cleanup. The missing-system-audio test now selects a real source ID before it supplies its test stream.
+
+Display tests cover a second monitor, negative display coordinates, display size changes, connection during preparation or capture, removal, and cancellation while an indicator loads. These use display test objects. Physical monitor connection checks remain open.
+
+The countdown and red and amber border screenshots were inspected in `output/playwright/04-countdown.png`, `05-recording-border.png`, and `06-paused-border.png`. The border image has a transparent center. The indicator uses Windows capture protection. This remote session cannot confirm indicator exclusion from saved screen video because the real screen capture remains black.
+
+Two review agents checked the service and desktop stages. Fixes cover a timer race in the transport test and monitors connected while indicator windows load. The final review returned no findings.

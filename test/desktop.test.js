@@ -40,9 +40,11 @@ test(
         ([name, args]) => window.midnight.execute(name, args),
         [name, args],
       );
+    const sourceId = (await call("capture.sources")).find((s) =>
+      s.id.startsWith("screen:"),
+    ).id;
     await assert.rejects(
-      () =>
-        call("recording.start", { sourceId: "screen:test", systemAudio: true }),
+      () => call("recording.start", { sourceId, systemAudio: true }),
       /System audio is not available/,
     );
     assert.equal((await call("app.status")).recording.state, "idle");

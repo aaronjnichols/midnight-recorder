@@ -5,6 +5,7 @@ import {
   desktopCapturer,
   dialog,
   session,
+  screen,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +21,7 @@ import { LocalTranscriber } from "../adapters/transcriber.js";
 import { PythonSpeechRunner } from "../adapters/transcription-worker.js";
 import { serve } from "../agent/server.js";
 import { dataRoot } from "../agent/client.js";
+import { RecordingFeedback } from "./recording-feedback.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = dataRoot();
@@ -92,8 +94,27 @@ else
         ).map((s) => ({
           id: s.id,
           name: s.name,
+          displayId: s.display_id,
           thumbnail: s.thumbnail.toDataURL(),
         }));
+      const feedback = new RecordingFeedback({
+        BrowserWindow,
+        screen,
+        onError: (error) => {
+          if (ui && !ui.isDestroyed())
+            ui.webContents.send(
+              "notice",
+              `Cannot show the recording border on the new display. ${error.message}`,
+            );
+        },
+        sources: async () =>
+          (
+            await desktopCapturer.getSources({
+              types: ["screen"],
+              thumbnailSize: { width: 0, height: 0 },
+            })
+          ).map((s) => ({ id: s.id, displayId: s.display_id })),
+      });
       session.defaultSession.setPermissionRequestHandler(
         (contents, permission, callback) =>
           callback(
@@ -169,6 +190,7 @@ else
           if (!stopped) {
             await rpc("stop");
             stopped = true;
+            feedback.update({ state: "stopped" });
             await closeStream();
           }
           if (writeError) throw writeError;
@@ -178,6 +200,7 @@ else
           try {
             await rpc("cancel");
           } finally {
+            feedback.update({ state: "idle" });
             await closeStream().catch(() => {});
             if (file) await rm(file, { force: true });
             file = null;
@@ -235,6 +258,14 @@ else
         }),
         capture,
         playback,
+        recordingFeedback: {
+          prepare: (options) => feedback.prepare(options),
+          update: (recording) => {
+            feedback.update(recording);
+            if (ui && !ui.isDestroyed())
+              ui.webContents.send("recording:state", recording);
+          },
+        },
       });
       let notifiedFailureId;
       ipcMain.on("capture:failed", (event, failure) => {
@@ -353,6 +384,7 @@ else
         }
       });
       ui.on("closed", () => {
+        feedback.dispose();
         server.close();
         worker.destroy();
         app.quit();

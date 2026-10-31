@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'"
+    />
+    <title>Midnight recording indicator</title>
+    <link rel="stylesheet" href="recording-feedback.css" />
+  </head>
+  <body>
+    <div id="border" hidden><div id="badge"></div></div>
+    <div id="countdown" hidden>
+      <div class="countdown-card">
+        <div class="eyebrow">MIDNIGHT RECORDER</div>
+        <div id="count" role="status" aria-live="polite">3</div>
+        <div class="label">Get ready to record</div>
+        <div class="hint">Use Cancel in the app to stop the countdown.</div>
+      </div>
+    </div>
+    <script src="recording-feedback-renderer.js"></script>
+  </body>
+</html>

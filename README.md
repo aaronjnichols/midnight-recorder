@@ -15,7 +15,9 @@ npm start
 
 You can also run `Start Midnight Recorder.cmd` from this folder.
 
-Select a screen or window. Select a microphone or camera if needed. Select Start recording. Use Pause, Resume, and Stop and save to control the recording. For a camera recording without a screen, select Camera only.
+Select a screen or window. Select a microphone or camera if needed. Select Start recording. The app shows 3, 2, 1 before capture starts. Use Cancel countdown if you are not ready. A red screen border and a Recording label show when capture is active. The border turns amber when paused. It closes when capture stops. Use Pause, Resume, and Stop and save to control the recording. For a camera recording without a screen, select Camera only.
+
+For screen capture, the border marks the selected display. For window or camera capture, it appears on all connected displays as a recording indicator. It also appears on all displays if Windows does not supply the screen's display ID. The border lets mouse clicks pass through and does not take keyboard focus. Windows capture protection is enabled for the indicator. Verify that it stays out of the saved video on your Windows capture system.
 
 Use Import video to add an existing MP4, WebM, MOV, or MKV file. The app copies the source into its library.
 
@@ -77,6 +79,8 @@ node src/agent/cli.js export.status '{"jobId":"JOB_ID"}'
 ```
 
 Use IDs from command results. Source IDs can change when a window closes. Export commands return a job ID. Poll `export.status` until its state is `complete` or `failed`.
+
+Use `recording.countdown` with the same arguments as `recording.start` to get the same 3, 2, 1 countdown as the desktop button. It returns an `id`, `state: "countdown"`, and `remaining: 3`. Poll `app.status` until recording starts. Use `recording.cancel` to cancel the countdown. A startup failure returns the recorder to `idle` with an `error` message. `recording.start` starts capture immediately. Both commands use the native recording border. These commands are also available through MCP.
 
 `recording.start` returns a recording `id`. Capture adapters use `recording.fail` with this `recordingId` and an `error` message to report a failure through the shared service. This command pauses capture and retains the pending data. The service ignores duplicate failure reports and reports for an old recording ID.
 
@@ -146,18 +150,18 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 
 ## Commands
 
-| Task               | Commands                                                                                                                            |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| App state and view | `app.status`, `app.view`                                                                                                            |
-| Capture selection  | `capture.sources`, `capture.devices`                                                                                                |
-| Recording          | `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail`                    |
-| Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                 |
-| Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                   |
-| Export             | `export.start`, `export.status`                                                                                                     |
-| Preview rendering  | `preview.start`, with job state from `export.status`                                                                                |
-| Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                              |
-| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`     |
-| Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen` |
+| Task               | Commands                                                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| App state and view | `app.status`, `app.view`                                                                                                                |
+| Capture selection  | `capture.sources`, `capture.devices`                                                                                                    |
+| Recording          | `recording.countdown`, `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail` |
+| Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                     |
+| Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                       |
+| Export             | `export.start`, `export.status`                                                                                                         |
+| Preview rendering  | `preview.start`, with job state from `export.status`                                                                                    |
+| Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                  |
+| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`         |
+| Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen`     |
 
 ## Code structure
 
