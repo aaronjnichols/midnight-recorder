@@ -23,6 +23,17 @@ export function duration(timeline) {
   );
 }
 
+export function isEdited(timeline, sourceDuration) {
+  const [first] = timeline.segments;
+  return !(
+    timeline.segments.length === 1 &&
+    first.start === 0 &&
+    first.end === sourceDuration &&
+    timeline.speed === 1 &&
+    !timeline.muted
+  );
+}
+
 function change(timeline, value) {
   return {
     ...timeline,

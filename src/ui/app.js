@@ -1,4 +1,16 @@
-import { duration } from "../domain/timeline.js";
+import { duration, isEdited } from "../domain/timeline.js";
+import { recordedSeconds } from "../domain/recording.js";
+import {
+  clock,
+  libraryView,
+  exportRows,
+  finishedExports,
+  recordingView,
+  readableError,
+  playheadValue,
+  rangeCheck,
+  shortcut,
+} from "./view-model.js";
 const $ = (selector) => document.querySelector(selector);
 const call = (name, args = {}) => window.midnight.execute(name, args);
 let selectedVideo,
@@ -6,38 +18,73 @@ let selectedVideo,
   currentRecording = "idle",
   busy = false,
   lastLibrary = "",
+  librarySequence = 0,
   statusTimer,
   previewKey = "",
   previewReady = false,
   viewGeneration = 0,
-  previewError = null;
+  previewError = null,
+  rangeKey = "",
+  lastJobs = [],
+  recordingDisplay = recordingView();
 let lastRecordingError;
+const loadedAt = Date.now();
+// The service keeps the timing fields. A reloaded page reads the same values.
+let lastRecording = { state: "idle" };
+const knownExports = new Map();
 const seconds = (video) => duration(video.timeline);
-const time = (value) =>
-  `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
+const element = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
 function notice(message, error = false) {
-  $("#message").textContent = message;
+  $("#message-text").textContent = message;
   $("#message").classList.toggle("error", error);
   $("#message").hidden = false;
   clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => {
-    $("#message").hidden = true;
-  }, 9000);
+  statusTimer = setTimeout(
+    () => {
+      $("#message").hidden = true;
+    },
+    error ? 12000 : 7000,
+  );
 }
+$("#message-close").addEventListener("click", () => {
+  clearTimeout(statusTimer);
+  $("#message").hidden = true;
+});
 window.midnight.onNotice((message) => notice(message));
 window.midnight.onRecording((recording) => renderRecording(recording));
-function handle(selector, event, action) {
-  $(selector).addEventListener(event, async () => {
-    if (busy) return;
-    busy = true;
+let activeRun = Promise.resolve(),
+  shortcutQueue = Promise.resolve();
+// Runs one page action at a time. A second click during an action is ignored.
+function run(action) {
+  if (busy) return Promise.resolve();
+  busy = true;
+  document.body.classList.add("is-busy");
+  activeRun = (async () => {
     try {
       await action();
     } catch (error) {
       notice(error.message, true);
     } finally {
       busy = false;
+      document.body.classList.remove("is-busy");
     }
+  })();
+  return activeRun;
+}
+// Keys and timeline selections wait for the current action. They are not lost.
+function enqueue(action) {
+  shortcutQueue = shortcutQueue.then(async () => {
+    while (busy) await activeRun;
+    await run(action);
   });
+}
+function handle(selector, event, action) {
+  $(selector).addEventListener(event, () => run(action));
 }
 async function refreshSources() {
   sources = await call("capture.sources");
@@ -64,66 +111,109 @@ async function refreshSources() {
   }
 }
 function updateSource() {
+  const preview = $("#source-preview");
   const source = sources.find((s) => s.id === $("#source").value);
-  const fallback = () => {
-    const icon = document.createElement("span");
-    icon.textContent = "▣";
-    const label = document.createElement("p");
-    label.textContent = source
-      ? "Preview unavailable"
-      : "Select a screen or window";
-    $("#source-preview").replaceChildren(icon, label);
+  const placeholder = (symbol, text) => {
+    preview.replaceChildren(
+      element("span", "", symbol),
+      element("p", "", text),
+    );
   };
+  preview.dataset.kind = $("#camera-only").checked ? "camera" : "source";
+  if ($("#camera-only").checked)
+    return placeholder(
+      "◉",
+      "Camera only. The app records the camera and not the screen.",
+    );
+  const fallback = () =>
+    placeholder(
+      "▣",
+      source ? "Preview unavailable" : "Select a screen or window",
+    );
   if (source?.thumbnail) {
     const image = document.createElement("img");
     image.onerror = fallback;
     image.src = source.thumbnail;
     image.alt = source.name;
-    $("#source-preview").replaceChildren(image);
+    preview.replaceChildren(image);
   } else fallback();
 }
-async function refreshLibrary() {
-  const videos = await call(
-    "library.list",
-    $("#search").value ? { query: $("#search").value } : {},
+function videoCard(video) {
+  const card = element("button", "video-card");
+  card.dataset.id = video.id;
+  card.title = video.title;
+  const cover = element("div", "video-cover");
+  const icon = element("span", "cover-icon", "▶");
+  icon.setAttribute("aria-hidden", "true");
+  const preview = document.createElement("video");
+  // Show a frame after the start. Many recordings start with a black frame.
+  const frame = Math.min(1, video.metadata.duration / 2);
+  preview.src = `${video.url}#t=${frame.toFixed(2)}`;
+  preview.muted = true;
+  preview.preload = "metadata";
+  preview.tabIndex = -1;
+  preview.setAttribute("aria-hidden", "true");
+  cover.append(
+    icon,
+    preview,
+    element("span", "duration", clock(seconds(video))),
   );
-  const key = JSON.stringify(videos);
+  if (isEdited(video.timeline, video.metadata.duration))
+    cover.append(element("span", "edited-badge", "Edited"));
+  const body = element("div", "card-body");
+  const date = new Date(video.createdAt).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const size =
+    video.metadata.width && video.metadata.height
+      ? ` · ${video.metadata.width} × ${video.metadata.height}`
+      : "";
+  body.append(
+    element("strong", "card-title", video.title),
+    element("span", "card-meta", date + size),
+  );
+  card.append(cover, body);
+  card.addEventListener("click", () =>
+    openVideo(video.id, { focus: true }).catch((error) =>
+      notice(error.message, true),
+    ),
+  );
+  return card;
+}
+async function refreshLibrary() {
+  const request = ++librarySequence;
+  const query = $("#search").value.trim();
+  const all = await call("library.list");
+  const videos = query ? await call("library.list", { query }) : all;
+  if (request !== librarySequence) return;
+  const key = JSON.stringify([query, all.length, videos]);
   if (key === lastLibrary) return;
   lastLibrary = key;
-  $("#videos").replaceChildren();
-  $("#empty").hidden = videos.length > 0;
-  $("#video-total").textContent =
-    `${videos.length} video${videos.length === 1 ? "" : "s"}`;
-  $("#library-count").textContent = videos.length;
-  for (const video of videos) {
-    const card = document.createElement("button");
-    card.className = "video-card";
-    const cover = document.createElement("div");
-    cover.className = "video-cover";
-    const preview = document.createElement("video");
-    preview.src = video.url;
-    preview.muted = true;
-    preview.preload = "metadata";
-    const length = document.createElement("span");
-    length.textContent = time(seconds(video));
-    cover.append(preview, length);
-    const body = document.createElement("div");
-    body.className = "card-body";
-    const title = document.createElement("strong");
-    title.className = "card-title";
-    title.textContent = video.title;
-    const meta = document.createElement("span");
-    meta.className = "card-meta";
-    meta.textContent = `${new Date(video.createdAt).toLocaleDateString()} · ${video.metadata.width || ""} × ${video.metadata.height || ""}`;
-    body.append(title, meta);
-    card.append(cover, body);
-    card.addEventListener("click", () =>
-      openVideo(video.id).catch((error) => notice(error.message, true)),
-    );
-    $("#videos").append(card);
+  const view = libraryView({
+    total: all.length,
+    shown: videos.length,
+    query,
+  });
+  $("#video-total").textContent = view.caption;
+  $("#library-count").textContent = all.length;
+  $("#empty").hidden = !view.empty;
+  if (view.empty) {
+    $("#empty").dataset.kind = view.empty.kind;
+    $("#empty-icon").textContent = view.empty.kind === "search" ? "⌕" : "▷";
+    $("#empty-title").textContent = view.empty.title;
+    $("#empty-text").textContent = view.empty.text;
+    $("#clear-search").hidden = view.empty.kind !== "search";
   }
+  $("#videos").replaceChildren(...videos.map(videoCard));
 }
-function showLibrary() {
+function clearSearch() {
+  $("#search").value = "";
+  return refreshLibrary();
+}
+function showLibrary({ restoreFocus = false } = {}) {
+  const previous = selectedVideo?.id;
   viewGeneration++;
   $("#player").pause();
   $("#editor").hidden = true;
@@ -132,12 +222,57 @@ function showLibrary() {
   selectedVideo = null;
   previewKey = "";
   previewReady = false;
+  rangeKey = "";
   $(".player-shell").classList.remove("fullscreen");
+  if (restoreFocus) {
+    const card = [...document.querySelectorAll(".video-card")].find(
+      (item) => item.dataset.id === previous,
+    );
+    (card || $("#search")).focus();
+  }
 }
-async function openVideo(id) {
+function focusRecorder() {
+  const recorder = $("#recorder");
+  recorder.classList.remove("attention");
+  void recorder.offsetWidth;
+  recorder.classList.add("attention");
+  const target = ["#stop", "#pause", "#cancel-recording", "#record-title"]
+    .map($)
+    .find((item) => !item.disabled && item.offsetParent !== null);
+  (target || recorder).focus();
+}
+function showView(view, options) {
+  showLibrary(options);
+  if (view === "recorder") focusRecorder();
+}
+async function openVideo(id, { focus = false } = {}) {
   const generation = ++viewGeneration;
   const video = await call("library.get", { id });
-  if (generation === viewGeneration) renderVideo(video);
+  if (generation !== viewGeneration) return;
+  renderVideo(video);
+  if (focus) $("#video-title").focus();
+}
+function previewStatus(text, state) {
+  $("#preview-state").textContent = text;
+  $("#preview-state").dataset.state = state;
+}
+function renderVideoInfo(video) {
+  const parts = [
+    element("span", "", clock(seconds(video))),
+    element("span", "", `${video.metadata.width} × ${video.metadata.height}`),
+  ];
+  if (video.metadata.hasAudio === false)
+    parts.push(element("span", "", "No sound"));
+  parts.push(
+    isEdited(video.timeline, video.metadata.duration)
+      ? element(
+          "span",
+          "chip edited",
+          `Edited from ${clock(video.metadata.duration)}`,
+        )
+      : element("span", "chip", "Original"),
+  );
+  $("#video-info").replaceChildren(...parts);
 }
 function renderVideo(video) {
   selectedVideo = video;
@@ -145,10 +280,15 @@ function renderVideo(video) {
   $("#library-view").hidden = true;
   $("#editor").hidden = false;
   $("#crumb").textContent = "Video editor";
-  $("#video-title").textContent = selectedVideo.title;
-  $("#rename-title").value = selectedVideo.title;
-  $("#video-info").textContent =
-    `${time(seconds(selectedVideo))} · ${selectedVideo.metadata.width} × ${selectedVideo.metadata.height} · Local video`;
+  $("#video-title").textContent = video.title;
+  const title = $("#rename-title");
+  if (title.dataset.videoId !== id || title.value === title.dataset.rendered)
+    title.value = video.title;
+  title.dataset.videoId = id;
+  title.dataset.rendered = video.title;
+  updateRenameState();
+  $("#delete-name").textContent = video.title;
+  renderVideoInfo(video);
   const player = $("#player");
   const { segments, speed, muted } = video.timeline;
   const key = id + JSON.stringify({ segments, speed, muted });
@@ -160,35 +300,43 @@ function renderVideo(video) {
     player.pause();
     player.removeAttribute("src");
     player.load();
-    const original =
-      segments.length === 1 &&
-      segments[0].start === 0 &&
-      segments[0].end === video.metadata.duration &&
-      speed === 1 &&
-      !muted;
-    if (original) setPreview(video.url, true);
+    if (!isEdited(video.timeline, video.metadata.duration))
+      setPreview(video.url, true);
     else {
-      $("#preview-state").textContent =
-        "Preparing edited preview. You can continue to edit.";
+      previewStatus(
+        "Preparing edited preview. You can continue to edit.",
+        "preparing",
+      );
       Promise.resolve().then(() => preparePreview(video, key));
     }
   }
-  $("#range-start").value = 0;
-  $("#range-end").value = seconds(selectedVideo);
-  $("#speed").value = selectedVideo.timeline.speed;
-  $("#mute").checked = selectedVideo.timeline.muted;
-  $("#undo").disabled = !selectedVideo.timeline.past.length;
-  $("#redo").disabled = !selectedVideo.timeline.future.length;
-  $("#duration").textContent = time(seconds(selectedVideo));
-  $("#preview-seek").max = seconds(selectedVideo);
-  syncPreview();
+  const total = seconds(video);
+  if (rangeKey !== key) {
+    rangeKey = key;
+    $("#range-start").value = 0;
+    $("#range-end").value = total;
+  }
+  $("#range-start").max = total;
+  $("#range-end").max = total;
+  $("#speed").value = video.timeline.speed;
+  $("#mute").checked = video.timeline.muted;
+  const silent = video.metadata.hasAudio === false;
+  $("#mute").disabled = silent && !video.timeline.muted;
+  $("#no-audio").hidden = !silent;
+  $("#undo").disabled = !video.timeline.past.length;
+  $("#redo").disabled = !video.timeline.future.length;
+  $("#duration").textContent = clock(total);
+  $("#preview-seek").max = total;
   $("#timeline-bars").replaceChildren(
-    ...selectedVideo.timeline.segments.map((s) => {
+    ...video.timeline.segments.map((s) => {
       const bar = document.createElement("i");
       bar.style.flex = s.end - s.start;
       return bar;
     }),
   );
+  renderRange();
+  renderExports();
+  syncPreview();
 }
 function setPreview(url, original = false) {
   const player = $("#player");
@@ -198,7 +346,7 @@ function setPreview(url, original = false) {
   player.muted = selectedVideo.timeline.muted;
   player.currentTime = 0;
   previewReady = false;
-  $("#preview-state").textContent = "Loading preview.";
+  previewStatus("Loading preview.", "preparing");
   syncPreview();
 }
 async function preparePreview(video, key) {
@@ -219,7 +367,7 @@ async function preparePreview(video, key) {
   } catch (error) {
     if (selectedVideo && previewKey === key) {
       previewError = error.message;
-      $("#preview-state").textContent = `Preview failed: ${error.message}`;
+      previewStatus(`Preview failed: ${error.message}`, "failed");
       notice(error.message, true);
     }
   }
@@ -231,8 +379,7 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
       viewGeneration++;
       renderVideo(args.video);
     } else if (action === "view") {
-      showLibrary();
-      if (args.view === "recorder") $("#record-title").focus();
+      showView(args.view);
     } else if (action === "fullscreen" && !args.enabled) {
       $(".player-shell").classList.remove("fullscreen");
     } else {
@@ -273,22 +420,37 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
 function syncPreview() {
   if (!selectedVideo) return;
   const player = $("#player");
-  $("#preview-play").textContent = player.paused ? "Play" : "Pause";
+  const total = seconds(selectedVideo);
+  const playing = !player.paused;
+  $("#preview-play .icon").textContent = playing ? "❚❚" : "▶";
+  $("#preview-play .label").textContent = playing ? "Pause" : "Play";
+  $("#preview-play").setAttribute(
+    "aria-label",
+    playing ? "Pause preview" : "Play preview",
+  );
   $("#preview-play").disabled = !previewReady;
   $("#preview-seek").disabled = !previewReady;
   $("#preview-seek").value = player.currentTime;
   $("#preview-time").textContent =
-    `${time(player.currentTime)} / ${time(seconds(selectedVideo))}`;
+    `${clock(player.currentTime)} / ${clock(total)}`;
   $("#preview-volume").value = player.volume;
+  $("#timeline-playhead").style.left =
+    `${Math.min(100, (player.currentTime / total) * 100)}%`;
+  $("#timeline-track").classList.toggle("ready", previewReady);
+  $("#range-start-now").disabled = !previewReady;
+  $("#range-end-now").disabled = !previewReady;
+  const fullscreen = $(".player-shell").classList.contains("fullscreen");
+  const label = fullscreen ? "Exit fullscreen" : "Fullscreen";
+  $("#preview-fullscreen .label").textContent = label;
+  $("#preview-fullscreen").setAttribute("aria-label", label);
 }
-for (const event of ["play", "pause", "volumechange"])
+for (const event of ["play", "pause", "volumechange", "timeupdate", "seeked"])
   $("#player").addEventListener(event, syncPreview);
 $("#player").addEventListener("loadeddata", () => {
   if (!selectedVideo || $("#player").readyState < 2) return;
   previewReady = true;
   previewError = null;
-  $("#preview-state").textContent =
-    "Preview ready. Your edits match the exported video.";
+  previewStatus("Preview ready. Your edits match the exported video.", "ready");
   syncPreview();
 });
 $("#player").addEventListener("error", () => {
@@ -297,16 +459,19 @@ $("#player").addEventListener("error", () => {
   previewReady = false;
   if (player.dataset.original === "true") {
     player.dataset.original = "false";
-    $("#preview-state").textContent = "Preparing a compatible preview.";
+    previewStatus("Preparing a compatible preview.", "preparing");
     preparePreview(selectedVideo, previewKey);
   } else {
     previewError =
       "Cannot play this preview. Check the source file and FFmpeg.";
-    $("#preview-state").textContent = previewError;
+    previewStatus(previewError, "failed");
   }
   syncPreview();
 });
-$("#player").addEventListener("timeupdate", syncPreview);
+new MutationObserver(syncPreview).observe($(".player-shell"), {
+  attributes: true,
+  attributeFilter: ["class"],
+});
 handle("#preview-play", "click", () =>
   call($("#player").paused ? "playback.play" : "playback.pause"),
 );
@@ -321,15 +486,130 @@ handle("#preview-fullscreen", "click", () =>
     enabled: !$(".player-shell").classList.contains("fullscreen"),
   }),
 );
+$("#timeline-track").addEventListener("click", (event) => {
+  if (!selectedVideo) return;
+  if (!previewReady) {
+    notice("Wait for the preview. Then select a point on the timeline.");
+    return;
+  }
+  const box = event.currentTarget.getBoundingClientRect();
+  const fraction = Math.min(
+    1,
+    Math.max(0, (event.clientX - box.left) / box.width),
+  );
+  const id = selectedVideo.id;
+  enqueue(async () => {
+    if (selectedVideo?.id !== id || !previewReady) return;
+    await call("playback.seek", { seconds: fraction * seconds(selectedVideo) });
+  });
+});
+function checkRange() {
+  return rangeCheck(
+    $("#range-start").value,
+    $("#range-end").value,
+    seconds(selectedVideo),
+  );
+}
+function rangeValues() {
+  const { start, end } = checkRange();
+  return { start, end };
+}
+function renderRange() {
+  if (!selectedVideo) return;
+  const total = seconds(selectedVideo);
+  const { start, end, valid, full, maximum } = checkRange();
+  const summary = $("#range-summary");
+  summary.classList.toggle("invalid", !valid);
+  summary.textContent = !valid
+    ? `Set an end time after the start time. The maximum is ${maximum}.`
+    : full
+      ? "The range is the full video. Change the start or end time."
+      : `Selected range: ${(end - start).toFixed(2)} seconds.`;
+  $("#trim").disabled = !valid || full;
+  $("#cut").disabled = !valid || full;
+  $("#timeline-range").hidden = !valid || full;
+  if (valid && !full) {
+    $("#timeline-range").style.left = `${(start / total) * 100}%`;
+    $("#timeline-range").style.width = `${((end - start) / total) * 100}%`;
+  }
+}
+for (const id of ["#range-start", "#range-end"])
+  $(id).addEventListener("input", renderRange);
+function setRangeFromPlayhead(which) {
+  if (!selectedVideo || !previewReady) return;
+  $(`#range-${which}`).value = playheadValue(
+    $("#player").currentTime,
+    seconds(selectedVideo),
+  );
+  renderRange();
+}
+$("#range-start-now").addEventListener("click", () =>
+  setRangeFromPlayhead("start"),
+);
+$("#range-end-now").addEventListener("click", () =>
+  setRangeFromPlayhead("end"),
+);
 document.addEventListener("keydown", (event) => {
   if (
     event.key === "Escape" &&
     $(".player-shell").classList.contains("fullscreen")
-  )
+  ) {
     call("playback.fullscreen", { enabled: false }).catch((error) =>
       notice(error.message, true),
     );
+    return;
+  }
+  const context = shortcutContext();
+  // Accept a key that can apply after the current action completes. Check it
+  // again with the state at that time.
+  const possible = shortcut(event, {
+    ...context,
+    ready: true,
+    canUndo: true,
+    canRedo: true,
+  });
+  if (!possible) return;
+  event.preventDefault();
+  if (context.view === "library") return perform(possible);
+  const keys = {
+    key: event.key,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    target: event.target,
+  };
+  const id = selectedVideo?.id;
+  enqueue(async () => {
+    if (!selectedVideo || selectedVideo.id !== id) return;
+    const action = shortcut(keys, shortcutContext());
+    if (action) await perform(action);
+  });
 });
+function shortcutContext() {
+  const player = $("#player");
+  return {
+    view: $("#editor").hidden ? "library" : "editor",
+    ready: previewReady,
+    paused: player.paused,
+    seconds: player.currentTime,
+    duration: selectedVideo ? seconds(selectedVideo) : 0,
+    fullscreen: $(".player-shell").classList.contains("fullscreen"),
+    canUndo: Boolean(selectedVideo?.timeline.past.length),
+    canRedo: Boolean(selectedVideo?.timeline.future.length),
+    dialog: $("#confirm-delete").open,
+  };
+}
+function perform(action) {
+  if (action.local === "search") {
+    $("#search").focus();
+    $("#search").select();
+  } else if (action.local === "range-start") setRangeFromPlayhead("start");
+  else if (action.local === "range-end") setRangeFromPlayhead("end");
+  else if (action.command.startsWith("edit."))
+    return edit(action.command.slice(5));
+  else return call(action.command, action.args);
+}
 async function edit(action, args = {}) {
   const id = selectedVideo.id,
     generation = viewGeneration;
@@ -363,7 +643,8 @@ handle("#stop", "click", async () => {
   const video = await call("recording.stop");
   await refreshStatus();
   await refreshLibrary();
-  await openVideo(video.id);
+  await openVideo(video.id, { focus: true });
+  notice(`Recording saved: ${video.title}`);
 });
 handle("#cancel-recording", "click", async () => {
   await call("recording.cancel");
@@ -371,29 +652,37 @@ handle("#cancel-recording", "click", async () => {
 });
 handle("#refresh-sources", "click", refreshSources);
 $("#source").addEventListener("change", updateSource);
+$("#camera-only").addEventListener("change", updateSource);
 $("#search").addEventListener("input", () =>
   refreshLibrary().catch((error) => notice(error.message, true)),
 );
+$("#search").addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !$("#search").value) return;
+  event.preventDefault();
+  clearSearch().catch((error) => notice(error.message, true));
+});
+$("#clear-search").addEventListener("click", () => {
+  $("#search").focus();
+  clearSearch().catch((error) => notice(error.message, true));
+});
 handle("#import", "click", async () => {
   const path = await window.midnight.pickImport();
-  if (path) {
+  if (!path) return;
+  const button = $("#import");
+  button.setAttribute("aria-busy", "true");
+  $("#import .label").textContent = "Importing…";
+  try {
     const video = await call("library.import", { path });
     await refreshLibrary();
-    await openVideo(video.id);
+    await openVideo(video.id, { focus: true });
+    notice(`Video imported: ${video.title}`);
+  } finally {
+    button.removeAttribute("aria-busy");
+    $("#import .label").textContent = "Import video";
   }
 });
-handle("#trim", "click", () =>
-  edit("trim", {
-    start: Number($("#range-start").value),
-    end: Number($("#range-end").value),
-  }),
-);
-handle("#cut", "click", () =>
-  edit("cut", {
-    start: Number($("#range-start").value),
-    end: Number($("#range-end").value),
-  }),
-);
+handle("#trim", "click", () => edit("trim", rangeValues()));
+handle("#cut", "click", () => edit("cut", rangeValues()));
 handle("#speed", "change", () =>
   edit("configure", { speed: Number($("#speed").value) }),
 );
@@ -402,19 +691,33 @@ handle("#mute", "change", () =>
 );
 for (const action of ["undo", "redo", "reset"])
   handle("#" + action, "click", () => edit(action));
+function updateRenameState() {
+  const value = $("#rename-title").value.trim();
+  $("#rename").disabled =
+    !selectedVideo || !value || value === selectedVideo.title;
+}
+$("#rename-title").addEventListener("input", updateRenameState);
+$("#rename-title").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || $("#rename").disabled) return;
+  event.preventDefault();
+  $("#rename").click();
+});
 handle("#rename", "click", async () => {
+  const id = selectedVideo.id;
   await call("library.rename", {
-    id: selectedVideo.id,
+    id,
     title: $("#rename-title").value,
   });
-  await openVideo(selectedVideo.id);
+  await openVideo(id);
   await refreshLibrary();
+  notice("Title saved.");
 });
 handle("#export", "click", async () => {
   const path = await window.midnight.pickExport(selectedVideo.title);
   if (path) {
     await call("export.start", { id: selectedVideo.id, path });
     notice("Export started. You can continue to edit.");
+    await refreshStatus();
   }
 });
 $("#delete").addEventListener("click", () => $("#confirm-delete").showModal());
@@ -431,16 +734,44 @@ handle("#confirm-delete-button", "click", async () => {
     renderVideo(selectedVideo);
     throw error;
   }
+  const title = selectedVideo.title;
   $("#confirm-delete").close();
   showLibrary();
   await refreshLibrary();
+  $("#search").focus();
+  notice(`Video deleted: ${title}`);
 });
-$("#back").addEventListener("click", showLibrary);
-$("#library-nav").addEventListener("click", showLibrary);
-$("#new-nav").addEventListener("click", () => {
-  showLibrary();
-  $("#record-title").focus();
-});
+$("#back").addEventListener("click", () => showLibrary({ restoreFocus: true }));
+$("#library-nav").addEventListener("click", () =>
+  showLibrary({ restoreFocus: true }),
+);
+$("#new-nav").addEventListener("click", () => showView("recorder"));
+$("#recording-pill").addEventListener("click", () => showView("recorder"));
+function renderExports() {
+  const rows = selectedVideo ? exportRows(lastJobs, selectedVideo.id) : [];
+  $("#exports").hidden = !rows.length;
+  $("#export-jobs").replaceChildren(
+    ...rows.map((row) => {
+      const item = element("div", "export-row");
+      item.dataset.state = row.state;
+      const file = element("div", "export-file");
+      file.append(
+        element("strong", "", row.file),
+        element("span", "", row.folder),
+      );
+      item.append(element("span", "export-state", row.label), file);
+      if (row.error) item.append(element("p", "export-error", row.error));
+      return item;
+    }),
+  );
+}
+function renderRecordingTime() {
+  const text = clock(recordedSeconds(lastRecording, Date.now()));
+  for (const id of ["#record-time", "#pill-time"]) {
+    $(id).hidden = !recordingDisplay.showTime;
+    if ($(id).textContent !== text) $(id).textContent = text;
+  }
+}
 function renderRecording(recording) {
   currentRecording = recording.state;
   if (
@@ -448,27 +779,36 @@ function renderRecording(recording) {
     recording.error &&
     recording.error !== lastRecordingError
   )
-    notice(`Cannot start recording. ${recording.error}`, true);
+    notice(`Cannot start recording. ${readableError(recording.error)}`, true);
   lastRecordingError = recording.error;
-  $("#start").hidden = currentRecording !== "idle";
-  $("#record-controls").hidden = currentRecording === "idle";
-  $("#record-status").textContent =
-    currentRecording === "failed"
-      ? `Recording failed. Select Stop and save to retry, or Cancel. ${recording.error}`
-      : currentRecording === "countdown"
-        ? `Recording starts in ${recording.remaining}…`
-        : currentRecording === "starting"
-          ? "Starting recording…"
-          : currentRecording === "paused"
-            ? "Paused"
-            : currentRecording === "stopped"
-              ? "Stopped. Select Stop and save to retry."
-              : "Recording";
-  $("#pause").disabled = !["recording", "paused"].includes(currentRecording);
-  $("#stop").disabled = ["countdown", "starting"].includes(currentRecording);
-  $("#cancel-recording").disabled = currentRecording === "starting";
-  $("#cancel-recording").textContent =
-    currentRecording === "countdown" ? "Cancel countdown" : "Cancel recording";
+  lastRecording = recording;
+  const view = recordingView(recording);
+  recordingDisplay = view;
+  $("#recorder").dataset.state = recording.state;
+  $("#start").hidden = view.active;
+  $("#start-hint").hidden = view.active;
+  $("#source-preview").hidden = view.active;
+  $("#settings-locked").hidden = !view.active;
+  $("#record-controls").hidden = !view.active;
+  $("#record-controls").dataset.tone = view.tone;
+  // The status text stays one sentence for screen readers. The error shows on
+  // its own line. Change the live region only when its text changes.
+  const status = $("#record-status");
+  if (status.textContent !== view.label) {
+    if (view.error)
+      status.replaceChildren(
+        element("span", "", view.short),
+        element("span", "visually-hidden", ": "),
+        element("span", "record-error", view.error),
+      );
+    else status.textContent = view.label;
+  }
+  $("#record-detail").textContent = view.detail;
+  $("#pause").disabled = !view.canPause;
+  $("#pause").textContent = view.pauseLabel;
+  $("#stop").disabled = !view.canStop;
+  $("#cancel-recording").disabled = !view.canCancel;
+  $("#cancel-recording").textContent = view.cancelLabel;
   for (const selector of [
     "#source",
     "#camera",
@@ -479,24 +819,29 @@ function renderRecording(recording) {
     "#record-title",
     "#refresh-sources",
   ])
-    $(selector).disabled = currentRecording !== "idle";
-  $("#pause").textContent = currentRecording === "paused" ? "Resume" : "Pause";
+    $(selector).disabled = view.active;
+  const pill = $("#recording-pill");
+  pill.hidden = !view.active;
+  pill.dataset.tone = view.tone;
+  pill.title = "Show recording controls";
+  $("#pill-label").textContent = view.short;
+  document.title = view.active
+    ? `${view.short} · Midnight Recorder`
+    : "Midnight Recorder";
+  renderRecordingTime();
 }
 async function refreshStatus() {
   const status = await call("app.status");
   renderRecording(status.recording);
-  $("#export-jobs").replaceChildren(
-    ...status.jobs
-      .filter((job) => job.kind !== "preview")
-      .map((job) => {
-        const row = document.createElement("div");
-        row.textContent =
-          job.state === "failed"
-            ? `Export failed: ${job.error}`
-            : `Export ${job.state}: ${job.path}`;
-        return row;
-      }),
-  );
+  lastJobs = status.jobs;
+  for (const row of finishedExports(knownExports, status.jobs, loadedAt))
+    notice(
+      row.state === "complete"
+        ? `Export complete: ${row.file}`
+        : `Export failed: ${row.error}`,
+      row.state !== "complete",
+    );
+  renderExports();
   if (selectedVideo) {
     const id = selectedVideo.id,
       generation = viewGeneration;
@@ -514,6 +859,7 @@ try {
 } catch (error) {
   notice(error.message, true);
 }
+setInterval(renderRecordingTime, 250);
 setInterval(async () => {
   if (!busy) {
     try {

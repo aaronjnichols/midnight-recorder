@@ -119,3 +119,41 @@ Display tests cover a second monitor, negative display coordinates, display size
 The countdown and red and amber border screenshots were inspected in `output/playwright/04-countdown.png`, `05-recording-border.png`, and `06-paused-border.png`. The border image has a transparent center. The indicator uses Windows capture protection. This remote session cannot confirm indicator exclusion from saved screen video because the real screen capture remains black.
 
 Two review agents checked the service and desktop stages. Fixes cover a timer race in the transport test and monitors connected while indicator windows load. The final review returned no findings.
+
+## Desktop UI pass
+
+The desktop page has a new layout. It keeps the Cursor Midnight colors. The muted text color is slightly lighter to increase contrast on panels. The command catalog did not change. New keys and controls use existing shared commands.
+
+Changes:
+
+- The top bar shows the recording state and the recorded time in the library and the editor. Select it to show the recording controls.
+- During a countdown or a recording, the recorder shows the state, the time, and the controls at the top of the panel. At the minimum window size, 1000 × 720, Start recording, Pause, and Stop and save are visible without scrolling. Settings are locked during a recording.
+- A search with no result shows the search text and Clear search. Before this change, it showed "Your video library is empty." and set the library count to 0. Spaces alone caused a `query must not be empty` error. Press / to go to the search field. Press Esc to clear it.
+- Video cards show the length, the date, the size, and an Edited label. Two cards fit in each row at 1000 × 720.
+- The editor timeline shows the playhead and the selected range. Select a point on it to move the playhead. Use playhead sets the range start or end. Keep range and Remove range are not available for a full or invalid range. A message tells the reason.
+- The Exports list shows the exports of the open video. Before this change, frame inspection jobs showed as "Export complete: undefined". A message shows when an export is complete or fails.
+- Keyboard shortcuts use `playback.play`, `playback.pause`, `playback.seek`, `playback.fullscreen`, `edit.undo`, and `edit.redo`. A key pressed during an operation applies after the operation. Before the fix, the app ignored it.
+- Enter saves a changed title. Focus moves to the editor title when you open a video, and back to its card when you go back. The delete dialog names the video and starts on Keep video.
+
+`src/ui/view-model.js` has the state rules and the keyboard map without DOM or Electron dependencies. `test/ui-view-model.test.js` checks it with `node:test`. `test/ui.test.js` checks the search states, the editor keys, the timeline, the title, the delete dialog, the export list, and the recording state at 1000 × 720. Each test failed before its production change. The logs are `.local/claude-ui/red-pure.log`, `.local/claude-ui/red-ui.log`, and `.local/claude-ui/red-ui-queue.log`.
+
+Before and after screenshots are in `output/playwright/claude-ui`. They show 1440 × 940 and 1000 × 720 windows. The screenshots use generated videos, Chromium test devices, and camera-only capture. They do not record the desktop or a microphone. The real screen capture limit in this session did not change.
+
+### Review corrections
+
+An independent review found three defects. Each correction has a regression test that failed before the fix.
+
+1. Recorded time after a page reload. The page counted time locally. After a reload, a paused recording showed 0:00, and a resumed recording counted the earlier pause. The service now keeps `startedAt`, `pausedSeconds`, `pausedAt`, and `stoppedAt`. `app.status` adds `recordedSeconds`. The page and agents use the same values. `test/recording-time.test.js` uses a test clock and checks pauses, resumes, failures, stops, countdown, cancel, and immediate start. An Electron test reloads the page while paused and after a resume. It compares the page, `app.status`, the CLI, and the saved video duration. Red logs: `.local/claude-ui/fix1-red-reload.log` and `.local/claude-ui/fix1-red-service.log`. The native border and the command guards did not change.
+2. Save wording. The page showed "The app did not save the recording" during a normal save. It showed "Not saved" when the import was complete and only the cleanup failed. The service now keeps the import or cleanup error in the `stopped` state and removes it when a retry starts. A capture error from the `failed` state does not show during the save. The page shows Saving, Not saved, or Saved. Cleanup failed. Red log: `.local/claude-ui/fix2-red.log`.
+3. Range end at fractional speeds. At 1.5x speed, Use playhead and the O key at the end wrote 6.67. The edited end is 6.666... seconds, so the app disabled Keep range. The message also showed 6.67 as the maximum. A playhead value within 0.005 seconds of the end now gives the exact end. A typed end up to 0.005 seconds after the end gives the exact end. The Electron test uses the arrow keys, the O key, Use playhead, the displayed maximum, and Keep range. The trim keeps source time 1.5 to 10. Red logs: `.local/claude-ui/fix3-red.log` and `.local/claude-ui/fix3-red-unit.log`.
+4. Range maximum at a rounding boundary. A second review found that a 5.35 second video at 2x speed showed the maximum 2.68, but the app did not accept 2.68. In floating point, 2.675 + 0.005 is 2.6799999999999997. The range check now adds a tolerance of 1e-9 seconds to the half-step limit. The shown maximum gives the exact end. Values after the half step, such as 2.681 and 2.69, stay outside the accepted range. A unit test checks this case and 42 combinations of 7 durations and 6 speeds. Red log: `.local/claude-ui/fix4-red-range.log`. Green logs: `.local/claude-ui/fix4-green-unit.log` and `.local/claude-ui/fix4-green-electron.log`.
+
+The combined `npm test` run had 91 tests. 90 passed and 1 failed. No test was skipped. The log is `.local/claude-ui/review-fixes-full-test.log`. The failed test is "cancel releases the recorder after a disk write fails". This existing test waits a fixed 1.4 seconds for the first recorder data, then expects the `failed` state. The state was still `recording`. When this test ran alone, it passed one time and failed two times.
+
+A timing script measured this path four times in each mode. The first data reached the main process 1.21 to 1.50 seconds after `recording.start` returned. The service set `failed` 17 to 88 ms after that data. With an idle page, the first data arrived after 1.15 to 1.31 seconds. With an active page after startup, it arrived after 1.25 to 1.35 seconds. The capture window and the capture code did not change. These results show that the 1.4 second wait has a small margin on this computer. A comparison with the baseline commit was not done. The logs are `.local/claude-ui/disk-timing-current.log`, `.local/claude-ui/disk-timing-idle.log`, and `.local/claude-ui/disk-timing-settled.log`.
+
+The disk-error test now polls `app.status` until the state is `failed`, with a limit of ten seconds. It does not use a fixed 1.4 second wait. All other checks did not change: the error message, the paused recorder, one failed write, the page status, the disabled Pause button, the pending file, the failed Stop, and the Cancel cleanup. Production capture code did not change. The test passed three of three times alone. The logs are `.local/claude-ui/disk-wait-1.log`, `.local/claude-ui/disk-wait-2.log`, and `.local/claude-ui/disk-wait-3.log`.
+
+The final `npm test` run for this stage had 92 tests. All 92 passed. No test failed or was skipped. The run took 211 seconds. The complete log is `.local/claude-ui/final-full-test.log`.
+
+Three independent review agents checked the layout, page behavior, and state rules. Follow-up reviews checked the timing, save states, keyboard queue, range limits, and disk-error test. The final reviews found no remaining defects.

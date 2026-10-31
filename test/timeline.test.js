@@ -51,6 +51,24 @@ test("rejects empty ranges beyond the end and invalid settings", () => {
   assert.throws(() => trim(createTimeline(20), -1, 4), /range/);
 });
 
+test("edited state compares the current timeline with the full source", () => {
+  const original = createTimeline(20);
+  assert.equal(timeline.isEdited(original, 20), false);
+  assert.equal(timeline.isEdited(trim(original, 0, 10), 20), true);
+  assert.equal(timeline.isEdited(timeline.cut(original, 2, 4), 20), true);
+  assert.equal(
+    timeline.isEdited(timeline.configure(original, { speed: 2 }), 20),
+    true,
+  );
+  assert.equal(
+    timeline.isEdited(timeline.configure(original, { muted: true }), 20),
+    true,
+  );
+  const reset = { ...createTimeline(20), past: [trim(original, 0, 10)] };
+  assert.equal(timeline.isEdited(reset, 20), false);
+  assert.equal(timeline.isEdited(undo(trim(original, 0, 10)), 20), false);
+});
+
 test("preview maps edited time through cuts and speed", () => {
   const edited = timeline.configure(timeline.cut(createTimeline(20), 4, 8), {
     speed: 2,

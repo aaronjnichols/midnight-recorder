@@ -17,15 +17,35 @@ You can also run `Start Midnight Recorder.cmd` from this folder.
 
 Select a screen or window. Select a microphone or camera if needed. Select Start recording. The app shows 3, 2, 1 before capture starts. Use Cancel countdown if you are not ready. A red screen border and a Recording label show when capture is active. The border turns amber when paused. It closes when capture stops. Use Pause, Resume, and Stop and save to control the recording. For a camera recording without a screen, select Camera only.
 
+The top bar of the app shows the recording state and the recorded time in the library and the editor. Select it to show the recording controls. Settings are locked during a recording.
+
 For screen capture, the border marks the selected display. For window or camera capture, it appears on all connected displays as a recording indicator. It also appears on all displays if Windows does not supply the screen's display ID. The border lets mouse clicks pass through and does not take keyboard focus. Windows capture protection is enabled for the indicator. Verify that it stays out of the saved video on your Windows capture system.
 
 Use Import video to add an existing MP4, WebM, MOV, or MKV file. The app copies the source into its library.
 
-Open a video to edit it. Keep range trims the video to the specified range. Remove range cuts out that range. All times refer to the current edited video. Speed and mute settings also apply to export. Undo, Redo, and Reset all edits keep the source file unchanged.
+Type in Search by title to find a video. The library count always shows all videos. If no title matches, select Clear search. An Edited label shows on a video that has edits.
+
+Open a video to edit it. Keep range trims the video to the specified range. Remove range cuts out that range. All times refer to the current edited video. Select Use playhead to set the start or end to the current preview time. The range fields show two decimals. At some speeds, the edited end has more decimals. For example, a 10 second video at 1.5x speed ends at 6.666... seconds. A playhead at the end, or an end value up to 0.005 seconds after the end, selects the exact end. The timeline shows the kept parts of the source video, the playhead, and the selected range. Select a point on the timeline to move the playhead. Speed and mute settings also apply to export. Undo, Redo, and Reset all edits keep the source file unchanged.
 
 The app prepares edited previews in the background. The preview and export use the same FFmpeg renderer. The app also prepares a compatible preview if it cannot play an imported source codec. Preview controls become available when the preview is ready.
 
-Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not replace an existing file. The app shows the export result below the editor.
+Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not replace an existing file. The Exports list below the editor shows the file name, folder, and state of each export of the open video. A message shows when an export is complete or fails.
+
+### Keyboard shortcuts
+
+Editor keys do not operate when a text field or a list has focus. A key that you press during an operation applies after the operation is complete.
+
+| Key                                       | Action                                     | Shared command                    |
+| ----------------------------------------- | ------------------------------------------ | --------------------------------- |
+| Space or K                                | Play or pause the preview                  | `playback.play`, `playback.pause` |
+| Left arrow or Right arrow                 | Move the playhead 5 seconds                | `playback.seek`                   |
+| Shift + Left arrow or Shift + Right arrow | Move the playhead 1 second                 | `playback.seek`                   |
+| I or O                                    | Set the range start or end to the playhead | None. This changes a form value.  |
+| Ctrl + Z                                  | Undo an edit                               | `edit.undo`                       |
+| Ctrl + Shift + Z or Ctrl + Y              | Redo an edit                               | `edit.redo`                       |
+| F                                         | Enter or leave fullscreen preview          | `playback.fullscreen`             |
+| / or Ctrl + F                             | Go to the library search                   | None                              |
+| Esc                                       | Clear the search, or leave fullscreen      | `playback.fullscreen`             |
 
 ## Storage
 
@@ -50,6 +70,8 @@ npm start
 Set `FFMPEG_PATH` and `FFPROBE_PATH` if the programs are not on `PATH`.
 
 If a save fails, leave the app open. Select Stop and save to retry. Cancel recording removes the pending recording. If the app stops unexpectedly, keep files in `pending`. You can import a readable pending file through `library.import`. Automatic recovery after an app crash is not yet available. Cached previews use extra disk space.
+
+After capture stops, the recording state is `stopped` while the app adds the video to the library. The app shows Saving. The state has no `error` value during this step. If the import fails, the state stays `stopped`, `error` has the message, and the app shows Not saved. If the import is complete but the recorder cleanup fails, `saved` has the library video, `error` has the cleanup message, and the app shows Saved. Cleanup failed. Stop and save then tries the cleanup again and does not import a second copy. Cancel recording keeps the saved video. A retry removes the old `error` value before it starts.
 
 If a recording write fails, capture pauses and `app.status` reports a recording state of `failed` with an `error` message. The desktop app shows the same error. Stop and save and Cancel remain available. The app keeps the pending file after a failed Stop. It does not repeat a failed write because the file can contain part of that write. The pending file can be incomplete or unreadable. Copy it before you select Cancel if you want to attempt manual recovery.
 
@@ -81,6 +103,16 @@ node src/agent/cli.js export.status '{"jobId":"JOB_ID"}'
 Use IDs from command results. Source IDs can change when a window closes. Export commands return a job ID. Poll `export.status` until its state is `complete` or `failed`.
 
 Use `recording.countdown` with the same arguments as `recording.start` to get the same 3, 2, 1 countdown as the desktop button. It returns an `id`, `state: "countdown"`, and `remaining: 3`. Poll `app.status` until recording starts. Use `recording.cancel` to cancel the countdown. A startup failure returns the recorder to `idle` with an `error` message. `recording.start` starts capture immediately. Both commands use the native recording border. These commands are also available through MCP.
+
+The service keeps the recording time in the shared state. A reloaded app page and CLI or MCP clients read the same values from `app.status`:
+
+- `startedAt` is the time when capture started.
+- `pausedSeconds` is the total time of completed pauses, in seconds.
+- `pausedAt` is the start time of the current pause or capture failure. It is not present while capture is active.
+- `stoppedAt` is the time when capture stopped.
+- `recordedSeconds` is the recorded time without pauses at the time of the request. Only `app.status` adds this value.
+
+The recorded time is the time from `startedAt` to `pausedAt`, `stoppedAt`, or now, less `pausedSeconds`. The times are ISO 8601 strings from the computer clock.
 
 `recording.start` returns a recording `id`. Capture adapters use `recording.fail` with this `recordingId` and an `error` message to report a failure through the shared service. This command pauses capture and retains the pending data. The service ignores duplicate failure reports and reports for an old recording ID.
 
@@ -169,7 +201,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 - `src/application` has command schemas, validation, and workflow state. It uses injected adapters.
 - `src/adapters` has file storage and FFmpeg operations.
 - `src/desktop` has Electron setup, capture, permissions, and IPC.
-- `src/ui` has the desktop page and styles.
+- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. It has no DOM or Electron dependencies, so `node:test` checks it directly.
 - `src/agent` has the local server, CLI, and MCP adapters.
 
 The command service serializes changes. Exports run as background jobs. Each export uses the edit state from the time the job starts.

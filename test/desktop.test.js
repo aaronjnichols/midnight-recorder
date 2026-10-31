@@ -327,8 +327,15 @@ test(
       });
     });
     await call("recording.start", { cameraOnly: true });
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    const failed = (await call("app.status")).recording;
+    // The first recorder data can arrive after more than 1.4 seconds on a busy
+    // Windows desktop. Wait for the reported state, with a ten-second limit.
+    let failed;
+    const deadline = Date.now() + 10000;
+    do {
+      failed = (await call("app.status")).recording;
+      if (failed.state === "failed") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
     assert.equal(failed.state, "failed");
     assert.match(failed.error, /Disk full/);
     const worker = app
