@@ -241,6 +241,65 @@ test("save retry keeps the stopped file and does not import twice after cleanup 
   assert.equal(imports, 2);
 });
 
+test("a stopped recording reports save progress, an import error, and cleanup after save", async () => {
+  const pushed = [];
+  let failImport = true,
+    failCleanup = true;
+  const service = new Service({
+    recordingFeedback: {
+      prepare: async () => {},
+      update: (recording) => pushed.push(structuredClone(recording)),
+    },
+    capture: {
+      start: async () => {},
+      pause: async () => {},
+      stop: async () => "pending.webm",
+      cancel: async () => {
+        if (failCleanup) throw new Error("Cleanup failed");
+      },
+    },
+    media: { probe: async () => ({ duration: 2 }) },
+    library: {
+      import: async () => {
+        if (failImport) throw new Error("Import failed");
+        return { id: "saved", title: "Demo" };
+      },
+    },
+  });
+  const status = async () => (await service.execute("app.status")).recording;
+  const started = await service.execute("recording.start", {
+    cameraOnly: true,
+  });
+  // A capture error must not show as a save error while the save runs.
+  await service.execute("recording.fail", {
+    recordingId: started.id,
+    error: "Disk full",
+  });
+  pushed.length = 0;
+  await assert.rejects(service.execute("recording.stop"), /Import failed/);
+  const stopped = pushed.filter((recording) => recording.state === "stopped");
+  assert.equal(stopped[0].error, undefined, "Saving has no error.");
+  assert.equal(stopped.at(-1).error, "Import failed");
+  let current = await status();
+  assert.equal(current.state, "stopped");
+  assert.equal(current.error, "Import failed");
+  assert.equal(current.saved, undefined);
+
+  pushed.length = 0;
+  failImport = false;
+  await assert.rejects(service.execute("recording.stop"), /Cleanup failed/);
+  assert.equal(pushed[0].state, "stopped");
+  assert.equal(pushed[0].error, undefined, "A retry clears the old error.");
+  current = await status();
+  assert.equal(current.state, "stopped");
+  assert.deepEqual(current.saved, { id: "saved", title: "Demo" });
+  assert.equal(current.error, "Cleanup failed");
+
+  failCleanup = false;
+  assert.equal((await service.execute("recording.stop")).id, "saved");
+  assert.deepEqual(await status(), { state: "idle" });
+});
+
 test("agents can open videos, control playback, and select the app view", async () => {
   const requests = [];
   const service = new Service({

@@ -1,6 +1,7 @@
 import * as timeline from "../domain/timeline.js";
 import { randomUUID } from "node:crypto";
 import { inspectionPlan, editRevision } from "../domain/inspection.js";
+import { recordedSeconds } from "../domain/recording.js";
 import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
 
 const field = (type, description, extra = {}) => ({
@@ -239,6 +240,7 @@ export class Service {
     transcription,
     recordingFeedback,
     scheduler = { setTimeout, clearTimeout },
+    now = () => Date.now(),
   }) {
     Object.assign(this, {
       library,
@@ -250,6 +252,7 @@ export class Service {
       transcription,
       recordingFeedback,
       scheduler,
+      now,
     });
     this.recording = { state: "idle" };
     this.jobs = new Map();
@@ -273,6 +276,18 @@ export class Service {
     this.recordingFeedback?.update(recording);
     return recording;
   }
+  timestamp() {
+    return new Date(this.now()).toISOString();
+  }
+  // Clients that start later, such as a reloaded page or an agent, read the
+  // recorded time from the shared state.
+  recordingStatus() {
+    if (!this.recording.startedAt) return this.recording;
+    return {
+      ...this.recording,
+      recordedSeconds: recordedSeconds(this.recording, this.now()),
+    };
+  }
   async beginRecording(id, options) {
     this.setRecording({ id, state: "starting", options });
     try {
@@ -280,7 +295,8 @@ export class Service {
       return this.setRecording({
         id,
         state: "recording",
-        startedAt: new Date().toISOString(),
+        startedAt: this.timestamp(),
+        pausedSeconds: 0,
         options,
       });
     } catch (error) {
@@ -313,7 +329,10 @@ export class Service {
     if (name.startsWith("transcript."))
       return this.transcriptJobs.execute(name, args);
     if (name === "app.status")
-      return { recording: this.recording, jobs: [...this.jobs.values()] };
+      return {
+        recording: this.recordingStatus(),
+        jobs: [...this.jobs.values()],
+      };
     if (name === "app.view") return this.playback.request("view", args);
     if (name === "playback.open")
       return this.playback.request("open", {
@@ -474,10 +493,13 @@ export class Service {
         this.recording.id === args.recordingId &&
         ["recording", "paused"].includes(this.recording.state)
       ) {
+        // Capture stays paused after a failure. A failure during a pause keeps
+        // the pause start time.
         this.setRecording({
           ...this.recording,
           state: "failed",
           error: args.error,
+          pausedAt: this.recording.pausedAt ?? this.timestamp(),
         });
         await this.capture.pause();
       }
@@ -497,34 +519,67 @@ export class Service {
         if (this.recording.state !== "recording")
           throw new Error("Recording is already paused.");
         await this.capture.pause();
-        this.setRecording({ ...this.recording, state: "paused" });
+        this.setRecording({
+          ...this.recording,
+          state: "paused",
+          pausedAt: this.timestamp(),
+        });
       }
       if (name === "recording.resume") {
         if (this.recording.state !== "paused")
           throw new Error("Recording is not paused.");
         await this.capture.resume();
-        this.setRecording({ ...this.recording, state: "recording" });
+        const { pausedAt, ...recording } = this.recording;
+        const paused = (this.now() - Date.parse(pausedAt)) / 1000;
+        this.setRecording({
+          ...recording,
+          state: "recording",
+          pausedSeconds:
+            Math.round(
+              ((recording.pausedSeconds || 0) +
+                (Number.isFinite(paused) ? paused : 0)) *
+                1000,
+            ) / 1000,
+        });
       }
       if (name === "recording.cancel") {
         await this.capture.cancel();
         this.setRecording({ state: "idle" });
       }
       if (name === "recording.stop") {
-        if (!this.recording.file) {
+        // In the stopped state, error holds only the last save error. A save
+        // in progress has no error.
+        const { error: lastError, ...recording } = this.recording;
+        if (!recording.file) {
           const file = await this.capture.stop();
-          this.setRecording({ ...this.recording, state: "stopped", file });
-        }
+          this.setRecording({
+            ...recording,
+            state: "stopped",
+            file,
+            stoppedAt: this.timestamp(),
+          });
+        } else if (lastError !== undefined) this.setRecording(recording);
         if (!this.recording.saved) {
           const file = this.recording.file;
-          const video = await this.library.import(
-            file,
-            await this.media.probe(file),
-            this.recording.options.title || "Untitled recording",
-          );
-          this.recording = { ...this.recording, saved: video };
+          try {
+            const video = await this.library.import(
+              file,
+              await this.media.probe(file),
+              this.recording.options.title || "Untitled recording",
+            );
+            this.recording = { ...this.recording, saved: video };
+          } catch (error) {
+            this.setRecording({ ...this.recording, error: error.message });
+            throw error;
+          }
         }
         const video = this.recording.saved;
-        await this.capture.cancel();
+        try {
+          await this.capture.cancel();
+        } catch (error) {
+          this.setRecording({ ...this.recording, error: error.message });
+          throw error;
+        }
         this.setRecording({ state: "idle" });
         return video;
       }
