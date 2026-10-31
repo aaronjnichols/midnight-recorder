@@ -27,7 +27,7 @@ Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not repl
 
 ## Storage
 
-The default data folder is `.local/data` in the working folder. It contains:
+The default data folder is `.local/data` in this project folder. The app, CLI, and MCP use this same folder even when they start from another working folder. It contains:
 
 - `library.json`, the video records and edit history.
 - `media`, the source video copies.
@@ -37,6 +37,8 @@ The default data folder is `.local/data` in the working folder. It contains:
 - `electron`, the desktop session data.
 
 Set `MIDNIGHT_DATA` to use another folder. Use the same value for the desktop app, CLI, and MCP server. Use an absolute path when you start these programs from different folders.
+
+If an earlier version created a library in another working folder, set `MIDNIGHT_DATA` to that library's `.local/data` path. The app does not move existing video files.
 
 ```powershell
 $env:MIDNIGHT_DATA = 'C:\Videos\Midnight'
@@ -49,7 +51,7 @@ If a save fails, leave the app open. Select Stop and save to retry. Cancel recor
 
 ## CLI
 
-Start the desktop app first. Run commands from this project folder. Commands return JSON. Errors use standard error and a nonzero exit code.
+Start the desktop app first. The examples use this project folder. From another folder, use the full path to `src/agent/cli.js`. Commands return JSON. Errors use standard error and a nonzero exit code.
 
 ```powershell
 node src/agent/cli.js help

@@ -1,8 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const dataRoot = () =>
-  path.resolve(process.env.MIDNIGHT_DATA || ".local/data");
+  process.env.MIDNIGHT_DATA
+    ? path.resolve(process.env.MIDNIGHT_DATA)
+    : fileURLToPath(new URL("../../.local/data", import.meta.url));
 
 export async function execute(command, args = {}) {
   let connection;
