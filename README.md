@@ -116,6 +116,12 @@ For label placement, inspect the start, middle, and end of the proposed interval
 
 Run `npm run practice:inspection` to test the workflow. It opens a separate app with a test library, makes a sample video, calls the CLI and MCP, and saves images and a JSON report under `.local`. The sample Save button changes position at source time 3. The practice then cuts source time 1 to 2 and sets speed to 0.5. The button changes position at edited time 4. The normal library stays unchanged.
 
+## Timed speech
+
+Run `npm run setup:transcription` once to install local English speech recognition. Start the app, then use `transcript.start`, `transcript.status`, `transcript.read`, and `transcript.search`. Search results include edited timestamps for frame inspection. Speech jobs support cancellation, bounded reads, cached results, and cut-word warnings.
+
+See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. Text, shape, and transition editing remain separate work.
+
 ## MCP
 
 Configure your MCP client to start Node with `src/agent/mcp.js`. Example server entry:
@@ -150,6 +156,7 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | Export             | `export.start`, `export.status`                                                                                                     |
 | Preview rendering  | `preview.start`, with job state from `export.status`                                                                                |
 | Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                              |
+| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`     |
 | Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen` |
 
 ## Code structure
@@ -179,4 +186,4 @@ The current agent execution session reports Windows capture access errors and pr
 
 The app uses Electron 45.2.1. It disables the Windows D3D11 camera capture path because that path caused the video capture service to stop during the combined camera and screen test. GPU rendering remains enabled.
 
-There is no cloud upload, hosted share link, transcript, or account system. Share an exported MP4 through a file-sharing method of your choice.
+There is no cloud upload, hosted share link, or account system. Share an exported MP4 through a file-sharing method of your choice. Timed English transcripts are local.

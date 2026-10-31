@@ -54,7 +54,8 @@ function view(data, timeline, args) {
             cutBefore: false,
           }))
         : mappedWords(data.words, timeline),
-    audioAudible: timeBase === "source" || !timeline.muted,
+    audioAudible:
+      data.outcome !== "no_audio" && (timeBase === "source" || !timeline.muted),
   };
 }
 function group(words) {

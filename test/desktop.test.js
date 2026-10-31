@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { _electron } from "playwright";
-import { mkdir, mkdtemp, access, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, access, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { Media } from "../src/adapters/media.js";
@@ -383,7 +383,20 @@ test(
         [name, args],
       );
     await call("recording.start", { cameraOnly: true });
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    // End an established recording. A fixed sleep can end the fake camera
+    // before its first data chunk arrives on a busy Windows desktop.
+    let recordedBytes = 0;
+    for (let i = 0; i < 100; i++) {
+      const files = await readdir(path.join(root, "pending"));
+      if (files[0])
+        recordedBytes = (await stat(path.join(root, "pending", files[0]))).size;
+      if (recordedBytes > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(
+      recordedBytes > 0,
+      "The test camera must produce data before its ended event.",
+    );
     const worker = app
       .windows()
       .find((page) => page.url().endsWith("/capture.html"));

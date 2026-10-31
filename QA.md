@@ -91,3 +91,15 @@ The first inspection test failed because the command was absent. The MCP test th
 `npm run practice:inspection` passed through the real Electron app with a separate library. It used the CLI to import and edit a generated sample, then an SDK MCP client to retrieve 11 PNG images. The agent inspected the images. The Save button is on the left before source time 3 and on the right from source time 3. After removing source time 1 to 2 and setting speed to 0.5, this change occurs at edited time 4. The final report is `.local/inspection-practice-aU7yzK/report.json`.
 
 This practice checks imported video inspection. It does not close the real desktop capture or physical device checks. It does not add text, shape, or transition editing commands. See `docs/inspection-practice.md` for the placement plan derived from the images.
+
+## Timed speech
+
+The final `npm test` run passed 67 tests with no failures or skipped tests. The log is `.local/transcription-verified-tests.log`. Three Python scoring tests also passed. The app now has 39 shared commands, including six transcript commands.
+
+Three downloaded public videos passed the production engine check. A NASA caption comparison measured 13 word edits in 970 reference words, or 1.34%. This is one English file, not a general accuracy score. Two Blender videos supplied actual screen controls and spoken instructions. See [sources, measurements, and limits](docs/transcription-validation.md).
+
+A fresh `npm run setup:transcription` passed. The actual desktop, CLI, and MCP workflow passed with word pages, phrase search, native PNG images, cuts, speed changes, stale flags, mute state, cache reuse after restart, silence, no audio, and validation errors. A cancellation check observed one completed speech region before it cancelled the Python process. The report is `.local/transcript-agent-practice/report.json`.
+
+An independent agent found the requested Blender control through CLI and MCP and viewed its before, during, and after frames. Review fixes cover cancellation during startup, package changes in cache identity, cache deletion order, the no-audio flag, scoring with no matched words, and proof of speech progress before cancellation. The final reviews returned no findings.
+
+An existing test-camera check was intermittent because it used a fixed sleep before ending the input. It now waits for recorded bytes with a ten-second limit. The full suite passed after this test change. Production capture code did not change. The real desktop and physical-device limits above remain open.

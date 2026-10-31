@@ -16,6 +16,8 @@ import { Library } from "../adapters/library.js";
 import { Media } from "../adapters/media.js";
 import { PreviewCache } from "../adapters/preview.js";
 import { FrameInspection } from "../adapters/inspection.js";
+import { LocalTranscriber } from "../adapters/transcriber.js";
+import { PythonSpeechRunner } from "../adapters/transcription-worker.js";
 import { serve } from "../agent/server.js";
 import { dataRoot } from "../agent/client.js";
 
@@ -228,6 +230,9 @@ else
         media,
         previews,
         inspection: new FrameInspection(media, previews),
+        transcription: new LocalTranscriber(root, media, {
+          runner: new PythonSpeechRunner(),
+        }),
         capture,
         playback,
       });

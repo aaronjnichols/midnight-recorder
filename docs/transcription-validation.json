@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-31",
+  "cases": [
+    {
+      "id": "blender",
+      "title": "First Steps",
+      "sourcePage": "https://studio.blender.org/training/blender-2-8-fundamentals/first-steps/",
+      "credit": "Mike Newbon / Blender Studio",
+      "reuseBasis": "CC-BY, as listed on the publisher page",
+      "sha256": "1a91e21525bf55829c6881b019395267a26d6276c62dc5378608b3ac3b6679b5",
+      "bytes": 42765160,
+      "durationSeconds": 58.5,
+      "wordCount": 160,
+      "elapsedSeconds": 13.835208399999999,
+      "cached": false,
+      "audioSha256": "f0b56a39edc67bf380e1ae045f7f5ecb4546b15ee3a19b70ec676008e49899c1",
+      "engine": {
+        "engine": "faster-whisper",
+        "model": "small.en",
+        "method": "speech-regions-v1",
+        "language": "en",
+        "device": "cpu",
+        "computeType": "int8",
+        "threads": 4,
+        "beamSize": 5,
+        "packages": {
+          "faster-whisper": "1.2.1",
+          "ctranslate2": "4.8.4",
+          "av": "16.1.0",
+          "onnxruntime": "1.31.1"
+        },
+        "fingerprint": "aa7b4492848458d0e6eef9bb989b9f8811196667e6777b42529dbe5b2956cfba"
+      }
+    },
+    {
+      "id": "viewport",
+      "title": "Viewport Navigation",
+      "sourcePage": "https://studio.blender.org/training/blender-2-8-fundamentals/viewport-navigation/",
+      "credit": "Mike Newbon / Blender Studio",
+      "reuseBasis": "CC-BY, as listed for Blender 2.8 Fundamentals",
+      "sha256": "75dcbad6d1d7606ddb61cda24300fa00b3ac4c2e41df93703176b8b5b4be6c3c",
+      "bytes": 25459155,
+      "durationSeconds": 221.833333,
+      "wordCount": 728,
+      "elapsedSeconds": 59.279807999999996,
+      "cached": false,
+      "audioSha256": "b8b53e0f5daceeec53e3a605cc2aa78bcab2883920f699f23a1dddbbc4a01fdb",
+      "engine": {
+        "engine": "faster-whisper",
+        "model": "small.en",
+        "method": "speech-regions-v1",
+        "language": "en",
+        "device": "cpu",
+        "computeType": "int8",
+        "threads": 4,
+        "beamSize": 5,
+        "packages": {
+          "faster-whisper": "1.2.1",
+          "ctranslate2": "4.8.4",
+          "av": "16.1.0",
+          "onnxruntime": "1.31.1"
+        },
+        "fingerprint": "aa7b4492848458d0e6eef9bb989b9f8811196667e6777b42529dbe5b2956cfba"
+      }
+    },
+    {
+      "id": "nasa",
+      "title": "Infrared: Beyond the Visible",
+      "sourcePage": "https://science.nasa.gov/asset/webb/infrared-beyond-the-visible/",
+      "credit": "NASA / STScI; narration Joshua Moore",
+      "reuseBasis": "NASA media use guidelines; publisher credits retained",
+      "sha256": "e8b634c16385bb6c30a0adda2fbbb02e8b46385d7f5376d96331028e32f6d4a5",
+      "bytes": 26384131,
+      "durationSeconds": 450.368,
+      "wordCount": 968,
+      "elapsedSeconds": 129.3968011,
+      "cached": false,
+      "audioSha256": "668ad9653c08b0464230e4e2afb6d8ec66010bc37d5c1f9a04b58a3b384bb45a",
+      "engine": {
+        "engine": "faster-whisper",
+        "model": "small.en",
+        "method": "speech-regions-v1",
+        "language": "en",
+        "device": "cpu",
+        "computeType": "int8",
+        "threads": 4,
+        "beamSize": 5,
+        "packages": {
+          "faster-whisper": "1.2.1",
+          "ctranslate2": "4.8.4",
+          "av": "16.1.0",
+          "onnxruntime": "1.31.1"
+        },
+        "fingerprint": "aa7b4492848458d0e6eef9bb989b9f8811196667e6777b42529dbe5b2956cfba"
+      }
+    }
+  ],
+  "nasaCaptionScore": {
+    "referenceWords": 970,
+    "recognizedWords": 968,
+    "wordEdits": 13,
+    "wordErrorRate": 0.013402061855670102,
+    "matchedWords": 960,
+    "wordOutsideCaptionSeconds": {
+      "count": 960,
+      "median": 0.0,
+      "p95": 0.15800000000001546,
+      "max": 0.6169999999999902
+    },
+    "firstWordVsCaptionStartSeconds": {
+      "count": 130,
+      "median": 0.1349999999999909,
+      "p95": 0.3340000000000032,
+      "max": 0.6169999999999902
+    },
+    "captionSha256": "abc4c14b7dfd9a52b96aa37d4ac749e92110a3dc696e9480f655b6f455cb4f9a",
+    "resultSha256": "3250584ee024845d2c684c4e836d68ea723167eda3391c7ac94ebe6059ca873e",
+    "timingLimit": "Publisher captions are approximate intervals, not measured word boundaries."
+  },
+  "limits": [
+    "Three files from two publishers. Two English narrators.",
+    "Only NASA has an independent text score. Blender captions could not be downloaded.",
+    "Publisher captions are approximate. They do not establish exact word boundaries.",
+    "No diarization, speaker identity, translation, or non-English qualification."
+  ]
+}

@@ -1,6 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as transcript from "../src/domain/transcript.js";
+test("a video without an audio track never reports audible audio", () => {
+  const data = { duration: 5, outcome: "no_audio", words: [] };
+  const timeline = { segments: [{ start: 0, end: 5 }], speed: 1, muted: false };
+  for (const timeBase of ["source", "edited"]) {
+    assert.equal(
+      transcript.readTranscript(data, timeline, { timeBase }).audioAudible,
+      false,
+    );
+    assert.equal(
+      transcript.searchTranscript(data, timeline, { query: "word", timeBase })
+        .audioAudible,
+      false,
+    );
+  }
+});
 
 test("transcript reads keep source times and mark words split by cuts", () => {
   const words = [
