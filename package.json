@@ -8,11 +8,14 @@
     "start": "electron .",
     "test": "node --test --test-concurrency=1",
     "cli": "node src/agent/cli.js",
-    "mcp": "node src/agent/mcp.js"
+    "mcp": "node src/agent/mcp.js",
+    "verify:desktop": "node --test --test-concurrency=1 acceptance/desktop.mjs",
+    "format": "prettier --write src test acceptance package.json README.md QA.md PLAN.md AGENTS.md"
   },
   "devDependencies": {
-    "electron": "40.9.3",
-    "playwright": "^1.64.1"
+    "electron": "45.2.1",
+    "playwright": "^1.64.1",
+    "prettier": "^3.9.10"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2"

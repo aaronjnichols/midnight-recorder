@@ -97,15 +97,15 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 
 ## Commands
 
-| Task | Commands |
-| --- | --- |
-| App state and view | `app.status`, `app.view` |
-| Capture selection | `capture.sources`, `capture.devices` |
-| Recording | `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel` |
-| Library | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete` |
-| Editing | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset` |
-| Export | `export.start`, `export.status` |
-| Preview | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen` |
+| Task               | Commands                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| App state and view | `app.status`, `app.view`                                                                                                            |
+| Capture selection  | `capture.sources`, `capture.devices`                                                                                                |
+| Recording          | `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`                                      |
+| Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                 |
+| Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                   |
+| Export             | `export.start`, `export.status`                                                                                                     |
+| Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen` |
 
 ## Code structure
 

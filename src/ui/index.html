@@ -1,56 +1,277 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file: blob:">
-  <title>Midnight Recorder</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <aside class="sidebar">
-    <a class="brand" href="#"><span class="brand-icon">◉</span><span>midnight<span class="brand-sub">RECORDER</span></span></a>
-    <div class="workspace-label">PERSONAL WORKSPACE</div>
-    <button class="nav active" id="library-nav"><span>▦</span> Video library <span id="library-count" class="count">0</span></button>
-    <button class="nav" id="new-nav"><span>⊙</span> New recording</button>
-    <div class="sidebar-bottom"><span class="local-dot"></span> Local storage<div>Your videos stay on this computer.</div><small>Cursor Midnight palette</small></div>
-  </aside>
-  <main>
-    <header><div class="breadcrumb">Workspace <span>/</span> <span id="crumb">Video library</span></div><span class="badge"><i></i> LOCAL ONLY</span></header>
-    <section id="library-view">
-      <div class="page-heading"><div><p class="eyebrow">MAKE YOURSELF CLEAR</p><h1>Your video workspace</h1><p>Record a thought. Show the details. Keep it here.</p></div><button id="import" class="button secondary">↓ Import video</button></div>
-      <div class="content-grid">
-        <div>
-          <div class="section-heading"><h2>Video library <span id="video-total">0 videos</span></h2><input id="search" type="search" placeholder="Search videos" aria-label="Search videos"></div>
-          <div id="videos" class="video-grid"></div>
-          <div id="empty" class="empty"><div class="empty-icon">▷</div><h3>A little context goes a long way.</h3><p>Your recordings will appear here.<br>Start a recording or import a video.</p></div>
-          <div class="note"><span>⌘</span><div><strong>Ready for your agent</strong><p>Use the CLI or MCP to record, edit, and export. Open Agent controls for commands.</p></div></div>
-        </div>
-        <section class="recorder panel">
-          <div class="panel-heading"><span class="record-dot"></span><h2>New recording</h2></div>
-          <div class="source-preview" id="source-preview"><span>▣</span><p>Select a screen or window</p></div>
-          <label>Recording title<input id="record-title" placeholder="Untitled recording"></label>
-          <label>Capture source<select id="source" aria-label="Capture source"></select></label>
-          <div class="two-cols"><label>Microphone<select id="microphone" aria-label="Microphone"><option value="">Off</option></select></label><label>Camera<select id="camera" aria-label="Camera"><option value="">Off</option></select></label></div>
-          <div class="options"><label class="check"><input type="checkbox" id="system-audio"> System audio</label><label class="check"><input type="checkbox" id="camera-only"> Camera only</label></div>
-          <label>Frame rate<select id="fps"><option>30</option><option>60</option><option>24</option><option>15</option></select></label>
-          <button id="start" class="button primary full" aria-label="Start recording"><span aria-hidden="true">●</span> Start recording</button>
-          <div id="record-controls" hidden><p id="record-status" role="status">Ready</p><div class="two-cols"><button class="button secondary" id="pause">Pause</button><button class="button primary" id="stop">Stop and save</button></div><button id="cancel-recording" class="text-button">Cancel recording</button></div>
-          <p class="hint">Screen, camera, and sound. Saved on your computer.</p>
-          <button id="refresh-sources" class="text-button">Refresh sources and devices</button>
-        </section>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file: blob:"
+    />
+    <title>Midnight Recorder</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#"
+        ><span class="brand-icon">◉</span
+        ><span>midnight<span class="brand-sub">RECORDER</span></span></a
+      >
+      <div class="workspace-label">PERSONAL WORKSPACE</div>
+      <button class="nav active" id="library-nav">
+        <span>▦</span> Video library
+        <span id="library-count" class="count">0</span>
+      </button>
+      <button class="nav" id="new-nav"><span>⊙</span> New recording</button>
+      <div class="sidebar-bottom">
+        <span class="local-dot"></span> Local storage
+        <div>Your videos stay on this computer.</div>
+        <small>Cursor Midnight palette</small>
       </div>
-    </section>
-    <section id="editor" hidden>
-      <div class="page-heading"><div><button id="back" class="text-button">← Video library</button><h1 id="video-title">Video</h1><p id="video-info"></p></div><button id="export" class="button primary">↑ Export MP4</button></div>
-      <div class="editor-grid"><div><div class="player-shell"><div class="player-wrap"><video id="player" disablepictureinpicture disableremoteplayback></video></div><div class="player-controls"><button id="preview-play" class="text-button">Play</button><span id="preview-time">0:00 / 0:00</span><input id="preview-seek" type="range" min="0" max="1" value="0" step="0.01" aria-label="Preview time"><label>Volume<input id="preview-volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="Preview volume"></label><button id="preview-fullscreen" class="text-button">Fullscreen</button></div></div><div class="timeline-display"><span id="duration">0:00</span><div id="timeline-bars"></div><span>EDITED VIDEO</span></div><p class="hint">The preview follows your cuts, speed, and mute settings.</p></div>
-        <section class="panel edit-panel"><h2>Edit video</h2><p class="hint">Times use the current edited video.</p><div class="two-cols"><label>Start, seconds<input type="number" id="range-start" value="0" min="0" step="0.01"></label><label>End, seconds<input type="number" id="range-end" min="0" step="0.01"></label></div><div class="two-cols"><button id="trim" class="button secondary">Keep range</button><button id="cut" class="button secondary">Remove range</button></div><label>Playback speed<select id="speed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label><label class="check"><input id="mute" type="checkbox"> Mute audio</label><div class="two-cols"><button id="undo" class="button secondary">↶ Undo</button><button id="redo" class="button secondary">↷ Redo</button></div><button id="reset" class="text-button">Reset all edits</button><hr><label>Video title<input id="rename-title"></label><button id="rename" class="button secondary full">Save title</button><button id="delete" class="text-button danger">Delete video</button></section></div>
-      <div id="export-jobs" class="jobs" aria-live="polite"></div>
-    </section>
-    <details class="agent-panel"><summary>Agent controls <span>CLI / MCP</span></summary><p>Start the app before you connect an agent. All app commands are available to CLI and MCP clients.</p><code>node src/agent/cli.js help<br>node src/agent/mcp.js</code><p>See README.md for setup and examples.</p></details>
-    <div id="message" class="message" role="status" hidden></div>
-  </main>
-  <dialog id="confirm-delete"><h2>Delete this video?</h2><p>This removes the library copy and its edits.</p><div class="two-cols"><button id="keep-video" class="button secondary">Keep video</button><button id="confirm-delete-button" class="button danger">Delete video</button></div></dialog>
-  <script type="module" src="app.js"></script>
-</body>
+    </aside>
+    <main>
+      <header>
+        <div class="breadcrumb">
+          Workspace <span>/</span> <span id="crumb">Video library</span>
+        </div>
+        <span class="badge"><i></i> LOCAL ONLY</span>
+      </header>
+      <section id="library-view">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">MAKE YOURSELF CLEAR</p>
+            <h1>Your video workspace</h1>
+            <p>Record a thought. Show the details. Keep it here.</p>
+          </div>
+          <button id="import" class="button secondary">↓ Import video</button>
+        </div>
+        <div class="content-grid">
+          <div>
+            <div class="section-heading">
+              <h2>Video library <span id="video-total">0 videos</span></h2>
+              <input
+                id="search"
+                type="search"
+                placeholder="Search videos"
+                aria-label="Search videos"
+              />
+            </div>
+            <div id="videos" class="video-grid"></div>
+            <div id="empty" class="empty">
+              <div class="empty-icon">▷</div>
+              <h3>A little context goes a long way.</h3>
+              <p>
+                Your recordings will appear here.<br />Start a recording or
+                import a video.
+              </p>
+            </div>
+            <div class="note">
+              <span>⌘</span>
+              <div>
+                <strong>Ready for your agent</strong>
+                <p>
+                  Use the CLI or MCP to record, edit, and export. Open Agent
+                  controls for commands.
+                </p>
+              </div>
+            </div>
+          </div>
+          <section class="recorder panel">
+            <div class="panel-heading">
+              <span class="record-dot"></span>
+              <h2>New recording</h2>
+            </div>
+            <div class="source-preview" id="source-preview">
+              <span>▣</span>
+              <p>Select a screen or window</p>
+            </div>
+            <label
+              >Recording title<input
+                id="record-title"
+                placeholder="Untitled recording"
+            /></label>
+            <label
+              >Capture source<select
+                id="source"
+                aria-label="Capture source"
+              ></select
+            ></label>
+            <div class="two-cols">
+              <label
+                >Microphone<select id="microphone" aria-label="Microphone">
+                  <option value="">Off</option>
+                </select></label
+              ><label
+                >Camera<select id="camera" aria-label="Camera">
+                  <option value="">Off</option>
+                </select></label
+              >
+            </div>
+            <div class="options">
+              <label class="check"
+                ><input type="checkbox" id="system-audio" /> System audio</label
+              ><label class="check"
+                ><input type="checkbox" id="camera-only" /> Camera only</label
+              >
+            </div>
+            <label
+              >Frame rate<select id="fps">
+                <option>30</option>
+                <option>60</option>
+                <option>24</option>
+                <option>15</option>
+              </select></label
+            >
+            <button
+              id="start"
+              class="button primary full"
+              aria-label="Start recording"
+            >
+              <span aria-hidden="true">●</span> Start recording
+            </button>
+            <div id="record-controls" hidden>
+              <p id="record-status" role="status">Ready</p>
+              <div class="two-cols">
+                <button class="button secondary" id="pause">Pause</button
+                ><button class="button primary" id="stop">Stop and save</button>
+              </div>
+              <button id="cancel-recording" class="text-button">
+                Cancel recording
+              </button>
+            </div>
+            <p class="hint">
+              Screen, camera, and sound. Saved on your computer.
+            </p>
+            <button id="refresh-sources" class="text-button">
+              Refresh sources and devices
+            </button>
+          </section>
+        </div>
+      </section>
+      <section id="editor" hidden>
+        <div class="page-heading">
+          <div>
+            <button id="back" class="text-button">← Video library</button>
+            <h1 id="video-title">Video</h1>
+            <p id="video-info"></p>
+          </div>
+          <button id="export" class="button primary">↑ Export MP4</button>
+        </div>
+        <div class="editor-grid">
+          <div>
+            <div class="player-shell">
+              <div class="player-wrap">
+                <video
+                  id="player"
+                  disablepictureinpicture
+                  disableremoteplayback
+                ></video>
+              </div>
+              <div class="player-controls">
+                <button id="preview-play" class="text-button">Play</button
+                ><span id="preview-time">0:00 / 0:00</span
+                ><input
+                  id="preview-seek"
+                  type="range"
+                  min="0"
+                  max="1"
+                  value="0"
+                  step="0.01"
+                  aria-label="Preview time"
+                /><label
+                  >Volume<input
+                    id="preview-volume"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value="1"
+                    aria-label="Preview volume" /></label
+                ><button id="preview-fullscreen" class="text-button">
+                  Fullscreen
+                </button>
+              </div>
+            </div>
+            <div class="timeline-display">
+              <span id="duration">0:00</span>
+              <div id="timeline-bars"></div>
+              <span>EDITED VIDEO</span>
+            </div>
+            <p class="hint">
+              The preview follows your cuts, speed, and mute settings.
+            </p>
+          </div>
+          <section class="panel edit-panel">
+            <h2>Edit video</h2>
+            <p class="hint">Times use the current edited video.</p>
+            <div class="two-cols">
+              <label
+                >Start, seconds<input
+                  type="number"
+                  id="range-start"
+                  value="0"
+                  min="0"
+                  step="0.01" /></label
+              ><label
+                >End, seconds<input
+                  type="number"
+                  id="range-end"
+                  min="0"
+                  step="0.01"
+              /></label>
+            </div>
+            <div class="two-cols">
+              <button id="trim" class="button secondary">Keep range</button
+              ><button id="cut" class="button secondary">Remove range</button>
+            </div>
+            <label
+              >Playback speed<select id="speed">
+                <option value="0.5">0.5×</option>
+                <option value="0.75">0.75×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select></label
+            ><label class="check"
+              ><input id="mute" type="checkbox" /> Mute audio</label
+            >
+            <div class="two-cols">
+              <button id="undo" class="button secondary">↶ Undo</button
+              ><button id="redo" class="button secondary">↷ Redo</button>
+            </div>
+            <button id="reset" class="text-button">Reset all edits</button>
+            <hr />
+            <label>Video title<input id="rename-title" /></label
+            ><button id="rename" class="button secondary full">
+              Save title</button
+            ><button id="delete" class="text-button danger">
+              Delete video
+            </button>
+          </section>
+        </div>
+        <div id="export-jobs" class="jobs" aria-live="polite"></div>
+      </section>
+      <details class="agent-panel">
+        <summary>Agent controls <span>CLI / MCP</span></summary>
+        <p>
+          Start the app before you connect an agent. All app commands are
+          available to CLI and MCP clients.
+        </p>
+        <code>node src/agent/cli.js help<br />node src/agent/mcp.js</code>
+        <p>See README.md for setup and examples.</p>
+      </details>
+      <div id="message" class="message" role="status" hidden></div>
+    </main>
+    <dialog id="confirm-delete">
+      <h2>Delete this video?</h2>
+      <p>This removes the library copy and its edits.</p>
+      <div class="two-cols">
+        <button id="keep-video" class="button secondary">Keep video</button
+        ><button id="confirm-delete-button" class="button danger">
+          Delete video
+        </button>
+      </div>
+    </dialog>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>
