@@ -418,3 +418,39 @@ test("keyboard shortcuts use shared commands and keep native keys", () => {
   assert.equal(shortcut(key(" "), library), null);
   assert.equal(shortcut(key("z", { ctrlKey: true }), library), null);
 });
+
+test("Delete removes the selected element only outside text fields and dialogs", () => {
+  const key = (name, target = { tagName: "BODY" }) => ({
+    key: name,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    target,
+  });
+  const editor = {
+    view: "editor",
+    ready: false,
+    paused: true,
+    seconds: 0,
+    duration: 10,
+    selected: "a",
+  };
+  // The preview does not need to be ready to delete an element.
+  for (const name of ["Delete", "Backspace"])
+    assert.deepEqual(shortcut(key(name), editor), { local: "delete-element" });
+  assert.deepEqual(shortcut(key("Delete", { tagName: "BUTTON" }), editor), {
+    local: "delete-element",
+  });
+  for (const target of [
+    { tagName: "INPUT", type: "text" },
+    { tagName: "INPUT", type: "number" },
+    { tagName: "TEXTAREA" },
+    { tagName: "SELECT" },
+    { tagName: "DIV", isContentEditable: true },
+  ])
+    assert.equal(shortcut(key("Delete", target), editor), null);
+  assert.equal(shortcut(key("Delete"), { ...editor, selected: null }), null);
+  assert.equal(shortcut(key("Delete"), { ...editor, dialog: true }), null);
+  assert.equal(shortcut(key("Delete"), { ...editor, view: "library" }), null);
+});

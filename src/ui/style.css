@@ -931,6 +931,23 @@ button.button.danger:hover:not(:disabled) {
 }
 .editor-main {
   min-width: 0;
+  container-type: inline-size;
+}
+/* The toolbar and the video stay in view. The timeline and the layers
+   scroll under them. */
+.stage-column {
+  position: sticky;
+  top: var(--header);
+  z-index: 6;
+  /* The background is a little wider, so content that scrolls under the
+     stage, for example the playhead dot, does not show at its sides. */
+  margin: 0 -8px;
+  padding: 10px 8px 12px;
+  background: var(--bg);
+}
+/* The fullscreen player must cover the top bar. */
+.stage-column:has(.player-shell.fullscreen) {
+  z-index: 30;
 }
 .player-shell {
   container-type: inline-size;
@@ -940,6 +957,7 @@ button.button.danger:hover:not(:disabled) {
   border-radius: 10px;
 }
 .player-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -947,9 +965,345 @@ button.button.danger:hover:not(:disabled) {
   overflow: hidden;
   background: #11141a;
 }
-#player {
+/* Both pictures fill the box and keep their aspect ratio, so the stage can
+   sit exactly on the displayed frame. */
+#player,
+.source-frame {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-height: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.source-frame {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.stage {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.stage-item {
+  position: absolute;
+  border: 1px dashed #88c0d099;
+  cursor: move;
+}
+.stage-item:hover {
+  border-color: var(--cyan);
+}
+.stage-item.selected {
+  border: 1.5px solid var(--cyan);
+  box-shadow: 0 0 0 1px #11141acc;
+}
+.stage-item.hidden-now {
+  border-color: #ebcb8b99;
+  background: repeating-linear-gradient(
+    135deg,
+    #ebcb8b14 0 6px,
+    transparent 6px 12px
+  );
+}
+.stage-item.type-arrow {
+  inset: 0;
+  border: 0;
+  background: none;
+  pointer-events: none;
+}
+.stage-item svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.arrow-line {
+  stroke: #88c0d0b3;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.stage-item.selected .arrow-line {
+  stroke: var(--cyan);
+  stroke-dasharray: none;
+}
+.arrow-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: move;
+}
+.handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -6px 0 0 -6px;
+  border: 1.5px solid #11141a;
+  border-radius: 3px;
+  background: var(--cyan);
+  pointer-events: auto;
+}
+.handle[data-handle="nw"],
+.handle[data-handle="se"] {
+  cursor: nwse-resize;
+}
+.handle[data-handle="ne"],
+.handle[data-handle="sw"] {
+  cursor: nesw-resize;
+}
+.handle[data-handle="n"],
+.handle[data-handle="s"] {
+  cursor: ns-resize;
+}
+.handle[data-handle="e"],
+.handle[data-handle="w"] {
+  cursor: ew-resize;
+}
+.handle[data-handle="tail"],
+.handle[data-handle="tip"] {
+  border-radius: 50%;
+  cursor: crosshair;
+}
+.handle[data-handle="tip"] {
+  background: var(--yellow);
+}
+.handle[data-handle^="n"] {
+  top: 0;
+}
+.handle[data-handle^="s"] {
+  top: 100%;
+}
+.handle[data-handle="e"],
+.handle[data-handle="w"] {
+  top: 50%;
+}
+.handle[data-handle$="w"] {
+  left: 0;
+}
+.handle[data-handle$="e"] {
+  left: 100%;
+}
+.handle[data-handle="n"],
+.handle[data-handle="s"] {
+  left: 50%;
+}
+.stage-note {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid #88c0d066;
+  border-radius: 6px;
+  background: #191c22e6;
+  font-size: 12px;
+  color: var(--text-strong);
+  pointer-events: none;
+}
+.element-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--selection);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tool > span[aria-hidden="true"] {
+  color: var(--cyan);
+}
+.tool:hover:not(:disabled) {
+  border-color: #56607a;
+}
+.tool.danger > span[aria-hidden="true"] {
+  color: var(--red-text);
+}
+@container (max-width: 560px) {
+  .tool-text {
+    display: none;
+  }
+}
+.layers {
+  margin-top: 18px;
+}
+.layers h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 232px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.layer-select {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon name time"
+    "track track track";
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  text-align: left;
+}
+.layer-select:hover {
+  border-color: var(--selection);
+}
+.layer-select[aria-pressed="true"] {
+  border-color: var(--cyan);
+  background: #88c0d014;
+}
+.layer-icon {
+  grid-area: icon;
+  color: var(--cyan);
+  font-weight: 700;
+  text-align: center;
+}
+.layer-name {
+  grid-area: name;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layer-time {
+  grid-area: time;
+  font:
+    11px Consolas,
+    monospace;
+  color: var(--muted);
+}
+.layer-row[data-visibility="none"] .layer-time {
+  color: var(--yellow);
+}
+.layer-track {
+  grid-area: track;
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+.layer-track i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  border-radius: 3px;
+  background: #88c0d099;
+}
+.layer-select[aria-pressed="true"] .layer-track i {
+  background: var(--cyan);
+}
+.element-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.element-form > .hint {
+  margin: 0;
+}
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.field-group legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.element-form textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--chrome);
+  color: var(--text-strong);
+  font: inherit;
+  resize: vertical;
+}
+.element-form textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--cyan);
+}
+.color-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+.color-grid > [hidden] {
+  display: none;
+}
+.color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.color-field > label:first-child {
+  font-size: 13px;
+}
+.element-form input[type="color"] {
+  width: 100%;
+  min-height: 30px;
+  padding: 2px;
+}
+.color-field .check {
+  font-size: 12px;
+}
+.fit-note,
+.hint.warn {
+  color: var(--yellow);
+}
+.fit-note {
+  padding: 8px 10px;
+  border: 1px solid #ebcb8b55;
+  border-radius: 6px;
+  background: #ebcb8b0f;
+  font-size: 12px;
+}
+.fit-note p {
+  margin: 0 0 4px;
+}
+.hint.warn:empty {
+  display: none;
 }
 .player-controls {
   display: flex;
@@ -1235,6 +1589,15 @@ button.button.danger:hover:not(:disabled) {
   color: var(--red-text);
   overflow-wrap: anywhere;
 }
+/* The edit panel scrolls by itself, so the video, the toolbar, and the
+   layers stay in view while you change properties. */
+.edit-panel {
+  position: sticky;
+  top: calc(var(--header) + 12px);
+  max-height: calc(100vh - var(--header) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .edit-panel > h2 {
   margin-bottom: 2px;
 }
@@ -1304,6 +1667,12 @@ button.button.danger:hover:not(:disabled) {
   border-left: 4px solid var(--cyan);
   border-radius: 8px;
   box-shadow: 0 10px 35px #0008;
+  /* The message can be over controls at the bottom of the edit panel.
+     Clicks go through to them. The close button still works. */
+  pointer-events: none;
+}
+.message .message-close {
+  pointer-events: auto;
 }
 .message.error {
   color: #f0bcc1;

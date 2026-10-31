@@ -1,10 +1,20 @@
-// One history entry. Entries from before elements existed have no elements
-// key. Those states had no elements, so restore() reads them as empty.
-const snapshot = ({ segments, speed, muted, elements = [] }) => ({
+// One history entry. Entries from before elements or video fades existed
+// have no such keys. Those states had none, so restore() reads them as empty
+// or 0.
+const snapshot = ({
+  segments,
+  speed,
+  muted,
+  elements = [],
+  fadeIn = 0,
+  fadeOut = 0,
+}) => ({
   segments: structuredClone(segments),
   speed,
   muted,
   elements: structuredClone(elements),
+  fadeIn,
+  fadeOut,
 });
 const restore = (timeline, state) => ({
   ...timeline,
@@ -12,7 +22,28 @@ const restore = (timeline, state) => ({
   speed: state.speed,
   muted: state.muted,
   elements: state.elements ?? [],
+  fadeIn: state.fadeIn ?? 0,
+  fadeOut: state.fadeOut ?? 0,
 });
+
+export const MAX_VIDEO_FADE = 10;
+
+// Video fade from black at the start and to black at the end, in edited
+// seconds. If both together are longer than the edited video, both get
+// shorter in proportion. The stored values do not change.
+export function videoFades(timeline) {
+  const fadeIn = timeline.fadeIn ?? 0,
+    fadeOut = timeline.fadeOut ?? 0;
+  const total = duration(timeline);
+  const scale = fadeIn + fadeOut > total ? total / (fadeIn + fadeOut) : 1;
+  const round = (value) => Math.round(value * 1e6) / 1e6;
+  return {
+    fadeIn,
+    fadeOut,
+    actualFadeIn: round(fadeIn * scale),
+    actualFadeOut: round(fadeOut * scale),
+  };
+}
 
 export function createTimeline(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0)
@@ -41,7 +72,9 @@ export function isEdited(timeline, sourceDuration) {
     first.end === sourceDuration &&
     timeline.speed === 1 &&
     !timeline.muted &&
-    !timeline.elements?.length
+    !timeline.elements?.length &&
+    !timeline.fadeIn &&
+    !timeline.fadeOut
   );
 }
 
@@ -106,17 +139,31 @@ export function redo(timeline) {
 
 export function configure(
   timeline,
-  { speed = timeline.speed, muted = timeline.muted },
+  {
+    speed = timeline.speed,
+    muted = timeline.muted,
+    fadeIn = timeline.fadeIn ?? 0,
+    fadeOut = timeline.fadeOut ?? 0,
+  },
 ) {
   if (!Number.isFinite(speed) || speed < 0.5 || speed > 2)
     throw new Error("Speed must be between 0.5 and 2.");
   if (typeof muted !== "boolean")
     throw new Error("Muted must be true or false.");
-  return change(timeline, { speed, muted });
+  for (const [name, value] of [
+    ["fadeIn", fadeIn],
+    ["fadeOut", fadeOut],
+  ])
+    if (!Number.isFinite(value) || value < 0 || value > MAX_VIDEO_FADE)
+      throw new Error(
+        `${name} must be a number from 0 to ${MAX_VIDEO_FADE} seconds.`,
+      );
+  return change(timeline, { speed, muted, fadeIn, fadeOut });
 }
 
-// Return to the original video. Scope "timeline" resets segments, speed, and
-// mute. Scope "elements" removes all elements. Scope "all" does both.
+// Return to the original video. Scope "timeline" resets segments, speed,
+// mute, and video fades. Scope "elements" removes all elements. Scope "all"
+// does both.
 export function reset(timeline, sourceDuration, scope = "all") {
   if (!["all", "timeline", "elements"].includes(scope))
     throw new Error("Invalid scope. Use all, timeline, or elements.");
@@ -127,6 +174,8 @@ export function reset(timeline, sourceDuration, scope = "all") {
       segments: fresh.segments,
       speed: fresh.speed,
       muted: fresh.muted,
+      fadeIn: 0,
+      fadeOut: 0,
     });
   if (scope !== "timeline") value.elements = [];
   return change(timeline, value);

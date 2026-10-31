@@ -1,6 +1,12 @@
-import { duration, isEdited } from "../domain/timeline.js";
+import {
+  duration,
+  isEdited,
+  sourceTime,
+  videoFades,
+} from "../domain/timeline.js";
 import { editRevision } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
+import { createElementEditor } from "./element-editor.js";
 import {
   clock,
   libraryView,
@@ -27,7 +33,10 @@ let selectedVideo,
   previewError = null,
   rangeKey = "",
   lastJobs = [],
-  recordingDisplay = recordingView();
+  recordingDisplay = recordingView(),
+  // The playhead time to use again after an edit loads a new preview.
+  resumeAt = 0,
+  previewVideoId = "";
 let lastRecordingError;
 const loadedAt = Date.now();
 // The service keeps the timing fields. A reloaded page reads the same values.
@@ -41,7 +50,9 @@ const element = (tag, className, text) => {
   return node;
 };
 function notice(message, error = false) {
-  $("#message-text").textContent = message;
+  // Command errors arrive with an Electron transport prefix. Show only the
+  // message from the service.
+  $("#message-text").textContent = readableError(message);
   $("#message").classList.toggle("error", error);
   $("#message").hidden = false;
   clearTimeout(statusTimer);
@@ -87,6 +98,44 @@ function enqueue(action) {
 function handle(selector, event, action) {
   $(selector).addEventListener(event, () => run(action));
 }
+// Like enqueue, but the caller gets the result or the error.
+function queued(action) {
+  return new Promise((resolve, reject) =>
+    enqueue(async () => {
+      try {
+        resolve(await action());
+      } catch (error) {
+        reject(error);
+      }
+    }),
+  );
+}
+const playhead = () => (previewReady ? $("#player").currentTime : resumeAt);
+// The size of the frame on screen: the rendered preview, the source frame
+// while the preview is prepared, or the library size.
+function frameSize() {
+  for (const media of [$("#player"), $("#source-frame")])
+    if (media.videoWidth && media.videoHeight && media.getAttribute("src"))
+      return { width: media.videoWidth, height: media.videoHeight };
+  const { width, height } = selectedVideo?.metadata || {};
+  return width && height ? { width, height } : null;
+}
+const editor = createElementEditor({
+  $,
+  call,
+  queue: queued,
+  notice,
+  showVideo: (video, id) => {
+    if (selectedVideo?.id === id) renderVideo(video);
+  },
+  playhead,
+  seek: (seconds) =>
+    call("playback.seek", { seconds }).catch((error) =>
+      notice(error.message, true),
+    ),
+  isReady: () => previewReady,
+  frameSize,
+});
 async function refreshSources() {
   sources = await call("capture.sources");
   const before = $("#source").value;
@@ -224,6 +273,10 @@ function showLibrary({ restoreFocus = false } = {}) {
   previewKey = "";
   previewReady = false;
   rangeKey = "";
+  resumeAt = 0;
+  previewVideoId = "";
+  editor.clear();
+  hideSourceFrame();
   $(".player-shell").classList.remove("fullscreen");
   if (restoreFocus) {
     const card = [...document.querySelectorAll(".video-card")].find(
@@ -294,6 +347,10 @@ function renderVideo(video) {
   // The revision includes elements, so an element change loads a new preview.
   const key = id + editRevision(video);
   if (previewKey !== key) {
+    // An edit keeps the playhead time. Another video starts at 0.
+    if (previewVideoId !== id) resumeAt = 0;
+    else if (previewReady) resumeAt = player.currentTime;
+    previewVideoId = id;
     previewKey = key;
     previewReady = false;
     previewError = null;
@@ -301,13 +358,15 @@ function renderVideo(video) {
     player.pause();
     player.removeAttribute("src");
     player.load();
-    if (!isEdited(video.timeline, video.metadata.duration))
+    if (!isEdited(video.timeline, video.metadata.duration)) {
+      hideSourceFrame();
       setPreview(video.url, true);
-    else {
+    } else {
       previewStatus(
         "Preparing edited preview. You can continue to edit.",
         "preparing",
       );
+      showSourceFrame(video);
       Promise.resolve().then(() => preparePreview(video, key));
     }
   }
@@ -337,15 +396,87 @@ function renderVideo(video) {
   );
   renderRange();
   renderExports();
+  renderVideoFades(video);
+  editor.render(video);
   syncPreview();
 }
+function renderVideoFades(video) {
+  const fades = videoFades(video.timeline);
+  for (const [id, key] of [
+    ["#video-fade-in", "fadeIn"],
+    ["#video-fade-out", "fadeOut"],
+  ]) {
+    const input = $(id);
+    if (input !== document.activeElement || !input.dataset.dirty)
+      input.value = String(fades[key]);
+  }
+  const shortened =
+    fades.actualFadeIn !== fades.fadeIn ||
+    fades.actualFadeOut !== fades.fadeOut;
+  $("#video-fade-note").classList.toggle("warn", shortened);
+  $("#video-fade-note").textContent = shortened
+    ? `The video is shorter than both fades together. The video uses ${fades.actualFadeIn} s and ${fades.actualFadeOut} s.`
+    : "The picture and the sound fade together. These are the only video effects. There are no crossfades between clips.";
+}
+for (const [id, key] of [
+  ["#video-fade-in", "fadeIn"],
+  ["#video-fade-out", "fadeOut"],
+]) {
+  const input = $(id);
+  input.addEventListener("input", () => (input.dataset.dirty = "1"));
+  const commit = () => {
+    input.dataset.dirty = "";
+    const value = Number(input.value);
+    if (!selectedVideo) return;
+    if (input.value.trim() === "" || !Number.isFinite(value)) {
+      notice("Enter a number of seconds.", true);
+      return renderVideoFades(selectedVideo);
+    }
+    if (value === (selectedVideo.timeline[key] ?? 0)) return;
+    run(async () => {
+      try {
+        await edit("configure", { [key]: value });
+      } catch (error) {
+        renderVideoFades(selectedVideo);
+        throw error;
+      }
+    });
+  };
+  input.addEventListener("change", commit);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commit();
+  });
+}
+// While the edited preview renders, the player shows the source frame at
+// the playhead without elements. The stage shows element outlines. The
+// rendered preview replaces this picture when it is ready.
+function showSourceFrame(video) {
+  const frame = $("#source-frame");
+  const total = seconds(video);
+  if (frame.getAttribute("src") !== video.url) frame.src = video.url;
+  frame.currentTime = sourceTime(video.timeline, Math.min(resumeAt, total));
+  frame.hidden = false;
+  $("#stage-note").textContent =
+    "Preparing the preview. This picture is the original video without elements. Outlines show the elements.";
+  $("#stage-note").hidden = false;
+}
+function hideSourceFrame() {
+  $("#source-frame").hidden = true;
+  $("#stage-note").hidden = true;
+}
+$("#source-frame").addEventListener("error", () => {
+  $("#source-frame").hidden = true;
+});
+$("#source-frame").addEventListener("loadedmetadata", () => editor.layout());
 function setPreview(url, original = false) {
   const player = $("#player");
   player.dataset.original = String(original);
   player.src = url;
   player.playbackRate = 1;
   player.muted = selectedVideo.timeline.muted;
-  player.currentTime = 0;
+  player.currentTime = Math.min(resumeAt, seconds(selectedVideo));
   previewReady = false;
   previewStatus("Loading preview.", "preparing");
   syncPreview();
@@ -443,13 +574,16 @@ function syncPreview() {
   const label = fullscreen ? "Exit fullscreen" : "Fullscreen";
   $("#preview-fullscreen .label").textContent = label;
   $("#preview-fullscreen").setAttribute("aria-label", label);
+  editor.layout();
 }
+new ResizeObserver(() => editor.layout()).observe($(".player-wrap"));
 for (const event of ["play", "pause", "volumechange", "timeupdate", "seeked"])
   $("#player").addEventListener(event, syncPreview);
 $("#player").addEventListener("loadeddata", () => {
   if (!selectedVideo || $("#player").readyState < 2) return;
   previewReady = true;
   previewError = null;
+  hideSourceFrame();
   previewStatus("Preview ready. Your edits match the exported video.", "ready");
   syncPreview();
 });
@@ -550,6 +684,11 @@ $("#range-end-now").addEventListener("click", () =>
   setRangeFromPlayhead("end"),
 );
 document.addEventListener("keydown", (event) => {
+  // Escape cancels a drag first. Nothing is saved.
+  if (event.key === "Escape" && editor.cancelGesture()) {
+    event.preventDefault();
+    return;
+  }
   if (
     event.key === "Escape" &&
     $(".player-shell").classList.contains("fullscreen")
@@ -559,6 +698,14 @@ document.addEventListener("keydown", (event) => {
     );
     return;
   }
+  if (
+    event.key === "Escape" &&
+    !$("#editor").hidden &&
+    !$("#confirm-delete").open &&
+    !["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) &&
+    editor.deselect()
+  )
+    return;
   const context = shortcutContext();
   // Accept a key that can apply after the current action completes. Check it
   // again with the state at that time.
@@ -571,6 +718,11 @@ document.addEventListener("keydown", (event) => {
   if (!possible) return;
   event.preventDefault();
   if (context.view === "library") return perform(possible);
+  // The editor queues its own command for the selected element.
+  if (possible.local === "delete-element") {
+    editor.deleteSelected();
+    return;
+  }
   const keys = {
     key: event.key,
     ctrlKey: event.ctrlKey,
@@ -598,6 +750,7 @@ function shortcutContext() {
     canUndo: Boolean(selectedVideo?.timeline.past.length),
     canRedo: Boolean(selectedVideo?.timeline.future.length),
     dialog: $("#confirm-delete").open,
+    selected: editor.selected(),
   };
 }
 function perform(action) {

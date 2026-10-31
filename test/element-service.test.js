@@ -38,7 +38,12 @@ test("shared element commands add, change, order, remove, and persist text", asy
   ])
     assert.ok(names.includes(name), name);
   const add = commands.find((c) => c.name === "element.add");
-  assert.deepEqual(add.inputSchema.properties.type.enum, ["text"]);
+  assert.deepEqual(add.inputSchema.properties.type.enum, [
+    "text",
+    "rectangle",
+    "ellipse",
+    "arrow",
+  ]);
   assert.match(add.inputSchema.properties.x.description, /inspect\.result/);
 
   const added = await service.execute("element.add", {
@@ -191,6 +196,170 @@ test("advertised color patterns accept the same values as the commands", async (
         );
       }
     }
+  }
+});
+
+test("shapes, arrows, and fades use the shared commands and report actual values", async () => {
+  const { service, video } = await setup();
+  const add = commands.find((c) => c.name === "element.add").inputSchema
+    .properties;
+  for (const key of [
+    "fill",
+    "fillOpacity",
+    "stroke",
+    "strokeWidth",
+    "x1",
+    "y1",
+    "x2",
+    "y2",
+    "fadeIn",
+    "fadeOut",
+  ])
+    assert.ok(add[key]?.description, `element.add describes ${key}`);
+  assert.match(add.x2.description, /tip/);
+  assert.match(add.fill.description, /rectangle/i);
+  const configure = commands.find((c) => c.name === "edit.configure")
+    .inputSchema.properties;
+  assert.match(configure.fadeIn.description, /black/);
+
+  const box = await service.execute("element.add", {
+    id: video.id,
+    type: "rectangle",
+    start: 1,
+    end: 2,
+    x: 0.1,
+    y: 0.1,
+    width: 0.3,
+    height: 0.2,
+    fill: "#BF616A",
+    fillOpacity: 0.4,
+    fadeIn: 0.8,
+    fadeOut: 0.8,
+  });
+  assert.equal(box.element.type, "rectangle");
+  // 0.8 + 0.8 is longer than the 1-second element.
+  assert.deepEqual(
+    [box.element.fadeIn, box.element.actualFadeIn, box.element.actualFadeOut],
+    [0.8, 0.5, 0.5],
+  );
+  const arrow = await service.execute("element.add", {
+    id: video.id,
+    type: "arrow",
+    start: 0,
+    end: 5,
+    x1: 0.8,
+    y1: 0.8,
+    x2: 0.25,
+    y2: 0.2,
+    color: "#A3BE8C",
+  });
+  const moved = await service.execute("element.update", {
+    id: video.id,
+    elementId: arrow.element.id,
+    x2: 0.3,
+  });
+  assert.deepEqual(
+    [moved.element.x1, moved.element.x2, moved.element.y2],
+    [0.8, 0.3, 0.2],
+  );
+  await assert.rejects(
+    service.execute("element.update", {
+      id: video.id,
+      elementId: arrow.element.id,
+      fill: "#FFFFFF",
+    }),
+    /does not use fill/,
+  );
+  await assert.rejects(
+    service.execute("edit.configure", { id: video.id, fadeOut: 12 }),
+    /fadeOut must be/,
+  );
+  const faded = await service.execute("edit.configure", {
+    id: video.id,
+    fadeIn: 1.5,
+    fadeOut: 2,
+  });
+  assert.deepEqual(faded.videoFades, {
+    fadeIn: 1.5,
+    fadeOut: 2,
+    actualFadeIn: 1.5,
+    actualFadeOut: 2,
+  });
+  const trimmed = await service.execute("edit.trim", {
+    id: video.id,
+    start: 0,
+    end: 2,
+  });
+  assert.ok(Math.abs(trimmed.videoFades.actualFadeIn - 2 * (1.5 / 3.5)) < 1e-6);
+  const list = await service.execute("element.list", { id: video.id });
+  assert.equal(list.videoFades.fadeOut, 2);
+  assert.deepEqual(
+    list.elements.map((e) => e.type),
+    ["rectangle", "arrow"],
+  );
+});
+
+test("advertised number bounds and colors for every type match the commands", async () => {
+  const { service, video } = await setup();
+  const schema = commands.find((c) => c.name === "element.add").inputSchema
+    .properties;
+  const users = {
+    color: ["text", "arrow"],
+    background: ["text"],
+    outline: ["text", "arrow"],
+    fill: ["rectangle", "ellipse"],
+    stroke: ["rectangle", "ellipse"],
+    fillOpacity: ["rectangle"],
+    strokeWidth: ["rectangle", "arrow"],
+    opacity: ["text", "ellipse", "arrow"],
+    fadeIn: ["text", "rectangle", "arrow"],
+    fadeOut: ["ellipse"],
+    size: ["text"],
+    backgroundOpacity: ["text"],
+    x1: ["arrow"],
+    y2: ["arrow"],
+  };
+  const accepted = (type, key, value) =>
+    service
+      .execute("element.add", {
+        id: video.id,
+        type,
+        start: 0,
+        end: 1,
+        ...(type === "text" ? { text: "x" } : {}),
+        // A shape without a line needs a fill.
+        ...(["rectangle", "ellipse"].includes(type) && key === "stroke"
+          ? { fill: "#FFFFFF" }
+          : {}),
+        [key]: value,
+      })
+      .then(
+        () => true,
+        () => false,
+      );
+  for (const [key, types] of Object.entries(users)) {
+    const spec = schema[key];
+    const values =
+      spec.type === "number"
+        ? [
+            spec.minimum - 0.0001,
+            spec.minimum,
+            spec.maximum,
+            spec.maximum + 0.0001,
+          ]
+        : ["none", "#12abEF", "red", "#FFF"];
+    for (const type of types)
+      for (const value of values) {
+        const advertised =
+          spec.type === "number"
+            ? value >= spec.minimum && value <= spec.maximum
+            : new RegExp(spec.pattern).test(value);
+        assert.equal(
+          await accepted(type, key, value),
+          advertised,
+          `${type} ${key} ${value}: the schema and the command must agree.`,
+        );
+      }
   }
 });
 

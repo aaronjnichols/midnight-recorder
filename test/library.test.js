@@ -28,6 +28,54 @@ test("import copies source, saves edits, and loads records after restart", async
   assert.equal(await readFile(source, "utf8"), "original");
 });
 
+test("a save retries a rename that Windows refuses for a short time", async () => {
+  await mkdir(".local", { recursive: true });
+  const root = await mkdtemp(path.resolve(".local", "library-rename-"));
+  const source = path.join(root, "input.webm");
+  await writeFile(source, "video");
+  const { rename } = await import("node:fs/promises");
+  let refusals = 2;
+  const flaky = new Library(path.join(root, "data"), {
+    rename: async (from, to) => {
+      if (refusals-- > 0)
+        throw Object.assign(new Error("operation not permitted"), {
+          code: "EPERM",
+        });
+      return rename(from, to);
+    },
+  });
+  const video = await flaky.import(source, { duration: 2 });
+  assert.equal((await flaky.get(video.id)).id, video.id);
+  // A refusal that does not stop fails after a bounded number of tries.
+  let attempts = 0;
+  const locked = new Library(path.join(root, "data"), {
+    rename: async () => {
+      attempts++;
+      throw Object.assign(new Error("operation not permitted"), {
+        code: "EPERM",
+      });
+    },
+  });
+  await assert.rejects(
+    locked.update(video.id, { title: "New" }),
+    /EPERM|permitted/,
+  );
+  assert.ok(attempts > 2 && attempts <= 20, String(attempts));
+  // Other errors fail at once.
+  let other = 0;
+  const missing = new Library(path.join(root, "data"), {
+    rename: async () => {
+      other++;
+      throw Object.assign(new Error("no such file"), { code: "ENOENT" });
+    },
+  });
+  await assert.rejects(
+    missing.update(video.id, { title: "New" }),
+    /no such file/,
+  );
+  assert.equal(other, 1);
+});
+
 test("a failed import removes its incomplete library copy", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "import-error-"));

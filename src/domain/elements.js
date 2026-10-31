@@ -66,8 +66,10 @@ export const LIMITS = {
   characters: 500,
   lines: 10,
   minSeconds: 0.05,
+  maxFade: 10,
+  minArrow: 0.02,
 };
-export const ELEMENT_TYPES = ["text"];
+export const ELEMENT_TYPES = ["text", "rectangle", "ellipse", "arrow"];
 export const FONTS = ["sans", "serif", "mono"];
 export const ALIGN = ["left", "center", "right"];
 export const VERTICAL_ALIGN = ["top", "middle", "bottom"];
@@ -128,62 +130,140 @@ function checkBox(v) {
       "The element box must be inside the frame. x + width and y + height must be at most 1.",
     );
 }
-function checkTextStyle(v) {
-  checkBox(v);
-  choice("font", v.font, FONTS);
-  if (typeof v.bold !== "boolean")
-    throw new Error("bold must be true or false.");
-  between("size", v.size, 0.01, 0.5);
+// Opacity and fades are common to all types. Fades are edited seconds.
+function checkCommon(v) {
   between("opacity", v.opacity, 0.1, 1);
-  choice("align", v.align, ALIGN);
-  choice("verticalAlign", v.verticalAlign, VERTICAL_ALIGN);
-  between("backgroundOpacity", v.backgroundOpacity, 0, 1);
+  between("fadeIn", v.fadeIn, 0, LIMITS.maxFade);
+  between("fadeOut", v.fadeOut, 0, LIMITS.maxFade);
+}
+const COMMON = { opacity: 1, fadeIn: 0, fadeOut: 0 };
+
+// Each type has its stored keys in a fixed order, defaults, and checks.
+// Stroke width is a fraction of the frame height, like the font size.
+const TYPES = {
+  text: {
+    defaults: {
+      text: undefined,
+      x: 0.1,
+      y: 0.4,
+      width: 0.8,
+      height: 0.2,
+      font: "sans",
+      bold: false,
+      size: 0.06,
+      color: "#FFFFFF",
+      opacity: 1,
+      align: "center",
+      verticalAlign: "middle",
+      background: "none",
+      backgroundOpacity: 0.75,
+      outline: "#000000",
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+    check(v) {
+      v.text = checkText(v.text);
+      checkBox(v);
+      choice("font", v.font, FONTS);
+      if (typeof v.bold !== "boolean")
+        throw new Error("bold must be true or false.");
+      between("size", v.size, 0.01, 0.5);
+      checkCommon(v);
+      choice("align", v.align, ALIGN);
+      choice("verticalAlign", v.verticalAlign, VERTICAL_ALIGN);
+      between("backgroundOpacity", v.backgroundOpacity, 0, 1);
+      v.color = color("color", v.color);
+      v.background = color("background", v.background, true);
+      v.outline = color("outline", v.outline, true);
+    },
+  },
+  rectangle: { defaults: shapeDefaults(), check: checkShape },
+  ellipse: { defaults: shapeDefaults(), check: checkShape },
+  arrow: {
+    defaults: {
+      x1: 0.3,
+      y1: 0.7,
+      x2: 0.5,
+      y2: 0.5,
+      color: "#EBCB8B",
+      strokeWidth: 0.008,
+      outline: "#000000",
+      ...COMMON,
+    },
+    check(v) {
+      for (const key of ["x1", "y1", "x2", "y2"]) between(key, v[key], 0, 1);
+      // A small tolerance accepts exactly the minimum, for example 0.1 to
+      // 0.12, where floating-point subtraction gives 0.019999999999999997.
+      if (Math.hypot(v.x2 - v.x1, v.y2 - v.y1) < LIMITS.minArrow - 1e-9)
+        throw new Error(
+          `An arrow must be at least ${LIMITS.minArrow} long from tail (x1, y1) to tip (x2, y2).`,
+        );
+      v.color = color("color", v.color);
+      between("strokeWidth", v.strokeWidth, 0.002, 0.05);
+      v.outline = color("outline", v.outline, true);
+      checkCommon(v);
+    },
+  },
+};
+function shapeDefaults() {
+  return {
+    x: 0.3,
+    y: 0.3,
+    width: 0.4,
+    height: 0.3,
+    fill: "none",
+    fillOpacity: 0.25,
+    stroke: "#EBCB8B",
+    strokeWidth: 0.006,
+    ...COMMON,
+  };
+}
+function checkShape(v) {
+  checkBox(v);
+  v.fill = color("fill", v.fill, true);
+  between("fillOpacity", v.fillOpacity, 0, 1);
+  v.stroke = color("stroke", v.stroke, true);
+  between("strokeWidth", v.strokeWidth, 0.002, 0.05);
+  // A fill with 0 opacity draws nothing, so it does not count as visible.
+  if ((v.fill === "none" || v.fillOpacity === 0) && v.stroke === "none")
+    throw new Error(
+      "A shape needs a visible fill or a line color. Set fillOpacity above 0 or set a stroke.",
+    );
+  checkCommon(v);
+}
+const PROPERTY_KEYS = new Set(
+  Object.values(TYPES).flatMap((spec) => Object.keys(spec.defaults)),
+);
+
+// Reject a known property that this type does not use.
+function checkKeys(type, values) {
+  for (const key of Object.keys(values))
+    if (
+      PROPERTY_KEYS.has(key) &&
+      values[key] !== undefined &&
+      !(key in TYPES[type].defaults)
+    )
+      throw new Error(`A ${type} element does not use ${key}.`);
 }
 
-const TEXT_DEFAULTS = {
-  x: 0.1,
-  y: 0.4,
-  width: 0.8,
-  height: 0.2,
-  font: "sans",
-  bold: false,
-  size: 0.06,
-  color: "#FFFFFF",
-  opacity: 1,
-  align: "center",
-  verticalAlign: "middle",
-  background: "none",
-  backgroundOpacity: 0.75,
-  outline: "#000000",
-};
-
-// Build a checked text element. Unknown keys are not copied.
-function textElement(id, sourceStart, sourceEnd, values) {
-  const v = { ...TEXT_DEFAULTS };
-  for (const [key, value] of Object.entries(values))
-    if (key in TEXT_DEFAULTS && value !== undefined) v[key] = value;
-  checkTextStyle(v);
+// Stored elements from before fades existed have no fade keys. Read them as
+// 0. The stored file does not change until the element changes.
+function normalize(element) {
   return {
-    id,
-    type: "text",
-    sourceStart,
-    sourceEnd,
-    text: checkText(values.text),
-    x: v.x,
-    y: v.y,
-    width: v.width,
-    height: v.height,
-    font: v.font,
-    bold: v.bold,
-    size: v.size,
-    color: color("color", v.color),
-    opacity: v.opacity,
-    align: v.align,
-    verticalAlign: v.verticalAlign,
-    background: color("background", v.background, true),
-    backgroundOpacity: v.backgroundOpacity,
-    outline: color("outline", v.outline, true),
+    ...element,
+    fadeIn: element.fadeIn ?? 0,
+    fadeOut: element.fadeOut ?? 0,
   };
+}
+
+// Build a checked element. Unknown keys are not copied.
+function buildElement(type, id, sourceStart, sourceEnd, values) {
+  const spec = TYPES[type];
+  const v = { ...spec.defaults };
+  for (const key of Object.keys(spec.defaults))
+    if (values[key] !== undefined) v[key] = values[key];
+  spec.check(v);
+  return { id, type, sourceStart, sourceEnd, ...v };
 }
 
 // The range checks in sourceTimes report an end before the start.
@@ -201,9 +281,10 @@ export function addElement(timeline, sourceDuration, id, args) {
     throw new Error(`A video can have at most ${LIMITS.elements} elements.`);
   if (list.some((e) => e.id === id))
     throw new Error("Element ID already exists.");
+  checkKeys(args.type, args);
   checkDuration(args);
   const range = sourceTimes(timeline, sourceDuration, args);
-  const element = textElement(id, range.start, range.end, args);
+  const element = buildElement(args.type, id, range.start, range.end, args);
   if (placement(timeline, element).visibility === "none")
     throw new Error(
       "The time range is not in the edited video. That part was cut or trimmed.",
@@ -223,15 +304,18 @@ const TIME_KEYS = ["start", "end"];
 // Change some properties. Times use the edited time base unless timeBase is
 // source. A missing start or end keeps its current value.
 export function updateElement(timeline, sourceDuration, elementId, args) {
-  const { list, index, element } = find(timeline, elementId);
+  const found = find(timeline, elementId);
+  const { list, index } = found;
+  const element = normalize(found.element);
   if (args.type !== undefined)
     throw new Error(
       "The element type cannot change. Add a new element and remove this one.",
     );
+  checkKeys(element.type, args);
   const keys = Object.keys(args).filter(
     (key) =>
       args[key] !== undefined &&
-      (key === "text" || key in TEXT_DEFAULTS || TIME_KEYS.includes(key)),
+      (key in TYPES[element.type].defaults || TIME_KEYS.includes(key)),
   );
   if (!keys.length) throw new Error("Give at least one property to change.");
   let { sourceStart, sourceEnd } = element;
@@ -268,7 +352,13 @@ export function updateElement(timeline, sourceDuration, elementId, args) {
     throw new Error("Select a time range where the end is after the start.");
   const values = { ...element };
   for (const key of keys) values[key] = args[key];
-  const next = textElement(element.id, sourceStart, sourceEnd, values);
+  const next = buildElement(
+    element.type,
+    element.id,
+    sourceStart,
+    sourceEnd,
+    values,
+  );
   if (JSON.stringify(next) === JSON.stringify(element)) return timeline;
   const shown = placement(timeline, next);
   if (shown.visibility === "none")
@@ -311,13 +401,70 @@ export function removeElement(timeline, elementId) {
   return withElements(timeline, list.toSpliced(index, 1));
 }
 
-// Elements with their layer (0 is the bottom) and edited placement.
+// Fades that fit in the visible interval. When fadeIn + fadeOut is longer
+// than the interval, both get shorter in proportion. The stored values do
+// not change, so undo of a cut gives the full fades again.
+function actualFades(element, shown) {
+  if (shown.visibility === "none") return { actualFadeIn: 0, actualFadeOut: 0 };
+  const length = shown.end - shown.start;
+  const total = element.fadeIn + element.fadeOut;
+  const scale = total > length ? length / total : 1;
+  return {
+    actualFadeIn: round(element.fadeIn * scale),
+    actualFadeOut: round(element.fadeOut * scale),
+  };
+}
+
+// The selection box of an arrow is the rectangle around its tail and tip.
+const bounds = (e) =>
+  e.type === "arrow"
+    ? {
+        x: round(Math.min(e.x1, e.x2)),
+        y: round(Math.min(e.y1, e.y2)),
+        width: round(Math.abs(e.x2 - e.x1)),
+        height: round(Math.abs(e.y2 - e.y1)),
+      }
+    : {};
+
+// Elements with their layer (0 is the bottom), edited placement, and actual
+// fades.
 export function describeElements(timeline) {
-  return elementsOf(timeline).map((element, layer) => ({
-    ...element,
-    layer,
-    ...placement(timeline, element),
-  }));
+  return elementsOf(timeline).map((stored, layer) => {
+    const element = normalize(stored);
+    const shown = placement(timeline, element);
+    return {
+      ...element,
+      ...bounds(element),
+      layer,
+      ...shown,
+      ...actualFades(element, shown),
+    };
+  });
+}
+
+// Arrow outline points in pixels: a shaft and a head. The last point of the
+// head is exactly the tip.
+function arrowPoints(x1, y1, x2, y2, shaft) {
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const ux = (x2 - x1) / length,
+    uy = (y2 - y1) / length;
+  const nx = -uy,
+    ny = ux;
+  const head = Math.min(Math.max(4 * shaft, 12), length * 0.6);
+  const half = Math.min(Math.max(2 * shaft, 7), head * 0.75);
+  const bx = x2 - ux * head,
+    by = y2 - uy * head;
+  const p = (x, y) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100];
+  const s = Math.min(shaft / 2, half * 0.8);
+  return [
+    p(x1 + nx * s, y1 + ny * s),
+    p(bx + nx * s, by + ny * s),
+    p(bx + nx * half, by + ny * half),
+    [x2, y2],
+    p(bx - nx * half, by - ny * half),
+    p(bx - nx * s, by - ny * s),
+    p(x1 - nx * s, y1 - ny * s),
+  ];
 }
 
 // Pixel drawing operations for the rendered frame, bottom layer first.
@@ -328,6 +475,39 @@ export function renderPlan(timeline, frame) {
   return describeElements(timeline)
     .filter((e) => e.visibility !== "none")
     .map((e) => {
+      const timing = {
+        id: e.id,
+        type: e.type,
+        start: e.start,
+        end: e.end,
+        opacity: e.opacity,
+        fadeIn: e.actualFadeIn,
+        fadeOut: e.actualFadeOut,
+      };
+      const line = (value) => Math.max(1, Math.round(value * frame.height));
+      if (e.type === "arrow") {
+        const x1 = Math.round(e.x1 * frame.width),
+          y1 = Math.round(e.y1 * frame.height),
+          x2 = Math.round(e.x2 * frame.width),
+          y2 = Math.round(e.y2 * frame.height);
+        const strokeWidth = line(e.strokeWidth);
+        return {
+          ...timing,
+          x1,
+          y1,
+          x2,
+          y2,
+          strokeWidth,
+          color: e.color,
+          outline: e.outline,
+          outlineWidth:
+            e.outline === "none" ? 0 : Math.max(1, Math.round(strokeWidth / 4)),
+          points:
+            x1 === x2 && y1 === y2
+              ? []
+              : arrowPoints(x1, y1, x2, y2, strokeWidth),
+        };
+      }
       const left = Math.round(e.x * frame.width),
         top = Math.round(e.y * frame.height);
       const width = Math.max(
@@ -338,6 +518,26 @@ export function renderPlan(timeline, frame) {
         1,
         Math.round((e.y + e.height) * frame.height) - top,
       );
+      if (e.type !== "text")
+        return {
+          ...timing,
+          x: left,
+          y: top,
+          width,
+          height,
+          fill: e.fill,
+          fillOpacity: e.fillOpacity,
+          stroke: e.stroke,
+          // The line is inside the box, so it cannot be wider than half of
+          // the box.
+          strokeWidth:
+            e.stroke === "none"
+              ? 0
+              : Math.min(
+                  line(e.strokeWidth),
+                  Math.max(1, Math.floor(Math.min(width, height) / 2)),
+                ),
+        };
       const fontSize = Math.max(1, Math.round(e.size * frame.height));
       // Padding keeps text off the box edge. The inner text box keeps at
       // least 1 pixel.
@@ -350,10 +550,7 @@ export function renderPlan(timeline, frame) {
         ),
       );
       return {
-        id: e.id,
-        type: e.type,
-        start: e.start,
-        end: e.end,
+        ...timing,
         x: left,
         y: top,
         width,
@@ -364,7 +561,6 @@ export function renderPlan(timeline, frame) {
         bold: e.bold,
         fontSize,
         color: e.color,
-        opacity: e.opacity,
         align: e.align,
         verticalAlign: e.verticalAlign,
         background: e.background,

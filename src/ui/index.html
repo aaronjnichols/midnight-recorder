@@ -226,51 +226,134 @@
         </div>
         <div class="editor-grid">
           <div class="editor-main">
-            <div class="player-shell">
-              <div class="player-wrap">
-                <video
-                  id="player"
-                  disablepictureinpicture
-                  disableremoteplayback
-                ></video>
+            <div class="stage-column">
+              <div
+                class="element-toolbar"
+                role="toolbar"
+                aria-label="Add and arrange elements"
+              >
+                <div class="tool-group" aria-label="Add at the playhead">
+                  <button id="add-text" class="tool" aria-label="Add text">
+                    <span aria-hidden="true">T</span> Text
+                  </button>
+                  <button id="add-label" class="tool" aria-label="Add label">
+                    <span aria-hidden="true">▤</span> Label
+                  </button>
+                  <button
+                    id="add-rectangle"
+                    class="tool"
+                    aria-label="Add rectangle"
+                  >
+                    <span aria-hidden="true">▭</span> Rectangle
+                  </button>
+                  <button
+                    id="add-ellipse"
+                    class="tool"
+                    aria-label="Add ellipse"
+                  >
+                    <span aria-hidden="true">◯</span> Ellipse
+                  </button>
+                  <button id="add-arrow" class="tool" aria-label="Add arrow">
+                    <span aria-hidden="true">↗</span> Arrow
+                  </button>
+                </div>
+                <div class="tool-group" aria-label="Selected element">
+                  <button
+                    id="duplicate-element"
+                    class="tool"
+                    aria-label="Duplicate element"
+                    title="Duplicate"
+                  >
+                    <span aria-hidden="true">⧉</span
+                    ><span class="tool-text">Duplicate</span>
+                  </button>
+                  <button
+                    id="raise-element"
+                    class="tool"
+                    aria-label="Bring element forward"
+                    title="Bring forward"
+                  >
+                    <span aria-hidden="true">↑</span
+                    ><span class="tool-text">Forward</span>
+                  </button>
+                  <button
+                    id="lower-element"
+                    class="tool"
+                    aria-label="Send element backward"
+                    title="Send backward"
+                  >
+                    <span aria-hidden="true">↓</span
+                    ><span class="tool-text">Backward</span>
+                  </button>
+                  <button
+                    id="delete-element"
+                    class="tool danger"
+                    aria-label="Delete element"
+                    aria-keyshortcuts="Delete"
+                    title="Delete"
+                  >
+                    <span aria-hidden="true">✕</span
+                    ><span class="tool-text">Delete</span>
+                  </button>
+                </div>
               </div>
-              <div class="player-controls">
-                <button
-                  id="preview-play"
-                  class="control-button"
-                  aria-label="Play preview"
-                  aria-keyshortcuts="Space"
-                >
-                  <span class="icon" aria-hidden="true">▶</span
-                  ><span class="label">Play</span></button
-                ><span id="preview-time" class="preview-time">0:00 / 0:00</span
-                ><input
-                  id="preview-seek"
-                  type="range"
-                  min="0"
-                  max="1"
-                  value="0"
-                  step="0.01"
-                  aria-label="Preview time"
-                /><label class="volume"
-                  ><span>Volume</span
+              <div class="player-shell">
+                <div class="player-wrap">
+                  <video
+                    id="player"
+                    disablepictureinpicture
+                    disableremoteplayback
+                  ></video>
+                  <video
+                    id="source-frame"
+                    class="source-frame"
+                    muted
+                    preload="auto"
+                    aria-hidden="true"
+                    hidden
+                  ></video>
+                  <div id="stage" class="stage" hidden></div>
+                  <p id="stage-note" class="stage-note" hidden></p>
+                </div>
+                <div class="player-controls">
+                  <button
+                    id="preview-play"
+                    class="control-button"
+                    aria-label="Play preview"
+                    aria-keyshortcuts="Space"
+                  >
+                    <span class="icon" aria-hidden="true">▶</span
+                    ><span class="label">Play</span></button
+                  ><span id="preview-time" class="preview-time"
+                    >0:00 / 0:00</span
                   ><input
-                    id="preview-volume"
+                    id="preview-seek"
                     type="range"
                     min="0"
                     max="1"
-                    step="0.05"
-                    value="1"
-                    aria-label="Preview volume" /></label
-                ><button
-                  id="preview-fullscreen"
-                  class="control-button"
-                  aria-label="Fullscreen"
-                  aria-keyshortcuts="F"
-                >
-                  <span class="icon" aria-hidden="true">⛶</span
-                  ><span class="label">Fullscreen</span>
-                </button>
+                    value="0"
+                    step="0.01"
+                    aria-label="Preview time"
+                  /><label class="volume"
+                    ><span>Volume</span
+                    ><input
+                      id="preview-volume"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value="1"
+                      aria-label="Preview volume" /></label
+                  ><button
+                    id="preview-fullscreen"
+                    class="control-button"
+                    aria-label="Fullscreen"
+                    aria-keyshortcuts="F"
+                  >
+                    <span class="icon" aria-hidden="true">⛶</span
+                    ><span class="label">Fullscreen</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="timeline">
@@ -292,6 +375,23 @@
                 the bar to move the playhead.
               </p>
             </div>
+            <section
+              id="layers"
+              class="layers"
+              aria-labelledby="layers-heading"
+            >
+              <div class="timeline-head">
+                <h2 id="layers-heading">Layers</h2>
+                <span id="layer-count" class="timeline-duration"
+                  >No elements</span
+                >
+              </div>
+              <p id="layers-empty" class="hint">
+                Add text, a label, a shape, or an arrow at the playhead. Higher
+                rows show in front.
+              </p>
+              <ol id="layer-list" class="layer-list"></ol>
+            </section>
             <p
               id="preview-state"
               class="preview-state"
@@ -308,6 +408,8 @@
               <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
               <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</li>
               <li><kbd>F</kbd> Fullscreen</li>
+              <li><kbd>Delete</kbd> Delete the selected element</li>
+              <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
             </ul>
             <section
               id="exports"
@@ -321,6 +423,307 @@
           </div>
           <section class="panel edit-panel" aria-labelledby="edit-heading">
             <h2 id="edit-heading">Edit video</h2>
+            <div id="element-panel" class="edit-section element-panel">
+              <h3 id="element-heading">Element</h3>
+              <p id="element-empty" class="hint">
+                Select an element in the video or in Layers. Or add one with the
+                buttons above the video.
+              </p>
+              <form id="element-form" class="element-form" hidden novalidate>
+                <p class="hint">
+                  Changes save when you leave a field or press Enter. Times are
+                  seconds in the edited video. Positions and sizes are percent
+                  of the video.
+                </p>
+                <div class="field-group" data-types="text">
+                  <label for="el-text">Text</label>
+                  <textarea id="el-text" rows="2" maxlength="500"></textarea>
+                  <div id="el-fit" class="fit-note" hidden>
+                    <p id="el-fit-text"></p>
+                    <button
+                      type="button"
+                      id="el-fit-button"
+                      class="text-button small"
+                    >
+                      Make the text fit the box
+                    </button>
+                  </div>
+                  <div class="two-cols">
+                    <label
+                      >Font<select id="el-font" data-key="font">
+                        <option value="sans">Sans</option>
+                        <option value="serif">Serif</option>
+                        <option value="mono">Mono</option>
+                      </select></label
+                    ><label
+                      >Size, % of the video height<input
+                        id="el-size"
+                        data-key="size"
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <label class="check"
+                    ><input type="checkbox" id="el-bold" data-key="bold" />
+                    Bold</label
+                  >
+                  <div class="two-cols">
+                    <label
+                      >Align<select id="el-align" data-key="align">
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                      </select></label
+                    ><label
+                      >Vertical<select id="el-valign" data-key="verticalAlign">
+                        <option value="top">Top</option>
+                        <option value="middle">Middle</option>
+                        <option value="bottom">Bottom</option>
+                      </select></label
+                    >
+                  </div>
+                </div>
+                <div class="field-group color-grid">
+                  <label data-types="text arrow"
+                    >Color<input id="el-color" data-key="color" type="color"
+                  /></label>
+                  <div
+                    class="color-field"
+                    data-types="text"
+                    data-key="background"
+                  >
+                    <label for="el-background">Background</label>
+                    <input id="el-background" type="color" />
+                    <label class="check"
+                      ><input type="checkbox" id="el-background-none" />
+                      None</label
+                    >
+                  </div>
+                  <label data-types="text"
+                    >Background opacity, %<input
+                      id="el-background-opacity"
+                      data-key="backgroundOpacity"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                  /></label>
+                  <div
+                    class="color-field"
+                    data-types="text arrow"
+                    data-key="outline"
+                  >
+                    <label for="el-outline">Outline</label>
+                    <input id="el-outline" type="color" />
+                    <label class="check"
+                      ><input type="checkbox" id="el-outline-none" />
+                      None</label
+                    >
+                  </div>
+                  <div
+                    class="color-field"
+                    data-types="rectangle ellipse"
+                    data-key="fill"
+                  >
+                    <label for="el-fill">Fill</label>
+                    <input id="el-fill" type="color" />
+                    <label class="check"
+                      ><input type="checkbox" id="el-fill-none" /> None</label
+                    >
+                  </div>
+                  <label data-types="rectangle ellipse"
+                    >Fill opacity, %<input
+                      id="el-fill-opacity"
+                      data-key="fillOpacity"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                  /></label>
+                  <div
+                    class="color-field"
+                    data-types="rectangle ellipse"
+                    data-key="stroke"
+                  >
+                    <label for="el-stroke">Line</label>
+                    <input id="el-stroke" type="color" />
+                    <label class="check"
+                      ><input type="checkbox" id="el-stroke-none" /> None</label
+                    >
+                  </div>
+                  <label data-types="rectangle ellipse arrow"
+                    >Line width, % of the video height<input
+                      id="el-stroke-width"
+                      data-key="strokeWidth"
+                      type="number"
+                      min="0.2"
+                      max="5"
+                      step="0.1"
+                  /></label>
+                </div>
+                <fieldset
+                  class="field-group"
+                  data-types="text rectangle ellipse"
+                >
+                  <legend>Position and size, % of the video</legend>
+                  <div class="two-cols">
+                    <label
+                      >Left (X)<input
+                        id="el-x"
+                        data-key="x"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1" /></label
+                    ><label
+                      >Top (Y)<input
+                        id="el-y"
+                        data-key="y"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <div class="two-cols">
+                    <label
+                      >Width<input
+                        id="el-width"
+                        data-key="width"
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="0.1" /></label
+                    ><label
+                      >Height<input
+                        id="el-height"
+                        data-key="height"
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                </fieldset>
+                <fieldset class="field-group" data-types="arrow">
+                  <legend>Arrow points, % of the video</legend>
+                  <div class="two-cols">
+                    <label
+                      >Tail X<input
+                        id="el-x1"
+                        data-key="x1"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1" /></label
+                    ><label
+                      >Tail Y<input
+                        id="el-y1"
+                        data-key="y1"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <div class="two-cols">
+                    <label
+                      >Tip X<input
+                        id="el-x2"
+                        data-key="x2"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1" /></label
+                    ><label
+                      >Tip Y<input
+                        id="el-y2"
+                        data-key="y2"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <p class="hint">The tip is the point that the arrow shows.</p>
+                </fieldset>
+                <fieldset class="field-group">
+                  <legend>Time, seconds</legend>
+                  <div class="two-cols">
+                    <div class="field">
+                      <label for="el-start">Start</label
+                      ><input
+                        id="el-start"
+                        data-key="start"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      /><button
+                        type="button"
+                        id="el-start-now"
+                        class="text-button small"
+                        aria-label="Set element start to the playhead time"
+                      >
+                        Use playhead
+                      </button>
+                    </div>
+                    <div class="field">
+                      <label for="el-end">End</label
+                      ><input
+                        id="el-end"
+                        data-key="end"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      /><button
+                        type="button"
+                        id="el-end-now"
+                        class="text-button small"
+                        aria-label="Set element end to the playhead time"
+                      >
+                        Use playhead
+                      </button>
+                    </div>
+                  </div>
+                  <p id="el-visibility" class="hint"></p>
+                </fieldset>
+                <fieldset class="field-group">
+                  <legend>Fade, seconds</legend>
+                  <div class="two-cols">
+                    <label
+                      >Fade in<input
+                        id="el-fade-in"
+                        data-key="fadeIn"
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.1" /></label
+                    ><label
+                      >Fade out<input
+                        id="el-fade-out"
+                        data-key="fadeOut"
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <p id="el-fade-in-note" class="hint warn"></p>
+                  <p id="el-fade-out-note" class="hint warn"></p>
+                  <label
+                    >Opacity, %<input
+                      id="el-opacity"
+                      data-key="opacity"
+                      type="number"
+                      min="10"
+                      max="100"
+                      step="1"
+                  /></label>
+                </fieldset>
+              </form>
+            </div>
             <div class="edit-section">
               <h3>Range</h3>
               <p class="hint">Times are seconds in the edited video.</p>
@@ -366,7 +769,7 @@
               </div>
             </div>
             <div class="edit-section">
-              <h3>Speed and sound</h3>
+              <h3>Speed, sound, and fades</h3>
               <label
                 >Playback speed<select id="speed">
                   <option value="0.5">0.5×</option>
@@ -380,6 +783,27 @@
                 ><input id="mute" type="checkbox" /> Mute audio</label
               >
               <p id="no-audio" class="hint" hidden>This video has no sound.</p>
+              <div class="two-cols">
+                <label
+                  >Fade in from black, s<input
+                    id="video-fade-in"
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1" /></label
+                ><label
+                  >Fade out to black, s<input
+                    id="video-fade-out"
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                /></label>
+              </div>
+              <p id="video-fade-note" class="hint">
+                The picture and the sound fade together. These are the only
+                video effects. There are no crossfades between clips.
+              </p>
             </div>
             <div class="edit-section">
               <h3>History</h3>

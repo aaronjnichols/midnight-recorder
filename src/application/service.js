@@ -142,11 +142,21 @@ export const commands = [
   ),
   define(
     "edit.configure",
-    "Set speed or mute audio.",
+    "Set speed, mute audio, or set video fades. Values that you do not give stay the same. The result gives videoFades with the actual fade times.",
     {
       id: string("Video ID."),
       speed: number("Speed from 0.5 to 2."),
       muted: boolean("Mute audio."),
+      fadeIn: field(
+        "number",
+        `Fade from black at the start of the edited video, in seconds, 0 to ${timeline.MAX_VIDEO_FADE}. The sound fades in at the same time. 0 is no fade. If fadeIn + fadeOut is longer than the video, both get shorter in proportion.`,
+        { minimum: 0, maximum: timeline.MAX_VIDEO_FADE },
+      ),
+      fadeOut: field(
+        "number",
+        `Fade to black at the end of the edited video, in seconds, 0 to ${timeline.MAX_VIDEO_FADE}. The sound fades out at the same time. 0 is no fade.`,
+        { minimum: 0, maximum: timeline.MAX_VIDEO_FADE },
+      ),
     },
     ["id"],
   ),
@@ -439,7 +449,11 @@ export class Service {
         );
       const saved = await this.library.update(args.id, { timeline: edited });
       // Report where elements show after this edit. This is not stored.
-      return { ...saved, elementPlacement: elementPlacement(saved) };
+      return {
+        ...saved,
+        elementPlacement: elementPlacement(saved),
+        videoFades: timeline.videoFades(saved.timeline),
+      };
     }
     if (
       name === "export.start" ||

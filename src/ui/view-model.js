@@ -278,6 +278,10 @@ export function shortcut(event, context) {
     return null;
   }
   if (context.view !== "editor") return null;
+  // Text fields return before this line, so Delete while typing changes the
+  // text and not the layers.
+  if ((key === "Delete" || key === "Backspace") && !control)
+    return context.selected ? { local: "delete-element" } : null;
   if (control) {
     if (key === "z" && !event.shiftKey)
       return context.canUndo ? { command: "edit.undo" } : null;

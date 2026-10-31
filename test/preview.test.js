@@ -107,6 +107,96 @@ test("a preview from the render before the exact output clock is not reused", as
   assert.ok(Math.abs(preview.metadata.duration - 2.3) < 0.04);
 });
 
+test("preview paths stay short for a deep data folder on Windows", async () => {
+  await mkdir(".local", { recursive: true });
+  // A data folder about 130 characters long, like a long user profile path.
+  const base = await mkdtemp(path.resolve(".local", "preview-path-"));
+  const root = path.join(base, "a-long-folder-name-for-path-checks", "data");
+  await mkdir(root, { recursive: true });
+  const source = path.join(root, "source.mp4");
+  execFileSync("ffmpeg", [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=blue:size=160x90:rate=30:duration=1",
+    "-c:v",
+    "libx264",
+    source,
+  ]);
+  const media = new Media();
+  const metadata = await media.probe(source);
+  const cache = new PreviewCache(root, media);
+  const video = {
+    id: "b2c1b0f4-6a3e-4c55-9d61-7f1f3c2e9a10",
+    path: source,
+    metadata,
+    timeline: cut(createTimeline(metadata.duration), 0.2, 0.4),
+  };
+  const preview = await cache.prepare(video);
+  // Chromium cannot open a file path longer than 260 characters on Windows.
+  // The cache adds 63 characters to the data folder: previews, 16, ,
+  // 32, and .mp4.
+  assert.ok(
+    preview.path.length - root.length <= 63,
+    `${preview.path.length - root.length} characters: ${preview.path}`,
+  );
+  // Deleting the video removes the preview folder.
+  await cache.remove(video.id);
+  await assert.rejects(() => access(preview.path), /ENOENT/);
+});
+
+test("video fades are part of the preview identity", async () => {
+  await mkdir(".local", { recursive: true });
+  const root = await mkdtemp(path.resolve(".local", "preview-fade-"));
+  const source = path.join(root, "white.mp4");
+  execFileSync("ffmpeg", [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=white:size=160x90:rate=30:duration=2",
+    "-c:v",
+    "libx264",
+    source,
+  ]);
+  const media = new Media();
+  const metadata = await media.probe(source);
+  const plain = cut(createTimeline(metadata.duration), 1.5, 1.6);
+  const cache = new PreviewCache(root, media);
+  const first = await cache.prepare({
+    id: "fade",
+    path: source,
+    metadata,
+    timeline: plain,
+  });
+  const faded = await cache.prepare({
+    id: "fade",
+    path: source,
+    metadata,
+    timeline: configure(plain, { fadeIn: 1 }),
+  });
+  assert.notEqual(faded.path, first.path);
+  const level = (file) =>
+    execFileSync("ffmpeg", [
+      "-v",
+      "error",
+      "-i",
+      file,
+      "-vf",
+      "scale=1:1,format=gray",
+      "-frames:v",
+      "1",
+      "-f",
+      "rawvideo",
+      "pipe:1",
+    ])[0];
+  assert.ok(level(first.path) > 200);
+  assert.ok(level(faded.path) < 30, "The faded preview starts black.");
+});
+
 test("an edited preview removes boundary content and reuses the cached file", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "preview-"));

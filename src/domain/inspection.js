@@ -17,8 +17,18 @@ function hash(text) {
 // Revision of everything that changes the rendered video: segments, speed,
 // mute, and elements. Preview, inspection, and export use it.
 export function editRevision(video) {
-  const { segments, speed, muted, elements = [] } = video.timeline;
-  return hash(JSON.stringify({ segments, speed, muted, elements }));
+  const {
+    segments,
+    speed,
+    muted,
+    elements = [],
+    fadeIn = 0,
+    fadeOut = 0,
+  } = video.timeline;
+  // Video fades are in the revision only when they are set, so a state
+  // without fades keeps the revision from before fades existed.
+  const fades = fadeIn || fadeOut ? { fadeIn, fadeOut } : {};
+  return hash(JSON.stringify({ segments, speed, muted, elements, ...fades }));
 }
 
 // Revision of the time mapping only. Transcripts use it, because elements do
