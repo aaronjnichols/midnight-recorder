@@ -1,6 +1,7 @@
 import * as timeline from "../domain/timeline.js";
 import { randomUUID } from "node:crypto";
 import { inspectionPlan, editRevision } from "../domain/inspection.js";
+import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
 
 const field = (type, description, extra = {}) => ({
   type,
@@ -22,6 +23,7 @@ const define = (name, description, properties = {}, required = []) => ({
 });
 
 export const commands = [
+  ...transcriptCommands,
   define(
     "inspect.result",
     "Read a completed inspection. Returns PNG images and frame coordinates. Check stale before placing elements. Use includeImages false for paths only. Images total at most 8 MiB.",
@@ -223,7 +225,15 @@ function validate(command, args) {
 }
 
 export class Service {
-  constructor({ library, media, capture, playback, previews, inspection }) {
+  constructor({
+    library,
+    media,
+    capture,
+    playback,
+    previews,
+    inspection,
+    transcription,
+  }) {
     Object.assign(this, {
       library,
       media,
@@ -231,9 +241,11 @@ export class Service {
       playback,
       previews,
       inspection,
+      transcription,
     });
     this.recording = { state: "idle" };
     this.jobs = new Map();
+    this.transcriptJobs = new TranscriptJobs(this);
     this.queue = Promise.resolve();
   }
   execute(name, args = {}) {
@@ -249,6 +261,8 @@ export class Service {
     return result;
   }
   async dispatch(name, args) {
+    if (name.startsWith("transcript."))
+      return this.transcriptJobs.execute(name, args);
     if (name === "app.status")
       return { recording: this.recording, jobs: [...this.jobs.values()] };
     if (name === "app.view") return this.playback.request("view", args);
@@ -278,12 +292,16 @@ export class Service {
     if (name === "library.delete") {
       if (
         [...this.jobs.values()].some(
-          (j) => j.videoId === args.id && j.state === "running",
+          (j) =>
+            j.videoId === args.id &&
+            ["running", "cancelling"].includes(j.state),
         )
       )
         throw new Error("Wait for the export before deleting this video.");
       await this.previews?.remove(args.id);
+      await this.transcription?.remove(args.id);
       const result = await this.library.remove(args.id);
+      this.transcriptJobs.remove(args.id);
       for (const [id, job] of this.jobs)
         if (job.videoId === args.id) this.jobs.delete(id);
       return result;

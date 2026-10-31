@@ -4,9 +4,9 @@ import { mkdir, stat, copyFile, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
 
-export function run(executable, args) {
+export function run(executable, args, { signal } = {}) {
   return new Promise((resolve, reject) => {
-    const process = spawn(executable, args, { windowsHide: true });
+    const process = spawn(executable, args, { windowsHide: true, signal });
     let output = "",
       error = "";
     process.stdout.on("data", (chunk) => {
@@ -28,6 +28,30 @@ export class Media {
   constructor({ ffmpeg = "ffmpeg", ffprobe = "ffprobe" } = {}) {
     this.ffmpeg = ffmpeg;
     this.ffprobe = ffprobe;
+  }
+  async extractAudio(video, output, { signal } = {}) {
+    await run(
+      this.ffmpeg,
+      [
+        "-v",
+        "error",
+        "-i",
+        video.path,
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-af",
+        `aresample=async=1:first_pts=0,apad,atrim=end=${video.metadata.duration}`,
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        output,
+      ],
+      { signal },
+    );
   }
   async probe(file) {
     const info = JSON.parse(
