@@ -14,6 +14,8 @@ test("authenticated HTTP, CLI, and MCP use the same service commands", async (t)
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "agent-"));
   const service = new Service({
+    // This test checks transport calls. Countdown timing has a separate test.
+    scheduler: { setTimeout: () => 1, clearTimeout: () => {} },
     capture: {
       start: async () => {},
       pause: async () => {},
@@ -96,6 +98,27 @@ test("authenticated HTTP, CLI, and MCP use the same service commands", async (t)
     JSON.parse(mcpFailed.content[0].text).recording.error,
     "Disk full",
   );
+  await client.callTool({ name: "recording.cancel", arguments: {} });
+  const countdown = await promisify(execFile)(
+    process.execPath,
+    ["src/agent/cli.js", "recording.countdown", '{"cameraOnly":true}'],
+    { env },
+  );
+  assert.equal(JSON.parse(countdown.stdout).state, "countdown");
+  const countdownStatus = await client.callTool({
+    name: "app.status",
+    arguments: {},
+  });
+  assert.equal(
+    JSON.parse(countdownStatus.content[0].text).recording.remaining,
+    3,
+  );
+  await client.callTool({ name: "recording.cancel", arguments: {} });
+  const mcpCountdown = await client.callTool({
+    name: "recording.countdown",
+    arguments: { cameraOnly: true },
+  });
+  assert.equal(JSON.parse(mcpCountdown.content[0].text).state, "countdown");
   await client.callTool({ name: "recording.cancel", arguments: {} });
 });
 

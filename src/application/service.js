@@ -58,20 +58,24 @@ export const commands = [
   define("app.status", "Read recording state and export jobs."),
   define("capture.sources", "List screens and windows."),
   define("capture.devices", "List microphones and cameras."),
-  define(
-    "recording.start",
-    "Start a local recording. Select a screen or use cameraOnly.",
-    {
-      sourceId: string("Screen or window ID from capture.sources."),
-      title: string("Recording title."),
-      microphoneId: string("Microphone ID, or default."),
-      cameraId: string("Camera ID, or default."),
-      cameraOnly: boolean("Record the camera without a screen."),
-      systemAudio: boolean("Include system audio."),
-      frameRate: field("number", "Frames per second.", {
-        enum: [15, 24, 30, 60],
-      }),
-    },
+  ...["start", "countdown"].map((action) =>
+    define(
+      `recording.${action}`,
+      action === "countdown"
+        ? "Start a 3, 2, 1 countdown, then record. Returns countdown state immediately. Poll app.status. Use recording.cancel to cancel."
+        : "Start a local recording immediately. Select a screen or use cameraOnly.",
+      {
+        sourceId: string("Screen or window ID from capture.sources."),
+        title: string("Recording title."),
+        microphoneId: string("Microphone ID, or default."),
+        cameraId: string("Camera ID, or default."),
+        cameraOnly: boolean("Record the camera without a screen."),
+        systemAudio: boolean("Include system audio."),
+        frameRate: field("number", "Frames per second.", {
+          enum: [15, 24, 30, 60],
+        }),
+      },
+    ),
   ),
   define(
     "recording.fail",
@@ -233,6 +237,8 @@ export class Service {
     previews,
     inspection,
     transcription,
+    recordingFeedback,
+    scheduler = { setTimeout, clearTimeout },
   }) {
     Object.assign(this, {
       library,
@@ -242,6 +248,8 @@ export class Service {
       previews,
       inspection,
       transcription,
+      recordingFeedback,
+      scheduler,
     });
     this.recording = { state: "idle" };
     this.jobs = new Map();
@@ -259,6 +267,47 @@ export class Service {
     const result = this.queue.then(() => this.dispatch(name, args));
     this.queue = result.catch(() => {});
     return result;
+  }
+  setRecording(recording) {
+    this.recording = recording;
+    this.recordingFeedback?.update(recording);
+    return recording;
+  }
+  async beginRecording(id, options) {
+    this.setRecording({ id, state: "starting", options });
+    try {
+      await this.capture.start({ ...options, recordingId: id });
+      return this.setRecording({
+        id,
+        state: "recording",
+        startedAt: new Date().toISOString(),
+        options,
+      });
+    } catch (error) {
+      this.setRecording({ state: "idle", error: error.message });
+      throw error;
+    }
+  }
+  scheduleCountdown(id) {
+    this.countdownTimer = this.scheduler.setTimeout(() => {
+      // Timer work uses the same queue as UI, CLI, and MCP commands.
+      const result = this.queue.then(async () => {
+        if (this.recording.id !== id || this.recording.state !== "countdown")
+          return;
+        if (this.recording.remaining > 1) {
+          this.setRecording({
+            ...this.recording,
+            remaining: this.recording.remaining - 1,
+          });
+          this.scheduleCountdown(id);
+        } else {
+          this.countdownTimer = undefined;
+          await this.beginRecording(id, this.recording.options);
+        }
+      });
+      // A delayed start reports its error through app.status.
+      this.queue = result.catch(() => {});
+    }, 1000);
   }
   async dispatch(name, args) {
     if (name.startsWith("transcript."))
@@ -403,19 +452,21 @@ export class Service {
         throw new Error("Export job was not found.");
       return this.jobs.get(args.jobId);
     }
-    if (name === "recording.start") {
+    if (name === "recording.start" || name === "recording.countdown") {
       if (this.recording.state !== "idle")
         throw new Error("A recording is already active.");
       if (!args.sourceId && !args.cameraOnly)
         throw new Error("Select a source or use cameraOnly.");
       const id = randomUUID();
-      await this.capture.start({ ...args, recordingId: id });
-      this.recording = {
+      await this.recordingFeedback?.prepare(args);
+      if (name === "recording.start") return this.beginRecording(id, args);
+      this.setRecording({
         id,
-        state: "recording",
-        startedAt: new Date().toISOString(),
-        options: args,
-      };
+        state: "countdown",
+        remaining: 3,
+        options: { ...args },
+      });
+      this.scheduleCountdown(id);
       return this.recording;
     }
     if (name === "recording.fail") {
@@ -423,11 +474,11 @@ export class Service {
         this.recording.id === args.recordingId &&
         ["recording", "paused"].includes(this.recording.state)
       ) {
-        this.recording = {
+        this.setRecording({
           ...this.recording,
           state: "failed",
           error: args.error,
-        };
+        });
         await this.capture.pause();
       }
       return this.recording;
@@ -435,26 +486,33 @@ export class Service {
     if (name.startsWith("recording.")) {
       if (this.recording.state === "idle")
         throw new Error("No recording is active.");
+      if (this.recording.state === "countdown") {
+        if (name !== "recording.cancel")
+          throw new Error("Wait for the countdown or cancel it.");
+        this.scheduler.clearTimeout(this.countdownTimer);
+        this.countdownTimer = undefined;
+        return this.setRecording({ state: "idle" });
+      }
       if (name === "recording.pause") {
         if (this.recording.state !== "recording")
           throw new Error("Recording is already paused.");
         await this.capture.pause();
-        this.recording = { ...this.recording, state: "paused" };
+        this.setRecording({ ...this.recording, state: "paused" });
       }
       if (name === "recording.resume") {
         if (this.recording.state !== "paused")
           throw new Error("Recording is not paused.");
         await this.capture.resume();
-        this.recording = { ...this.recording, state: "recording" };
+        this.setRecording({ ...this.recording, state: "recording" });
       }
       if (name === "recording.cancel") {
         await this.capture.cancel();
-        this.recording = { state: "idle" };
+        this.setRecording({ state: "idle" });
       }
       if (name === "recording.stop") {
         if (!this.recording.file) {
           const file = await this.capture.stop();
-          this.recording = { ...this.recording, state: "stopped", file };
+          this.setRecording({ ...this.recording, state: "stopped", file });
         }
         if (!this.recording.saved) {
           const file = this.recording.file;
@@ -467,7 +525,7 @@ export class Service {
         }
         const video = this.recording.saved;
         await this.capture.cancel();
-        this.recording = { state: "idle" };
+        this.setRecording({ state: "idle" });
         return video;
       }
       return this.recording;
