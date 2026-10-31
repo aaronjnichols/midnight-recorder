@@ -20,6 +20,7 @@ export class PreviewCache {
     const key = createHash("sha256")
       .update(
         JSON.stringify({
+          renderVersion: 2,
           id: video.id,
           path: video.path,
           metadata: video.metadata,

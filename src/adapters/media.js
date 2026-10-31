@@ -94,8 +94,9 @@ export class Media {
       );
       labels.push(`[v${index}]`);
       if (audio) {
+        // Fill gaps on the source clock before trimming each segment.
         filters.push(
-          `[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS,atempo=${speed}[a${index}]`,
+          `[0:a]aresample=async=1:first_pts=0,apad,atrim=start=${s.start}:end=${s.end},asetpts=PTS-${s.start}/TB,atempo=${speed}[a${index}]`,
         );
         labels.push(`[a${index}]`);
       }
