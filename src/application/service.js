@@ -1,5 +1,6 @@
 import * as timeline from "../domain/timeline.js";
 import { randomUUID } from "node:crypto";
+import { inspectionPlan, editRevision } from "../domain/inspection.js";
 
 const field = (type, description, extra = {}) => ({
   type,
@@ -21,6 +22,37 @@ const define = (name, description, properties = {}, required = []) => ({
 });
 
 export const commands = [
+  define(
+    "inspect.result",
+    "Read a completed inspection. Returns PNG images and frame coordinates. Check stale before placing elements. Use includeImages false for paths only. Images total at most 8 MiB.",
+    {
+      jobId: string("Inspection job ID from inspect.start."),
+      includeImages: boolean("Include image data. Default true."),
+    },
+    ["jobId"],
+  ),
+  define(
+    "inspect.start",
+    "Read frames from the edited video. Returns a job ID. Poll export.status, then call inspect.result for images. Times are seconds. Selects the frame at or before each time. This can first render a full preview.",
+    {
+      id: string("Video ID."),
+      timestamps: field(
+        "array",
+        "From 1 to 12 edited times, before the video end.",
+        { items: { type: "number", minimum: 0 }, minItems: 1, maxItems: 12 },
+      ),
+      width: field(
+        "number",
+        "Maximum image width. Default 960. Height is at most 1080. Images do not enlarge.",
+        { minimum: 160, maximum: 1920 },
+      ),
+      grid: boolean("Show a grid with 10 rows and 10 columns. Default false."),
+      revision: string(
+        "Optional revision from an earlier inspection. Reject changed edits.",
+      ),
+    },
+    ["id", "timestamps"],
+  ),
   define("app.status", "Read recording state and export jobs."),
   define("capture.sources", "List screens and windows."),
   define("capture.devices", "List microphones and cameras."),
@@ -175,7 +207,9 @@ function validate(command, args) {
     const spec = command.inputSchema.properties[key];
     if (!spec) throw new Error(`Unknown argument: ${key}.`);
     if (
-      typeof args[key] !== spec.type ||
+      (spec.type === "array"
+        ? !Array.isArray(args[key])
+        : typeof args[key] !== spec.type) ||
       (spec.type === "number" && !Number.isFinite(args[key]))
     )
       throw new Error(`Invalid ${key}. Expected ${spec.type}.`);
@@ -189,8 +223,15 @@ function validate(command, args) {
 }
 
 export class Service {
-  constructor({ library, media, capture, playback, previews }) {
-    Object.assign(this, { library, media, capture, playback, previews });
+  constructor({ library, media, capture, playback, previews, inspection }) {
+    Object.assign(this, {
+      library,
+      media,
+      capture,
+      playback,
+      previews,
+      inspection,
+    });
     this.recording = { state: "idle" };
     this.jobs = new Map();
     this.queue = Promise.resolve();
@@ -247,6 +288,23 @@ export class Service {
         if (job.videoId === args.id) this.jobs.delete(id);
       return result;
     }
+    if (name === "inspect.result") {
+      const job = this.jobs.get(args.jobId);
+      if (!job || job.kind !== "inspection")
+        throw new Error("Inspection job was not found.");
+      if (job.state !== "complete")
+        throw new Error(
+          job.error || "Inspection is still running. Poll export.status.",
+        );
+      const video = await this.library.get(job.videoId);
+      const result = {
+        ...job.result,
+        stale: job.result.revision !== editRevision(video),
+      };
+      return args.includeImages === false
+        ? result
+        : this.inspection.images(result);
+    }
     if (name.startsWith("edit.")) {
       const video = await this.library.get(args.id);
       const action = name.slice(5);
@@ -273,8 +331,14 @@ export class Service {
       }
       return this.library.update(args.id, { timeline: edited });
     }
-    if (name === "export.start" || name === "preview.start") {
+    if (
+      name === "export.start" ||
+      name === "preview.start" ||
+      name === "inspect.start"
+    ) {
       const video = await this.library.get(args.id);
+      const plan =
+        name === "inspect.start" ? inspectionPlan(video, args) : undefined;
       if (name === "preview.start" && args.revision) {
         const { segments, speed, muted } = video.timeline;
         if (args.revision !== JSON.stringify({ segments, speed, muted }))
@@ -283,7 +347,12 @@ export class Service {
       const job = {
         id: randomUUID(),
         videoId: args.id,
-        kind: name === "preview.start" ? "preview" : "export",
+        kind:
+          name === "inspect.start"
+            ? "inspection"
+            : name === "preview.start"
+              ? "preview"
+              : "export",
         path: args.path,
         state: "running",
         startedAt: new Date().toISOString(),
@@ -291,9 +360,11 @@ export class Service {
       this.jobs.set(job.id, job);
       Promise.resolve()
         .then(() =>
-          name === "preview.start"
-            ? this.previews.prepare(video)
-            : this.media.export(video, args.path),
+          name === "inspect.start"
+            ? this.inspection.prepare(video, plan)
+            : name === "preview.start"
+              ? this.previews.prepare(video)
+              : this.media.export(video, args.path),
         )
         .then(
           (result) => {

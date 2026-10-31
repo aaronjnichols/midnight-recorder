@@ -15,6 +15,7 @@ import { Service } from "../application/service.js";
 import { Library } from "../adapters/library.js";
 import { Media } from "../adapters/media.js";
 import { PreviewCache } from "../adapters/preview.js";
+import { FrameInspection } from "../adapters/inspection.js";
 import { serve } from "../agent/server.js";
 import { dataRoot } from "../agent/client.js";
 
@@ -221,10 +222,12 @@ else
         ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
         ffprobe: process.env.FFPROBE_PATH || "ffprobe",
       });
+      const previews = new PreviewCache(root, media);
       const service = new Service({
         library: new Library(root),
         media,
-        previews: new PreviewCache(root, media),
+        previews,
+        inspection: new FrameInspection(media, previews),
         capture,
         playback,
       });
