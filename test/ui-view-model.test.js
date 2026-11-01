@@ -419,6 +419,49 @@ test("keyboard shortcuts use shared commands and keep native keys", () => {
   assert.equal(shortcut(key("z", { ctrlKey: true }), library), null);
 });
 
+test("keys on an editing tool tab move between tabs and do not seek", () => {
+  const editor = {
+    view: "editor",
+    ready: true,
+    paused: true,
+    seconds: 3,
+    duration: 10,
+    fullscreen: false,
+    canUndo: true,
+    canRedo: true,
+  };
+  const tab = {
+    tagName: "BUTTON",
+    getAttribute: (name) => (name === "role" ? "tab" : null),
+  };
+  const key = (name, target = tab) => ({
+    key: name,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    target,
+  });
+  for (const name of ["ArrowLeft", "ArrowRight", "Home", "End"])
+    assert.equal(shortcut(key(name), editor), null, name);
+  // Shift+arrow and Space on a tab are not playback keys either.
+  assert.equal(
+    shortcut({ ...key("ArrowRight"), shiftKey: true }, editor),
+    null,
+  );
+  assert.equal(shortcut(key(" "), editor), null);
+  // Other editor keys still work on a tab.
+  assert.deepEqual(shortcut(key("i"), editor), { local: "range-start" });
+  assert.deepEqual(shortcut({ ...key("z"), ctrlKey: true }, editor), {
+    command: "edit.undo",
+  });
+  // The same arrow key on another button seeks.
+  assert.deepEqual(shortcut(key("ArrowRight", { tagName: "BUTTON" }), editor), {
+    command: "playback.seek",
+    args: { seconds: 8 },
+  });
+});
+
 test("Delete removes the selected element only outside text fields and dialogs", () => {
   const key = (name, target = { tagName: "BODY" }) => ({
     key: name,

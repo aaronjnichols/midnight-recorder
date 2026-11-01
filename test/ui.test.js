@@ -192,7 +192,7 @@ test(
     // Undo is pressed while the cut is still in progress. The app must not
     // drop the key press.
     await page
-      .getByRole("button", { name: "Remove range", exact: true })
+      .getByRole("button", { name: "Remove the selection", exact: true })
       .click();
     await page.keyboard.press("Control+z");
     await page.waitForFunction(
@@ -207,6 +207,8 @@ test(
     );
     assert.match(await page.locator("#video-info").innerText(), /Edited/);
 
+    // The title and Delete video are in the Details tool.
+    await page.getByRole("tab", { name: "Details", exact: true }).click();
     assert.equal(await page.locator("#rename").isDisabled(), true);
     await page.locator("#rename-title").click();
     await page.keyboard.press("End");
@@ -403,7 +405,9 @@ test(
     );
 
     await page.locator("#range-end-now").click();
-    await page.getByRole("button", { name: "Keep range", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Keep only the selection", exact: true })
+      .click();
     await page.waitForFunction(
       async (id) =>
         (await window.midnight.execute("library.get", { id })).timeline.past

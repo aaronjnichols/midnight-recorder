@@ -18,7 +18,8 @@ import {
 import { frameAt, region, isWhite } from "../test-support/frames.js";
 
 const TUTORIAL = path.resolve(".local/transcript-validation/blender.mp4");
-const SHOTS = path.resolve("output/playwright/claude-editing");
+// The current editor layout. Earlier stage files in claude-editing stay.
+const SHOTS = path.resolve("output/playwright/claude-editing-ux");
 const available = await access(TUTORIAL).then(
   () => true,
   () => false,
@@ -75,6 +76,7 @@ test(
       title: "First Steps excerpt",
     });
     await openEditor(page, call, video);
+    await page.getByRole("tab", { name: "Captions", exact: true }).click();
     const generate = page.locator("#caption-generate");
     await until(
       () => generate.isEnabled(),
@@ -151,7 +153,7 @@ test(
       async () => (await style(call, video.id)).verticalAlign === "top",
       "Position not saved.",
     );
-    await page.locator("#edit-heading").click();
+    await page.locator("#video-title").click();
     await page.keyboard.press("Control+z");
     await until(
       async () => (await style(call, video.id)).verticalAlign === "bottom",
@@ -183,7 +185,7 @@ test(
       async () => (await captionList(call, video.id)).count === made.count - 1,
       "Delete failed.",
     );
-    await page.locator("#edit-heading").click();
+    await page.locator("#video-title").click();
     await page.keyboard.press("Control+z");
     await until(
       async () => (await captionList(call, video.id)).count === made.count,

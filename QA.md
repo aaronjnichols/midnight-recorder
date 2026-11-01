@@ -177,3 +177,13 @@ Real speech trial: a 30-second excerpt of "First Steps" (Mike Newbon, Blender St
 Screenshots at 1440 × 940 and 1000 × 720: `output/playwright/claude-editing/stage3-captions-*`.
 
 Limits: English only. One speech job at a time, on a source of at most one hour. 500 captions, 200 characters, and 3 lines for each caption. Word times are estimates. The app does not write SRT or VTT files. Characters that the font does not have show as boxes. The real speech desktop test skips if the engine or the excerpt source is not on the computer.
+
+## Editor navigation pass
+
+A user could not find trim and cut, because the Range section was below the Element and Captions sections. At 1000 × 720 the range buttons were 200 px below the window, and Undo was not in view at either size.
+
+The Edit video panel now has five tools: Trim & cut (the first tool), Text & shapes, Captions, Speed & sound, and Details. Undo, Redo, and Export MP4 are in the top bar. Trim & cut has the selection start and end with Set to playhead (I, O), the reason when the actions are not available, Keep only the selection, and Remove the selection. The timeline shows the selection in every tool. A selection opens its tool. A tool change sends no command, keeps the selection times, playhead, and selection, and makes a pending add result unable to select. Delete and Backspace change only the selection of the open tool.
+
+Tests: `test/editor-navigation.test.js` checks, with real clicks and keys at 1000 × 720 and 1440 × 940, that the tools, selection fields, both actions, the reason, Undo, Redo, Export, and the video are in view and not covered. It also checks the keyboard trim and cut flow with one undo step each, the exact fractional end, tool changes, tab keys, the inspector on selection, the first-click caption seek, the Delete rule, and held add and apply replies. Mutation runs with each new guard removed failed. Earlier UI tests now open the tool of a moved control. Their assertions did not change.
+
+Three independent review findings (first-click seek, both actions at 1000 × 720, Delete in another tool) have regressions and were cleared. The full `npm test` run had 212 tests. All passed, none were skipped. Logs: `.local/claude-editing-ux/logs.md`. Screenshots before and after: `output/playwright/claude-editing-ux`.

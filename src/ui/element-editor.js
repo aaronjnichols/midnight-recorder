@@ -660,6 +660,11 @@ export function createElementEditor({
       select(null);
       return had;
     },
+    // A tool change: a pending result cannot select any more. The current
+    // selection stays.
+    invalidate: () => {
+      selection++;
+    },
     deleteSelected,
     cancelGesture,
     typeLabel: (type) => TYPE_LABELS[type],

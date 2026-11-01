@@ -310,7 +310,7 @@ export function createCaptionEditor({
 
   // Generation. Existing captions are replaced only after a confirmation.
   // The confirmation keeps the exact scope that it shows. A change to the
-  // range or to "Only the selected range" closes it, so Replace cannot send
+  // selection or to "Only the selection" closes it, so Replace cannot send
   // a different scope.
   let confirmation = null;
   function scope() {
@@ -594,6 +594,11 @@ export function createCaptionEditor({
       const had = Boolean(selectedId);
       select(null);
       return had;
+    },
+    // A tool change: a pending result cannot select any more. The current
+    // selection stays.
+    invalidate: () => {
+      selection++;
     },
     deleteSelected,
   };

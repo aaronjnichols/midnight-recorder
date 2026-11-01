@@ -77,21 +77,24 @@ export async function forwardCommands(app, root) {
     ipcMain.handle("command", async (_, command, args) => {
       globalThis.commandLog.push({ command, args });
       // A stub replaces the service for one command, for example the
-      // speech capability. { error } is a rejected command.
+      // speech capability. { error } is a rejected command. A hold rule
+      // also applies to a stub reply.
+      let response, body;
       if (command in globalThis.stubs) {
         const stub = globalThis.stubs[command];
-        if (stub?.error) throw new Error(stub.error);
-        return stub;
+        response = { ok: !stub?.error };
+        body = stub?.error ? { error: stub.error } : { result: stub };
+      } else {
+        response = await fetch(`http://127.0.0.1:${port}/command`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ command, args }),
+        });
+        body = await response.json();
       }
-      const response = await fetch(`http://127.0.0.1:${port}/command`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ command, args }),
-      });
-      const body = await response.json();
       const rule = globalThis.holdRule;
       if (
         rule &&
@@ -126,11 +129,13 @@ export async function forwardCommands(app, root) {
         (_, [name, value]) => (globalThis.stubs[name] = value),
         [command, result],
       ),
-    // Page and test commands with their arguments, in order.
+    // Page and test commands with their arguments, in order. Without a
+    // command name, all commands.
     log: (command) =>
       app.evaluate(
-        (_, name) => globalThis.commandLog.filter((c) => c.command === name),
-        command,
+        (_, name) =>
+          globalThis.commandLog.filter((c) => !name || c.command === name),
+        command ?? null,
       ),
     release: () =>
       app.evaluate(() => {

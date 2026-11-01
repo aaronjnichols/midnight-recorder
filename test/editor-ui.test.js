@@ -7,7 +7,8 @@ import { promisify } from "node:util";
 import { execFile, execFileSync } from "node:child_process";
 import { frameAt, region } from "../test-support/frames.js";
 
-const SHOTS = path.resolve("output/playwright/claude-editing");
+// The current editor layout. Earlier stage files in claude-editing stay.
+const SHOTS = path.resolve("output/playwright/claude-editing-ux");
 
 async function launch(t, prefix) {
   await mkdir(".local/claude-editing", { recursive: true });
@@ -323,12 +324,15 @@ test(
         ),
       "No actual fade note.",
     );
+    // Video fades are in Speed & sound. Element fades are in Text & shapes.
+    await page.getByRole("tab", { name: "Speed & sound", exact: true }).click();
     await page.locator("#video-fade-out").fill("1");
     await page.locator("#video-fade-out").press("Enter");
     await until(
       async () => (await list(call, video.id)).videoFades.fadeOut === 1,
       "The video fade did not save.",
     );
+    await page.getByRole("tab", { name: "Text & shapes", exact: true }).click();
     await page.locator("#el-fade-in").fill("0");
     await page.locator("#el-fade-in").press("Enter");
     await until(
@@ -416,6 +420,8 @@ test(
     await page.reload();
     await page.waitForSelector(".video-card");
     await page.locator(".video-card").click();
+    // A video opens with Trim & cut. Layers are in Text & shapes.
+    await page.getByRole("tab", { name: "Text & shapes", exact: true }).click();
     await page.waitForSelector(`.layer-row[data-id="${label.id}"]`);
     assert.equal(await page.locator(".layer-row").count(), 2);
   },

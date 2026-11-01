@@ -15,19 +15,32 @@ There are no crossfades between clips, no wipes or other transitions, and no mul
 
 Open a video in the library. The editor has these parts:
 
-- **Toolbar above the video.** Text, Label, Rectangle, Ellipse, and Arrow add an element at the playhead. The element shows for 3 seconds, or less if the video is shorter. Label adds text with a dark background that is easy to read. Duplicate, Forward, Backward, and Delete change the selected element.
+- **Top bar.** Undo, Redo, and Export MP4. They stay in view when the page scrolls.
+- **Add buttons above the video.** Text, Label, Rectangle, Ellipse, and Arrow add an element at the playhead. The element shows for 3 seconds, or less if the video is shorter. Label adds text with a dark background that is easy to read.
 - **Video.** The rendered preview is the exact result. Dashed outlines show the elements at the playhead. Select an element to see its handles. Drag the element to move it. Drag a square handle to change its size. For an arrow, drag the round handles: the yellow handle is the tip. Press Esc during a drag to cancel it. Nothing is saved until you release the pointer. Each drag is one undo step.
-- **Layers.** One row for each element, with its time as a bar on the video length. The top row shows in front. Select a row to select the element. A click also moves the playhead into the element's time. A row in yellow is not in the edited video, because a cut or trim removed its time.
-- **Edit video panel.** The Element section shows the properties of the selected element. This panel scrolls by itself, so the video stays in view. A change saves when you leave a field or press Enter. Each field sends only its own value. For example, a font size change does not send the times again.
+- **Timeline.** The kept parts of the video, the playhead, and the selection. Select a point to move the playhead. When a selection is set, the timeline shows its times in every tool. Its button opens Trim & cut.
+- **Edit video panel.** Five tools, with one tab each. Only one tool shows at a time. The tabs stay at the top when the panel scrolls, and the panel scrolls by itself, so the video stays in view. A video opens with Trim & cut.
+  - **Trim & cut:** the selection start and end, each with Set to playhead (keys I and O). **Keep only the selection** removes the video before and after it. **Remove the selection** removes it and joins the parts around it. The line above these buttons gives the selection, or tells you why they are not available.
+  - **Text & shapes:** Duplicate, Forward, Backward, and Delete for the selected element; Layers; and the properties of the selected element.
+  - **Captions:** see [Captions](#captions).
+  - **Speed & sound:** playback speed, mute, and the video fades.
+  - **Details:** the title, Reset all edits, and Delete video.
+- **Layers** (in Text & shapes). One row for each element, with its time as a bar on the video length. The top row shows in front. Select a row to select the element. A click also moves the playhead into the element's time. A row in yellow is not in the edited video, because a cut or trim removed its time.
+
+A selection opens its tool. If you select an element in the video, in Layers, or with an Add button, Text & shapes opens with its properties. If you select a caption, Captions opens with the caption. A tool change does not change the video, the undo history, the selection, the selection times, or the playhead. A command result that arrives after you open another tool does not change the tool.
+
+The selection times stay when you change elements, captions, or the style. A trim, cut, or speed change moves the edited times, so the selection is then the full video again.
+
+A change saves when you leave a field or press Enter. This is also true when you open another tool. Each field sends only its own value. For example, a font size change does not send the times again.
 
 Units in the panel:
 
 - Positions and sizes are percent of the video width or height.
 - Font size and line width are percent of the video height.
-- Times are seconds in the edited video. Use playhead sets the start or end to the playhead time.
+- Times are seconds in the edited video. Set to playhead sets the start or end to the playhead time.
 - Fades are seconds.
 
-Keys: Delete removes the selected element or caption. Esc cancels a drag, then clears the selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. Keys in text fields and dialogs do not change elements.
+Keys: Delete and Backspace remove the selected element or caption of the open tool. A selection in another tool stays and does not change. Esc cancels a drag, then clears the selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. I and O set the selection start and end in every tool. On a tool tab, Left arrow, Right arrow, Home, and End move between the tools. Keys in text fields and dialogs do not change elements.
 
 After a change, the app makes a new exact preview. While it does this, the video area shows the original video at the same time, without elements, and the element outlines. A note on the video tells you this. The preview replaces it when it is ready, at the same playhead time. Changes from the CLI or MCP show in the editor in the same way.
 
@@ -194,14 +207,14 @@ A video has one caption track. It is separate from the elements: a caption chang
 
 ### Desktop editor
 
-- **Captions section in the Edit video panel.** Make captions from speech starts the local speech recognition. The section shows the progress, for example "Recognizing speech: part 2 of 4". Cancel stops the job, and nothing changes. When recognition is complete, the app adds the captions as one undo step. The section then shows the result: the number of captions, and a warning if some speech is not in the captions. If you change the video during recognition, the app does not add the captions. Select Add captions to add them to the current edits.
-- **Replace.** If the video has captions, the app asks you to confirm the replacement. The confirmation shows the scope: all captions, or the captions in the selected range. If you change the range or Only the selected range, the confirmation closes. Labels and shapes do not change.
-- **Captions list below Layers.** One row for each caption, with its number, time, and text. A green mark shows the caption at the playhead. Check shows a caption to examine. Part cut shows a caption that a cut made shorter. Cut shows a caption that is not in the edited video. Select a row to select the caption. A click also moves the playhead to it.
-- **Selected caption.** Change the text, the start, or the end. Use playhead sets a time. Ctrl+Enter or leaving the text field saves the text. Delete caption or the Delete key removes it.
+- **Captions tool.** Make captions from speech starts the local speech recognition. The tool shows the progress, for example "Recognizing speech: part 2 of 4". Cancel stops the job, and nothing changes. When recognition is complete, the app adds the captions as one undo step. The tool then shows the result: the number of captions, and a warning if some speech is not in the captions. If you change the video during recognition, the app does not add the captions. Select Add captions to add them to the current edits.
+- **Replace.** If the video has captions, the app asks you to confirm the replacement. The confirmation shows the scope: all captions, or the captions in the selection from Trim & cut. If you change the selection times or Only the selection, the confirmation closes. Labels and shapes do not change.
+- **Caption list in the Captions tool.** One row for each caption, with its number, time, and text. A green mark shows the caption at the playhead. Check shows a caption to examine. Part cut shows a caption that a cut made shorter. Cut shows a caption that is not in the edited video. Select a row to select the caption. A click also moves the playhead to it.
+- **Selected caption** (below the list). Change the text, the start, or the end. Set to playhead sets a time. Ctrl+Enter or leaving the text field saves the text. Delete caption, or the Delete key while Captions is open, removes it.
 - **Caption style for all captions.** Size, position (bottom, middle, or top), text color, bold, and a background band with its opacity. A style change does not run speech recognition again.
 - **Show captions** turns the captions on or off in the preview and the export. **+ Caption at playhead** adds a caption in the gap at the playhead. **Remove all captions** removes the track.
 
-One selection is active at a time: an element or a caption. Each change is one undo step. If the video has no sound, the section tells you, and you can add captions by hand. If the edit is muted, the captions still show, and the section tells you that the sound is muted.
+One selection is active at a time: an element or a caption. Each change is one undo step. If the video has no sound, the Captions tool tells you, and you can add captions by hand. If the edit is muted, the captions still show, and the Captions tool tells you that the sound is muted.
 
 ### How captions are made from speech
 

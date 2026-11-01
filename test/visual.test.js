@@ -8,7 +8,7 @@ import { duration } from "../src/domain/timeline.js";
 
 for (const speed of [1.5, 0.75]) {
   test(
-    `Keep range preserves the untouched full end at ${speed}x speed`,
+    `Keep only the selection preserves the untouched full end at ${speed}x speed`,
     { timeout: 30000 },
     async (t) => {
       await mkdir(".local", { recursive: true });
@@ -49,13 +49,18 @@ for (const speed of [1.5, 0.75]) {
       const video = await call("library.import", { path: source });
       assert.equal(video.metadata.duration, 10);
       await call("playback.open", { id: video.id });
+      // Speed is in Speed & sound. Keep only the selection is in Trim & cut.
+      await page
+        .getByRole("tab", { name: "Speed & sound", exact: true })
+        .click();
       await page.locator("#speed").selectOption(String(speed));
       await page.waitForFunction(
         () => Number(document.querySelector("#range-end").value) !== 10,
       );
+      await page.getByRole("tab", { name: "Trim & cut", exact: true }).click();
       await page.locator("#range-start").fill("1");
       await page
-        .getByRole("button", { name: "Keep range", exact: true })
+        .getByRole("button", { name: "Keep only the selection", exact: true })
         .click();
       await page.waitForFunction(async (id) => {
         const video = await window.midnight.execute("library.get", { id });

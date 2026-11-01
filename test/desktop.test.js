@@ -282,6 +282,8 @@ test(
         throw new Error("Cannot delete during export");
       });
     });
+    // Delete video is in the Details tool.
+    await page.getByRole("tab", { name: "Details", exact: true }).click();
     await page.locator("#delete").click();
     await page.locator("#confirm-delete-button").click();
     await page.waitForFunction(() =>

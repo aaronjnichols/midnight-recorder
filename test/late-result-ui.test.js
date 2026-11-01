@@ -86,6 +86,9 @@ test(
       async () => (await rowCount(page, "#layer-list")) === 1,
       "No layer row.",
     );
+    // Layers are in Text & shapes. Open it before the held reply: a tool
+    // change also stops a pending selection, so it must not occur here.
+    await page.getByRole("tab", { name: "Text & shapes", exact: true }).click();
     await forward.hold("element.add");
     await page.locator("#add-ellipse").click();
     await forward.held();
@@ -93,7 +96,7 @@ test(
     await page.locator(textRow).click();
     // Focus leaves the list. A row with focus selects itself again when the
     // list draws again, so only the selection guard keeps the choice here.
-    await page.locator("#edit-heading").click();
+    await page.locator("#video-title").click();
     await forward.release();
     await until(
       async () => (await rowCount(page, "#layer-list")) === 2,
@@ -114,6 +117,7 @@ test(
     await page.keyboard.press("Escape");
     await ready(call);
     await call("playback.seek", { seconds: 1 });
+    await page.getByRole("tab", { name: "Captions", exact: true }).click();
     await forward.hold("captions.add");
     await page.locator("#caption-add").click();
     await forward.held();
@@ -141,6 +145,9 @@ test(
     );
     await ready(call);
     await call("playback.seek", { seconds: 6 });
+    // The open video changed, so the editor shows Trim & cut. Open Captions
+    // before the held reply.
+    await page.getByRole("tab", { name: "Captions", exact: true }).click();
     await forward.hold("captions.add");
     await page.locator("#caption-add").click();
     await forward.held();
@@ -149,7 +156,7 @@ test(
     );
     const secondRow = `.caption-row[data-id="${second.id}"] .caption-select`;
     await page.locator(secondRow).click();
-    await page.locator("#edit-heading").click();
+    await page.locator("#video-title").click();
     await forward.release();
     await until(
       async () => (await rowCount(page, "#caption-list")) === 3,

@@ -886,7 +886,8 @@ button.button.danger:hover:not(:disabled) {
 /* Editor */
 .editor-heading {
   align-items: flex-end;
-  padding-top: 18px;
+  padding-top: 12px;
+  margin-bottom: 14px;
 }
 .title-block {
   min-width: 0;
@@ -925,7 +926,7 @@ button.button.danger:hover:not(:disabled) {
 }
 .editor-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 330px;
   gap: 24px;
   align-items: start;
 }
@@ -1104,8 +1105,8 @@ button.button.danger:hover:not(:disabled) {
 .element-toolbar {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 8px 10px;
   margin-bottom: 10px;
 }
 .tool-group {
@@ -1230,12 +1231,17 @@ button.button.danger:hover:not(:disabled) {
 .caption-list {
   max-height: 260px;
 }
+/* In the edit panel each caption row has two lines: the number, time, and
+   marks, then the text. */
 .caption-select {
-  grid-template-columns: 26px auto minmax(0, 1fr) auto auto;
-  grid-template-areas: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   padding: 5px 10px;
 }
 .caption-number {
+  min-width: 18px;
   font:
     11px Consolas,
     monospace;
@@ -1245,6 +1251,11 @@ button.button.danger:hover:not(:disabled) {
 .caption-select .layer-time,
 .caption-select .layer-name {
   grid-area: auto;
+}
+.caption-select .caption-text {
+  order: 3;
+  flex: 1 0 100%;
+  padding-left: 26px;
 }
 .caption-row.current .caption-select {
   box-shadow: inset 3px 0 0 var(--green);
@@ -1770,6 +1781,129 @@ button.button.danger:hover:not(:disabled) {
 .edit-section > h3 + .hint {
   margin-top: 4px;
 }
+/* Editing tools: the tabs stay at the top of the edit panel when it
+   scrolls. One tool shows at a time. */
+.tool-head {
+  position: sticky;
+  top: -18px;
+  z-index: 3;
+  margin: -18px -18px 14px;
+  padding: 16px 18px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+}
+.tool-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tool-tabs [role="tab"] {
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tool-tabs [role="tab"]:hover {
+  border-color: var(--selection);
+  color: var(--text-strong);
+}
+.tool-tabs [role="tab"][aria-selected="true"] {
+  border-color: var(--cyan);
+  background: #88c0d01f;
+  color: var(--text-strong);
+}
+.tool-panel[hidden] {
+  display: none;
+}
+.tool-panel > * + * {
+  margin-top: 12px;
+}
+.tool-panel .layers {
+  margin-top: 14px;
+}
+.layers h3,
+.layers h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.trim-actions {
+  display: grid;
+  gap: 4px;
+}
+.trim-actions .hint + .trim-action {
+  margin-top: 8px;
+}
+.trim-action {
+  width: 100%;
+  justify-content: flex-start;
+}
+.trim-action:not(:disabled) {
+  border-color: var(--cyan);
+}
+.trim-action > span[aria-hidden="true"] {
+  color: var(--cyan);
+}
+.kept-parts {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.arrange-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.selection-chip {
+  padding: 1px 9px;
+  border: 1px solid #ebcb8b80;
+  border-radius: 10px;
+  background: #ebcb8b14;
+  color: var(--yellow);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.selection-chip:hover {
+  border-color: var(--yellow);
+}
+.selection-chip[hidden] {
+  display: none;
+}
+.timeline-note kbd {
+  font-size: 10px;
+}
+/* Undo, Redo, and Export stay in the top bar in the editor. */
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.editor-actions[hidden] {
+  display: none;
+}
+.button.compact {
+  min-height: 32px;
+  padding: 0 12px;
+}
+.toolbar-label {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .field input {
   margin-bottom: 2px;
 }
@@ -1901,8 +2035,19 @@ dialog strong {
     gap: 20px;
   }
   .editor-grid {
-    grid-template-columns: minmax(0, 1fr) 272px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: 20px;
+  }
+  /* The editor actions need the room in the top bar. */
+  .editor-actions:not([hidden]) ~ .badge {
+    display: none;
+  }
+  /* The tool names and the Add buttons need the room. */
+  .tool-tabs [role="tab"] {
+    padding: 0 6px;
+  }
+  .toolbar-label {
+    display: none;
   }
   h1 {
     font-size: 23px;

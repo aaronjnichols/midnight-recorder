@@ -289,6 +289,13 @@ export function shortcut(event, context) {
       return context.canRedo ? { command: "edit.redo" } : null;
     return null;
   }
+  // An editing tool tab uses the arrow keys, Home, and End to move between
+  // the tabs, so these keys do not move the playhead there.
+  if (
+    target.getAttribute?.("role") === "tab" &&
+    ["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)
+  )
+    return null;
   if (key === " " || key === "k") {
     if (key === " " && ["BUTTON", "INPUT", "SUMMARY", "A"].includes(tag))
       return null;

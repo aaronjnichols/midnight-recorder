@@ -43,6 +43,31 @@
           <span id="crumb">Video library</span>
         </div>
         <div class="topbar-end">
+          <div
+            id="editor-actions"
+            class="editor-actions"
+            role="group"
+            aria-label="Editor actions"
+            hidden
+          >
+            <button
+              id="undo"
+              class="button secondary compact"
+              aria-keyshortcuts="Control+Z"
+              title="Undo the last edit (Ctrl+Z)"
+            >
+              <span aria-hidden="true">↶</span> Undo</button
+            ><button
+              id="redo"
+              class="button secondary compact"
+              aria-keyshortcuts="Control+Shift+Z"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <span aria-hidden="true">↷</span> Redo</button
+            ><button id="export" class="button primary compact">
+              <span aria-hidden="true">↑</span> Export MP4
+            </button>
+          </div>
           <button
             id="recording-pill"
             class="recording-pill"
@@ -220,9 +245,6 @@
             <h1 id="video-title" tabindex="-1">Video</h1>
             <p id="video-info" class="video-info"></p>
           </div>
-          <button id="export" class="button primary">
-            <span aria-hidden="true">↑</span> Export MP4
-          </button>
         </div>
         <div class="editor-grid">
           <div class="editor-main">
@@ -230,8 +252,9 @@
               <div
                 class="element-toolbar"
                 role="toolbar"
-                aria-label="Add and arrange elements"
+                aria-label="Add text and shapes at the playhead"
               >
+                <span class="toolbar-label" aria-hidden="true">Add</span>
                 <div class="tool-group" aria-label="Add at the playhead">
                   <button id="add-text" class="tool" aria-label="Add text">
                     <span aria-hidden="true">T</span> Text
@@ -255,45 +278,6 @@
                   </button>
                   <button id="add-arrow" class="tool" aria-label="Add arrow">
                     <span aria-hidden="true">↗</span> Arrow
-                  </button>
-                </div>
-                <div class="tool-group" aria-label="Selected element">
-                  <button
-                    id="duplicate-element"
-                    class="tool"
-                    aria-label="Duplicate element"
-                    title="Duplicate"
-                  >
-                    <span aria-hidden="true">⧉</span
-                    ><span class="tool-text">Duplicate</span>
-                  </button>
-                  <button
-                    id="raise-element"
-                    class="tool"
-                    aria-label="Bring element forward"
-                    title="Bring forward"
-                  >
-                    <span aria-hidden="true">↑</span
-                    ><span class="tool-text">Forward</span>
-                  </button>
-                  <button
-                    id="lower-element"
-                    class="tool"
-                    aria-label="Send element backward"
-                    title="Send backward"
-                  >
-                    <span aria-hidden="true">↓</span
-                    ><span class="tool-text">Backward</span>
-                  </button>
-                  <button
-                    id="delete-element"
-                    class="tool danger"
-                    aria-label="Delete element"
-                    aria-keyshortcuts="Delete"
-                    title="Delete"
-                  >
-                    <span aria-hidden="true">✕</span
-                    ><span class="tool-text">Delete</span>
                   </button>
                 </div>
               </div>
@@ -359,6 +343,13 @@
             <div class="timeline">
               <div class="timeline-head">
                 <span>Edited video</span>
+                <button
+                  id="selection-chip"
+                  type="button"
+                  class="selection-chip"
+                  title="Open Trim & cut"
+                  hidden
+                ></button>
                 <span id="duration" class="timeline-duration">0:00</span>
               </div>
               <div
@@ -371,49 +362,11 @@
                 <div id="timeline-playhead" class="timeline-playhead"></div>
               </div>
               <p class="timeline-note">
-                Each bar is a kept part of the source video. Select a point on
-                the bar to move the playhead.
+                Each bar is a kept part of the video. Select a point to move the
+                playhead. Press <kbd>I</kbd> and <kbd>O</kbd> to set the start
+                and end of a selection.
               </p>
             </div>
-            <section
-              id="layers"
-              class="layers"
-              aria-labelledby="layers-heading"
-            >
-              <div class="timeline-head">
-                <h2 id="layers-heading">Layers</h2>
-                <span id="layer-count" class="timeline-duration"
-                  >No elements</span
-                >
-              </div>
-              <p id="layers-empty" class="hint">
-                Add text, a label, a shape, or an arrow at the playhead. Higher
-                rows show in front.
-              </p>
-              <ol id="layer-list" class="layer-list"></ol>
-            </section>
-            <section
-              id="captions"
-              class="layers captions"
-              aria-labelledby="captions-heading"
-            >
-              <div class="timeline-head">
-                <h2 id="captions-heading">Captions</h2>
-                <span id="caption-count" class="timeline-duration"
-                  >No captions</span
-                >
-              </div>
-              <p id="caption-audio" class="hint warn" hidden></p>
-              <p id="captions-empty" class="hint">
-                Make captions from the speech in Edit video, or add a caption at
-                the playhead. Captions are separate from labels and shapes.
-              </p>
-              <ol
-                id="caption-list"
-                class="layer-list caption-list"
-                aria-label="Caption list"
-              ></ol>
-            </section>
             <p
               id="preview-state"
               class="preview-state"
@@ -426,11 +379,14 @@
               <li><kbd>Space</kbd> Play or pause</li>
               <li><kbd>←</kbd><kbd>→</kbd> Move 5 s</li>
               <li><kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> Move 1 s</li>
-              <li><kbd>I</kbd><kbd>O</kbd> Set range start or end</li>
+              <li><kbd>I</kbd><kbd>O</kbd> Set selection start or end</li>
               <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
               <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</li>
               <li><kbd>F</kbd> Fullscreen</li>
-              <li><kbd>Delete</kbd> Delete the selected element or caption</li>
+              <li>
+                <kbd>Delete</kbd> Delete the selected element or caption of the
+                open tool
+              </li>
               <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
             </ul>
             <section
@@ -444,488 +400,74 @@
             </section>
           </div>
           <section class="panel edit-panel" aria-labelledby="edit-heading">
-            <h2 id="edit-heading">Edit video</h2>
-            <div id="element-panel" class="edit-section element-panel">
-              <h3 id="element-heading">Element</h3>
-              <p id="element-empty" class="hint">
-                Select an element in the video or in Layers. Or add one with the
-                buttons above the video.
-              </p>
-              <form id="element-form" class="element-form" hidden novalidate>
-                <p class="hint">
-                  Changes save when you leave a field or press Enter. Times are
-                  seconds in the edited video. Positions and sizes are percent
-                  of the video.
-                </p>
-                <div class="field-group" data-types="text">
-                  <label for="el-text">Text</label>
-                  <textarea id="el-text" rows="2" maxlength="500"></textarea>
-                  <div id="el-fit" class="fit-note" hidden>
-                    <p id="el-fit-text"></p>
-                    <button
-                      type="button"
-                      id="el-fit-button"
-                      class="text-button small"
-                    >
-                      Make the text fit the box
-                    </button>
-                  </div>
-                  <div class="two-cols">
-                    <label
-                      >Font<select id="el-font" data-key="font">
-                        <option value="sans">Sans</option>
-                        <option value="serif">Serif</option>
-                        <option value="mono">Mono</option>
-                      </select></label
-                    ><label
-                      >Size, % of the video height<input
-                        id="el-size"
-                        data-key="size"
-                        type="number"
-                        min="1"
-                        max="50"
-                        step="0.1"
-                    /></label>
-                  </div>
-                  <label class="check"
-                    ><input type="checkbox" id="el-bold" data-key="bold" />
-                    Bold</label
-                  >
-                  <div class="two-cols">
-                    <label
-                      >Align<select id="el-align" data-key="align">
-                        <option value="left">Left</option>
-                        <option value="center">Center</option>
-                        <option value="right">Right</option>
-                      </select></label
-                    ><label
-                      >Vertical<select id="el-valign" data-key="verticalAlign">
-                        <option value="top">Top</option>
-                        <option value="middle">Middle</option>
-                        <option value="bottom">Bottom</option>
-                      </select></label
-                    >
-                  </div>
-                </div>
-                <div class="field-group color-grid">
-                  <label data-types="text arrow"
-                    >Color<input id="el-color" data-key="color" type="color"
-                  /></label>
-                  <div
-                    class="color-field"
-                    data-types="text"
-                    data-key="background"
-                  >
-                    <label for="el-background">Background</label>
-                    <input id="el-background" type="color" />
-                    <label class="check"
-                      ><input type="checkbox" id="el-background-none" />
-                      None</label
-                    >
-                  </div>
-                  <label data-types="text"
-                    >Background opacity, %<input
-                      id="el-background-opacity"
-                      data-key="backgroundOpacity"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                  /></label>
-                  <div
-                    class="color-field"
-                    data-types="text arrow"
-                    data-key="outline"
-                  >
-                    <label for="el-outline">Outline</label>
-                    <input id="el-outline" type="color" />
-                    <label class="check"
-                      ><input type="checkbox" id="el-outline-none" />
-                      None</label
-                    >
-                  </div>
-                  <div
-                    class="color-field"
-                    data-types="rectangle ellipse"
-                    data-key="fill"
-                  >
-                    <label for="el-fill">Fill</label>
-                    <input id="el-fill" type="color" />
-                    <label class="check"
-                      ><input type="checkbox" id="el-fill-none" /> None</label
-                    >
-                  </div>
-                  <label data-types="rectangle ellipse"
-                    >Fill opacity, %<input
-                      id="el-fill-opacity"
-                      data-key="fillOpacity"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                  /></label>
-                  <div
-                    class="color-field"
-                    data-types="rectangle ellipse"
-                    data-key="stroke"
-                  >
-                    <label for="el-stroke">Line</label>
-                    <input id="el-stroke" type="color" />
-                    <label class="check"
-                      ><input type="checkbox" id="el-stroke-none" /> None</label
-                    >
-                  </div>
-                  <label data-types="rectangle ellipse arrow"
-                    >Line width, % of the video height<input
-                      id="el-stroke-width"
-                      data-key="strokeWidth"
-                      type="number"
-                      min="0.2"
-                      max="5"
-                      step="0.1"
-                  /></label>
-                </div>
-                <fieldset
-                  class="field-group"
-                  data-types="text rectangle ellipse"
-                >
-                  <legend>Position and size, % of the video</legend>
-                  <div class="two-cols">
-                    <label
-                      >Left (X)<input
-                        id="el-x"
-                        data-key="x"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1" /></label
-                    ><label
-                      >Top (Y)<input
-                        id="el-y"
-                        data-key="y"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                    /></label>
-                  </div>
-                  <div class="two-cols">
-                    <label
-                      >Width<input
-                        id="el-width"
-                        data-key="width"
-                        type="number"
-                        min="1"
-                        max="100"
-                        step="0.1" /></label
-                    ><label
-                      >Height<input
-                        id="el-height"
-                        data-key="height"
-                        type="number"
-                        min="1"
-                        max="100"
-                        step="0.1"
-                    /></label>
-                  </div>
-                </fieldset>
-                <fieldset class="field-group" data-types="arrow">
-                  <legend>Arrow points, % of the video</legend>
-                  <div class="two-cols">
-                    <label
-                      >Tail X<input
-                        id="el-x1"
-                        data-key="x1"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1" /></label
-                    ><label
-                      >Tail Y<input
-                        id="el-y1"
-                        data-key="y1"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                    /></label>
-                  </div>
-                  <div class="two-cols">
-                    <label
-                      >Tip X<input
-                        id="el-x2"
-                        data-key="x2"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1" /></label
-                    ><label
-                      >Tip Y<input
-                        id="el-y2"
-                        data-key="y2"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                    /></label>
-                  </div>
-                  <p class="hint">The tip is the point that the arrow shows.</p>
-                </fieldset>
-                <fieldset class="field-group">
-                  <legend>Time, seconds</legend>
-                  <div class="two-cols">
-                    <div class="field">
-                      <label for="el-start">Start</label
-                      ><input
-                        id="el-start"
-                        data-key="start"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      /><button
-                        type="button"
-                        id="el-start-now"
-                        class="text-button small"
-                        aria-label="Set element start to the playhead time"
-                      >
-                        Use playhead
-                      </button>
-                    </div>
-                    <div class="field">
-                      <label for="el-end">End</label
-                      ><input
-                        id="el-end"
-                        data-key="end"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      /><button
-                        type="button"
-                        id="el-end-now"
-                        class="text-button small"
-                        aria-label="Set element end to the playhead time"
-                      >
-                        Use playhead
-                      </button>
-                    </div>
-                  </div>
-                  <p id="el-visibility" class="hint"></p>
-                </fieldset>
-                <fieldset class="field-group">
-                  <legend>Fade, seconds</legend>
-                  <div class="two-cols">
-                    <label
-                      >Fade in<input
-                        id="el-fade-in"
-                        data-key="fadeIn"
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1" /></label
-                    ><label
-                      >Fade out<input
-                        id="el-fade-out"
-                        data-key="fadeOut"
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                    /></label>
-                  </div>
-                  <p id="el-fade-in-note" class="hint warn"></p>
-                  <p id="el-fade-out-note" class="hint warn"></p>
-                  <label
-                    >Opacity, %<input
-                      id="el-opacity"
-                      data-key="opacity"
-                      type="number"
-                      min="10"
-                      max="100"
-                      step="1"
-                  /></label>
-                </fieldset>
-              </form>
-            </div>
-            <div id="caption-panel" class="edit-section caption-panel">
-              <h3 id="caption-heading">Captions</h3>
-              <p id="caption-setup" class="hint warn" hidden></p>
-              <button
-                id="caption-generate"
-                type="button"
-                class="button secondary full"
-              >
-                Make captions from speech
-              </button>
-              <label class="check"
-                ><input type="checkbox" id="caption-range-only" /> Only the
-                selected range (see Range)</label
-              >
-              <p class="hint">
-                Speech recognition runs on this computer. The words and times
-                are estimates, so check the captions before you export.
-              </p>
-              <div id="caption-replace" class="confirm-note" hidden>
-                <p id="caption-replace-text"></p>
-                <div class="two-cols">
-                  <button
-                    id="caption-replace-yes"
-                    type="button"
-                    class="button primary"
-                  >
-                    Replace captions</button
-                  ><button
-                    id="caption-replace-no"
-                    type="button"
-                    class="button secondary"
-                  >
-                    Keep captions
-                  </button>
-                </div>
-              </div>
-              <div id="caption-job" class="caption-job" hidden>
-                <p id="caption-job-text" role="status" aria-live="polite"></p>
-                <progress
-                  id="caption-progress"
-                  max="1"
-                  aria-label="Speech recognition progress"
-                ></progress>
-                <div class="caption-job-actions">
-                  <button
-                    id="caption-apply"
-                    type="button"
-                    class="button primary"
-                    hidden
-                  >
-                    Add captions</button
-                  ><button
-                    id="caption-cancel"
-                    type="button"
-                    class="text-button small"
-                    hidden
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <div class="caption-tools">
+            <div class="tool-head">
+              <h2 id="edit-heading" class="visually-hidden">Edit video</h2>
+              <div class="tool-tabs" role="tablist" aria-label="Editing tools">
                 <button
-                  id="caption-add"
                   type="button"
-                  class="button secondary"
-                  aria-label="Add a caption at the playhead"
+                  role="tab"
+                  id="tab-trim"
+                  data-tool="trim"
+                  aria-controls="tool-trim"
+                  aria-selected="true"
                 >
-                  + Caption at playhead</button
-                ><label class="check"
-                  ><input type="checkbox" id="caption-enabled" /> Show
-                  captions</label
-                >
-              </div>
-              <form id="caption-form" class="caption-form" hidden novalidate>
-                <h4 id="caption-cue-heading">Selected caption</h4>
-                <label for="cap-text">Text</label>
-                <textarea id="cap-text" rows="2" maxlength="200"></textarea>
-                <p id="cap-check" class="hint warn" hidden></p>
-                <div class="two-cols">
-                  <div class="field">
-                    <label for="cap-start">Start, s</label
-                    ><input
-                      id="cap-start"
-                      data-key="start"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                    /><button
-                      type="button"
-                      id="cap-start-now"
-                      class="text-button small"
-                      aria-label="Set caption start to the playhead time"
-                    >
-                      Use playhead
-                    </button>
-                  </div>
-                  <div class="field">
-                    <label for="cap-end">End, s</label
-                    ><input
-                      id="cap-end"
-                      data-key="end"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                    /><button
-                      type="button"
-                      id="cap-end-now"
-                      class="text-button small"
-                      aria-label="Set caption end to the playhead time"
-                    >
-                      Use playhead
-                    </button>
-                  </div>
-                </div>
-                <p id="cap-visibility" class="hint"></p>
-                <button
-                  id="cap-delete"
+                  Trim &amp; cut</button
+                ><button
                   type="button"
-                  class="text-button danger"
+                  role="tab"
+                  id="tab-elements"
+                  data-tool="elements"
+                  aria-controls="tool-elements"
+                  aria-selected="false"
+                  tabindex="-1"
                 >
-                  Delete caption
+                  Text &amp; shapes</button
+                ><button
+                  type="button"
+                  role="tab"
+                  id="tab-captions"
+                  data-tool="captions"
+                  aria-controls="tool-captions"
+                  aria-selected="false"
+                  tabindex="-1"
+                >
+                  Captions</button
+                ><button
+                  type="button"
+                  role="tab"
+                  id="tab-sound"
+                  data-tool="sound"
+                  aria-controls="tool-sound"
+                  aria-selected="false"
+                  tabindex="-1"
+                >
+                  Speed &amp; sound</button
+                ><button
+                  type="button"
+                  role="tab"
+                  id="tab-details"
+                  data-tool="details"
+                  aria-controls="tool-details"
+                  aria-selected="false"
+                  tabindex="-1"
+                >
+                  Details
                 </button>
-              </form>
-              <details id="caption-style" class="caption-style">
-                <summary>Caption style for all captions</summary>
-                <div class="two-cols">
-                  <label
-                    >Size, % of the video height<input
-                      id="cap-size"
-                      type="number"
-                      min="1"
-                      max="50"
-                      step="0.1" /></label
-                  ><label
-                    >Position<select id="cap-position">
-                      <option value="bottom">Bottom</option>
-                      <option value="middle">Middle</option>
-                      <option value="top">Top</option>
-                      <option value="custom" hidden>Custom</option>
-                    </select></label
-                  >
-                </div>
-                <div class="two-cols">
-                  <label>Text color<input id="cap-color" type="color" /></label
-                  ><label class="check"
-                    ><input type="checkbox" id="cap-bold" /> Bold</label
-                  >
-                </div>
-                <div class="color-field">
-                  <label for="cap-background">Background band</label>
-                  <input id="cap-background" type="color" />
-                  <label class="check"
-                    ><input type="checkbox" id="cap-background-none" />
-                    None</label
-                  >
-                </div>
-                <label
-                  >Background opacity, %<input
-                    id="cap-background-opacity"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                /></label>
-              </details>
-              <button
-                id="caption-remove"
-                type="button"
-                class="text-button danger"
-              >
-                Remove all captions
-              </button>
+              </div>
             </div>
-            <div class="edit-section">
-              <h3>Range</h3>
-              <p class="hint">Times are seconds in the edited video.</p>
+            <div
+              role="tabpanel"
+              id="tool-trim"
+              class="tool-panel trim-panel"
+              aria-labelledby="tab-trim"
+            >
+              <p class="hint trim-intro">
+                Select a part of the video with a start and an end. Then keep
+                only that part, or remove it.
+              </p>
               <div class="two-cols">
                 <div class="field">
-                  <label for="range-start">Start</label
+                  <label for="range-start">Selection start, s</label
                   ><input
                     type="number"
                     id="range-start"
@@ -935,14 +477,14 @@
                   /><button
                     id="range-start-now"
                     class="text-button small"
-                    aria-label="Set start to the playhead time"
+                    aria-label="Set selection start to the playhead"
                     aria-keyshortcuts="I"
                   >
-                    Use playhead <kbd aria-hidden="true">I</kbd>
+                    Set to playhead <kbd aria-hidden="true">I</kbd>
                   </button>
                 </div>
                 <div class="field">
-                  <label for="range-end">End</label
+                  <label for="range-end">Selection end, s</label
                   ><input
                     type="number"
                     id="range-end"
@@ -951,21 +493,628 @@
                   /><button
                     id="range-end-now"
                     class="text-button small"
-                    aria-label="Set end to the playhead time"
+                    aria-label="Set selection end to the playhead"
                     aria-keyshortcuts="O"
                   >
-                    Use playhead <kbd aria-hidden="true">O</kbd>
+                    Set to playhead <kbd aria-hidden="true">O</kbd>
                   </button>
                 </div>
               </div>
-              <p id="range-summary" class="range-summary"></p>
-              <div class="two-cols">
-                <button id="trim" class="button secondary">Keep range</button
-                ><button id="cut" class="button secondary">Remove range</button>
+              <p
+                id="range-summary"
+                class="range-summary"
+                aria-live="polite"
+              ></p>
+              <div class="trim-actions">
+                <button
+                  id="trim"
+                  class="button secondary trim-action"
+                  aria-describedby="trim-help range-summary"
+                >
+                  <span aria-hidden="true">▣</span> Keep only the selection
+                </button>
+                <p id="trim-help" class="hint">
+                  Removes the video before and after it.
+                </p>
+                <button
+                  id="cut"
+                  class="button secondary trim-action"
+                  aria-describedby="cut-help range-summary"
+                >
+                  <span aria-hidden="true">✂</span> Remove the selection
+                </button>
+                <p id="cut-help" class="hint">
+                  Removes it and joins the parts around it.
+                </p>
+              </div>
+              <p id="kept-parts" class="hint kept-parts"></p>
+            </div>
+            <div
+              role="tabpanel"
+              id="tool-elements"
+              class="tool-panel"
+              aria-labelledby="tab-elements"
+              hidden
+            >
+              <div
+                class="tool-group arrange-group"
+                role="toolbar"
+                aria-label="Selected element"
+              >
+                <button
+                  id="duplicate-element"
+                  class="tool"
+                  aria-label="Duplicate element"
+                  title="Duplicate"
+                >
+                  <span aria-hidden="true">⧉</span
+                  ><span class="tool-text">Duplicate</span>
+                </button>
+                <button
+                  id="raise-element"
+                  class="tool"
+                  aria-label="Bring element forward"
+                  title="Bring forward"
+                >
+                  <span aria-hidden="true">↑</span
+                  ><span class="tool-text">Forward</span>
+                </button>
+                <button
+                  id="lower-element"
+                  class="tool"
+                  aria-label="Send element backward"
+                  title="Send backward"
+                >
+                  <span aria-hidden="true">↓</span
+                  ><span class="tool-text">Backward</span>
+                </button>
+                <button
+                  id="delete-element"
+                  class="tool danger"
+                  aria-label="Delete element"
+                  aria-keyshortcuts="Delete"
+                  title="Delete"
+                >
+                  <span aria-hidden="true">✕</span
+                  ><span class="tool-text">Delete</span>
+                </button>
+              </div>
+              <section
+                id="layers"
+                class="layers"
+                aria-labelledby="layers-heading"
+              >
+                <div class="timeline-head">
+                  <h3 id="layers-heading">Layers</h3>
+                  <span id="layer-count" class="timeline-duration"
+                    >No elements</span
+                  >
+                </div>
+                <p id="layers-empty" class="hint">
+                  Use Add above the video to add text, a label, a shape, or an
+                  arrow at the playhead. Higher rows show in front.
+                </p>
+                <ol id="layer-list" class="layer-list"></ol>
+              </section>
+              <div id="element-panel" class="edit-section element-panel">
+                <h3 id="element-heading">Element</h3>
+                <p id="element-empty" class="hint">
+                  Select an element in the video or in Layers to change it.
+                </p>
+                <form id="element-form" class="element-form" hidden novalidate>
+                  <p class="hint">
+                    Changes save when you leave a field or press Enter. Times
+                    are seconds in the edited video. Positions and sizes are
+                    percent of the video.
+                  </p>
+                  <div class="field-group" data-types="text">
+                    <label for="el-text">Text</label>
+                    <textarea id="el-text" rows="2" maxlength="500"></textarea>
+                    <div id="el-fit" class="fit-note" hidden>
+                      <p id="el-fit-text"></p>
+                      <button
+                        type="button"
+                        id="el-fit-button"
+                        class="text-button small"
+                      >
+                        Make the text fit the box
+                      </button>
+                    </div>
+                    <div class="two-cols">
+                      <label
+                        >Font<select id="el-font" data-key="font">
+                          <option value="sans">Sans</option>
+                          <option value="serif">Serif</option>
+                          <option value="mono">Mono</option>
+                        </select></label
+                      ><label
+                        >Size, % of the video height<input
+                          id="el-size"
+                          data-key="size"
+                          type="number"
+                          min="1"
+                          max="50"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <label class="check"
+                      ><input type="checkbox" id="el-bold" data-key="bold" />
+                      Bold</label
+                    >
+                    <div class="two-cols">
+                      <label
+                        >Align<select id="el-align" data-key="align">
+                          <option value="left">Left</option>
+                          <option value="center">Center</option>
+                          <option value="right">Right</option>
+                        </select></label
+                      ><label
+                        >Vertical<select
+                          id="el-valign"
+                          data-key="verticalAlign"
+                        >
+                          <option value="top">Top</option>
+                          <option value="middle">Middle</option>
+                          <option value="bottom">Bottom</option>
+                        </select></label
+                      >
+                    </div>
+                  </div>
+                  <div class="field-group color-grid">
+                    <label data-types="text arrow"
+                      >Color<input id="el-color" data-key="color" type="color"
+                    /></label>
+                    <div
+                      class="color-field"
+                      data-types="text"
+                      data-key="background"
+                    >
+                      <label for="el-background">Background</label>
+                      <input id="el-background" type="color" />
+                      <label class="check"
+                        ><input type="checkbox" id="el-background-none" />
+                        None</label
+                      >
+                    </div>
+                    <label data-types="text"
+                      >Background opacity, %<input
+                        id="el-background-opacity"
+                        data-key="backgroundOpacity"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                    /></label>
+                    <div
+                      class="color-field"
+                      data-types="text arrow"
+                      data-key="outline"
+                    >
+                      <label for="el-outline">Outline</label>
+                      <input id="el-outline" type="color" />
+                      <label class="check"
+                        ><input type="checkbox" id="el-outline-none" />
+                        None</label
+                      >
+                    </div>
+                    <div
+                      class="color-field"
+                      data-types="rectangle ellipse"
+                      data-key="fill"
+                    >
+                      <label for="el-fill">Fill</label>
+                      <input id="el-fill" type="color" />
+                      <label class="check"
+                        ><input type="checkbox" id="el-fill-none" /> None</label
+                      >
+                    </div>
+                    <label data-types="rectangle ellipse"
+                      >Fill opacity, %<input
+                        id="el-fill-opacity"
+                        data-key="fillOpacity"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                    /></label>
+                    <div
+                      class="color-field"
+                      data-types="rectangle ellipse"
+                      data-key="stroke"
+                    >
+                      <label for="el-stroke">Line</label>
+                      <input id="el-stroke" type="color" />
+                      <label class="check"
+                        ><input type="checkbox" id="el-stroke-none" />
+                        None</label
+                      >
+                    </div>
+                    <label data-types="rectangle ellipse arrow"
+                      >Line width, % of the video height<input
+                        id="el-stroke-width"
+                        data-key="strokeWidth"
+                        type="number"
+                        min="0.2"
+                        max="5"
+                        step="0.1"
+                    /></label>
+                  </div>
+                  <fieldset
+                    class="field-group"
+                    data-types="text rectangle ellipse"
+                  >
+                    <legend>Position and size, % of the video</legend>
+                    <div class="two-cols">
+                      <label
+                        >Left (X)<input
+                          id="el-x"
+                          data-key="x"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Top (Y)<input
+                          id="el-y"
+                          data-key="y"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <div class="two-cols">
+                      <label
+                        >Width<input
+                          id="el-width"
+                          data-key="width"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Height<input
+                          id="el-height"
+                          data-key="height"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="field-group" data-types="arrow">
+                    <legend>Arrow points, % of the video</legend>
+                    <div class="two-cols">
+                      <label
+                        >Tail X<input
+                          id="el-x1"
+                          data-key="x1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Tail Y<input
+                          id="el-y1"
+                          data-key="y1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <div class="two-cols">
+                      <label
+                        >Tip X<input
+                          id="el-x2"
+                          data-key="x2"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Tip Y<input
+                          id="el-y2"
+                          data-key="y2"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <p class="hint">
+                      The tip is the point that the arrow shows.
+                    </p>
+                  </fieldset>
+                  <fieldset class="field-group">
+                    <legend>Time, seconds</legend>
+                    <div class="two-cols">
+                      <div class="field">
+                        <label for="el-start">Start</label
+                        ><input
+                          id="el-start"
+                          data-key="start"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                        /><button
+                          type="button"
+                          id="el-start-now"
+                          class="text-button small"
+                          aria-label="Set element start to the playhead time"
+                        >
+                          Set to playhead
+                        </button>
+                      </div>
+                      <div class="field">
+                        <label for="el-end">End</label
+                        ><input
+                          id="el-end"
+                          data-key="end"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                        /><button
+                          type="button"
+                          id="el-end-now"
+                          class="text-button small"
+                          aria-label="Set element end to the playhead time"
+                        >
+                          Set to playhead
+                        </button>
+                      </div>
+                    </div>
+                    <p id="el-visibility" class="hint"></p>
+                  </fieldset>
+                  <fieldset class="field-group">
+                    <legend>Fade, seconds</legend>
+                    <div class="two-cols">
+                      <label
+                        >Fade in<input
+                          id="el-fade-in"
+                          data-key="fadeIn"
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.1" /></label
+                      ><label
+                        >Fade out<input
+                          id="el-fade-out"
+                          data-key="fadeOut"
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <p id="el-fade-in-note" class="hint warn"></p>
+                    <p id="el-fade-out-note" class="hint warn"></p>
+                    <label
+                      >Opacity, %<input
+                        id="el-opacity"
+                        data-key="opacity"
+                        type="number"
+                        min="10"
+                        max="100"
+                        step="1"
+                    /></label>
+                  </fieldset>
+                </form>
               </div>
             </div>
-            <div class="edit-section">
-              <h3>Speed, sound, and fades</h3>
+            <div
+              role="tabpanel"
+              id="tool-captions"
+              class="tool-panel"
+              aria-labelledby="tab-captions"
+              hidden
+            >
+              <div id="caption-panel" class="caption-panel">
+                <h3 id="caption-heading" class="visually-hidden">Captions</h3>
+                <p id="caption-setup" class="hint warn" hidden></p>
+                <button
+                  id="caption-generate"
+                  type="button"
+                  class="button secondary full"
+                >
+                  Make captions from speech
+                </button>
+                <label class="check"
+                  ><input type="checkbox" id="caption-range-only" /> Only the
+                  selection (set it in Trim &amp; cut)</label
+                >
+                <p class="hint">
+                  Speech recognition runs on this computer. The words and times
+                  are estimates, so check the captions before you export.
+                </p>
+                <div id="caption-replace" class="confirm-note" hidden>
+                  <p id="caption-replace-text"></p>
+                  <div class="two-cols">
+                    <button
+                      id="caption-replace-yes"
+                      type="button"
+                      class="button primary"
+                    >
+                      Replace captions</button
+                    ><button
+                      id="caption-replace-no"
+                      type="button"
+                      class="button secondary"
+                    >
+                      Keep captions
+                    </button>
+                  </div>
+                </div>
+                <div id="caption-job" class="caption-job" hidden>
+                  <p id="caption-job-text" role="status" aria-live="polite"></p>
+                  <progress
+                    id="caption-progress"
+                    max="1"
+                    aria-label="Speech recognition progress"
+                  ></progress>
+                  <div class="caption-job-actions">
+                    <button
+                      id="caption-apply"
+                      type="button"
+                      class="button primary"
+                      hidden
+                    >
+                      Add captions</button
+                    ><button
+                      id="caption-cancel"
+                      type="button"
+                      class="text-button small"
+                      hidden
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+                <div class="caption-tools">
+                  <button
+                    id="caption-add"
+                    type="button"
+                    class="button secondary"
+                    aria-label="Add a caption at the playhead"
+                  >
+                    + Caption at playhead</button
+                  ><label class="check"
+                    ><input type="checkbox" id="caption-enabled" /> Show
+                    captions</label
+                  >
+                </div>
+                <section
+                  id="captions"
+                  class="layers captions"
+                  aria-labelledby="captions-heading"
+                >
+                  <div class="timeline-head">
+                    <h4 id="captions-heading">Caption list</h4>
+                    <span id="caption-count" class="timeline-duration"
+                      >No captions</span
+                    >
+                  </div>
+                  <p id="caption-audio" class="hint warn" hidden></p>
+                  <p id="captions-empty" class="hint">
+                    Make captions from the speech, or add a caption at the
+                    playhead. Captions are separate from labels and shapes.
+                  </p>
+                  <ol
+                    id="caption-list"
+                    class="layer-list caption-list"
+                    aria-label="Caption list"
+                  ></ol>
+                </section>
+                <form id="caption-form" class="caption-form" hidden novalidate>
+                  <h4 id="caption-cue-heading">Selected caption</h4>
+                  <label for="cap-text">Text</label>
+                  <textarea id="cap-text" rows="2" maxlength="200"></textarea>
+                  <p id="cap-check" class="hint warn" hidden></p>
+                  <div class="two-cols">
+                    <div class="field">
+                      <label for="cap-start">Start, s</label
+                      ><input
+                        id="cap-start"
+                        data-key="start"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      /><button
+                        type="button"
+                        id="cap-start-now"
+                        class="text-button small"
+                        aria-label="Set caption start to the playhead time"
+                      >
+                        Set to playhead
+                      </button>
+                    </div>
+                    <div class="field">
+                      <label for="cap-end">End, s</label
+                      ><input
+                        id="cap-end"
+                        data-key="end"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      /><button
+                        type="button"
+                        id="cap-end-now"
+                        class="text-button small"
+                        aria-label="Set caption end to the playhead time"
+                      >
+                        Set to playhead
+                      </button>
+                    </div>
+                  </div>
+                  <p id="cap-visibility" class="hint"></p>
+                  <button
+                    id="cap-delete"
+                    type="button"
+                    class="text-button danger"
+                  >
+                    Delete caption
+                  </button>
+                </form>
+                <details id="caption-style" class="caption-style">
+                  <summary>Caption style for all captions</summary>
+                  <div class="two-cols">
+                    <label
+                      >Size, % of the video height<input
+                        id="cap-size"
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="0.1" /></label
+                    ><label
+                      >Position<select id="cap-position">
+                        <option value="bottom">Bottom</option>
+                        <option value="middle">Middle</option>
+                        <option value="top">Top</option>
+                        <option value="custom" hidden>Custom</option>
+                      </select></label
+                    >
+                  </div>
+                  <div class="two-cols">
+                    <label
+                      >Text color<input id="cap-color" type="color" /></label
+                    ><label class="check"
+                      ><input type="checkbox" id="cap-bold" /> Bold</label
+                    >
+                  </div>
+                  <div class="color-field">
+                    <label for="cap-background">Background band</label>
+                    <input id="cap-background" type="color" />
+                    <label class="check"
+                      ><input type="checkbox" id="cap-background-none" />
+                      None</label
+                    >
+                  </div>
+                  <label
+                    >Background opacity, %<input
+                      id="cap-background-opacity"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                  /></label>
+                </details>
+                <button
+                  id="caption-remove"
+                  type="button"
+                  class="text-button danger"
+                >
+                  Remove all captions
+                </button>
+              </div>
+            </div>
+            <div
+              role="tabpanel"
+              id="tool-sound"
+              class="tool-panel"
+              aria-labelledby="tab-sound"
+              hidden
+            >
               <label
                 >Playback speed<select id="speed">
                   <option value="0.5">0.5×</option>
@@ -1001,33 +1150,25 @@
                 video effects. There are no crossfades between clips.
               </p>
             </div>
-            <div class="edit-section">
-              <h3>History</h3>
-              <div class="two-cols">
-                <button
-                  id="undo"
-                  class="button secondary"
-                  aria-keyshortcuts="Control+Z"
-                >
-                  ↶ Undo</button
-                ><button
-                  id="redo"
-                  class="button secondary"
-                  aria-keyshortcuts="Control+Shift+Z"
-                >
-                  ↷ Redo
-                </button>
-              </div>
-              <button id="reset" class="text-button">Reset all edits</button>
-            </div>
-            <div class="edit-section">
-              <h3>Details</h3>
+            <div
+              role="tabpanel"
+              id="tool-details"
+              class="tool-panel"
+              aria-labelledby="tab-details"
+              hidden
+            >
               <label
                 >Video title<input id="rename-title" autocomplete="off"
               /></label>
               <button id="rename" class="button secondary full">
                 Save title
               </button>
+              <p class="hint">
+                Reset all edits returns to the original video: it removes trim,
+                cuts, speed, mute, fades, elements, and captions. You can undo
+                it.
+              </p>
+              <button id="reset" class="text-button">Reset all edits</button>
               <button id="delete" class="text-button danger">
                 Delete video
               </button>

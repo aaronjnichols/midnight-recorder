@@ -8,6 +8,7 @@ import { editRevision } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { createElementEditor } from "./element-editor.js";
 import { createCaptionEditor } from "./caption-editor.js";
+import { createTools } from "./tools.js";
 import {
   clock,
   libraryView,
@@ -131,6 +132,53 @@ const seek = (seconds) =>
   call("playback.seek", { seconds }).catch((error) =>
     notice(error.message, true),
   );
+// The editing tools. A tool change only changes the page. It also makes a
+// pending add result unable to select, so a late result cannot change the
+// tool that the user opened. The current selection stays.
+const tools = createTools({
+  onChange: () => {
+    editor.invalidate();
+    captions.invalidate();
+  },
+});
+// Show the properties of a new selection in the edit panel. The panel
+// scrolls only if the properties are not already in view.
+function reveal(selector) {
+  const node = $(selector),
+    panel = $(".edit-panel");
+  if (!node || node.closest("[hidden]")) return;
+  const top = $(".tool-head").getBoundingClientRect().bottom;
+  const bottom = Math.min(panel.getBoundingClientRect().bottom, innerHeight);
+  const box = node.getBoundingClientRect();
+  if (box.top < top || box.top > bottom - 160)
+    panel.scrollTop += box.top - top - 8;
+}
+// A user selection shows its tool: the selected element or caption.
+// A pointer selection starts at pointerdown, before the click. A scroll of
+// the panel at that time moves the row under the pointer, so the click
+// would not occur, for example the first-click seek of a caption row. So
+// the panel scrolls after the pointer is released.
+let pointerDown = false,
+  pendingReveal = null;
+document.addEventListener("pointerdown", () => (pointerDown = true), true);
+for (const type of ["pointerup", "pointercancel"])
+  document.addEventListener(
+    type,
+    () => {
+      pointerDown = false;
+      const selector = pendingReveal;
+      pendingReveal = null;
+      // After the click that this release makes.
+      if (selector) setTimeout(() => reveal(selector));
+    },
+    true,
+  );
+function showSelection(tool, selector) {
+  tools.show(tool);
+  if (pointerDown) pendingReveal = selector;
+  // After the editor shows the properties of the new selection.
+  else queueMicrotask(() => reveal(selector));
+}
 const editor = createElementEditor({
   $,
   call,
@@ -142,7 +190,10 @@ const editor = createElementEditor({
   isReady: () => previewReady,
   frameSize,
   // One selection at a time: an element or a caption.
-  onSelect: () => captions.deselect(),
+  onSelect: () => {
+    captions.deselect();
+    showSelection("elements", "#element-heading");
+  },
 });
 const captions = createCaptionEditor({
   $,
@@ -154,8 +205,12 @@ const captions = createCaptionEditor({
   seek,
   isReady: () => previewReady,
   range: () => checkRange(),
-  onSelect: () => editor.deselect(),
+  onSelect: () => {
+    editor.deselect();
+    showSelection("captions", "#caption-form");
+  },
 });
+$("#selection-chip").addEventListener("click", () => tools.show("trim"));
 async function refreshSources() {
   sources = await call("capture.sources");
   const before = $("#source").value;
@@ -287,6 +342,7 @@ function showLibrary({ restoreFocus = false } = {}) {
   viewGeneration++;
   $("#player").pause();
   $("#editor").hidden = true;
+  $("#editor-actions").hidden = true;
   $("#library-view").hidden = false;
   $("#crumb").textContent = "Video library";
   selectedVideo = null;
@@ -350,10 +406,14 @@ function renderVideoInfo(video) {
   $("#video-info").replaceChildren(...parts);
 }
 function renderVideo(video) {
+  // A video opens with Trim & cut. A new state of the open video, for
+  // example after an edit or a status update, keeps the user's tool.
+  if (selectedVideo?.id !== video.id) tools.show("trim");
   selectedVideo = video;
   const id = video.id;
   $("#library-view").hidden = true;
   $("#editor").hidden = false;
+  $("#editor-actions").hidden = false;
   $("#crumb").textContent = "Video editor";
   $("#video-title").textContent = video.title;
   const title = $("#rename-title");
@@ -392,11 +452,22 @@ function renderVideo(video) {
     }
   }
   const total = seconds(video);
-  if (rangeKey !== key) {
-    rangeKey = key;
+  // The selection times are edited times. They stay after an element,
+  // caption, style, or title change. A trim, cut, or speed change moves the
+  // edited times, and another video has other times: then the selection is
+  // the full video again.
+  const { segments, speed } = video.timeline;
+  const timing = id + JSON.stringify([segments, speed]);
+  if (rangeKey !== timing) {
+    rangeKey = timing;
     $("#range-start").value = 0;
     $("#range-end").value = total;
   }
+  const parts = segments.length;
+  $("#kept-parts").textContent =
+    parts === 1
+      ? `The edited video is ${clock(total)} long. Undo restores a removed part.`
+      : `The edited video has ${parts} kept parts and is ${clock(total)} long. Undo restores a removed part.`;
   $("#range-start").max = total;
   $("#range-end").max = total;
   $("#speed").value = video.timeline.speed;
@@ -676,18 +747,25 @@ function renderRange() {
   const total = seconds(selectedVideo);
   const { start, end, valid, full, maximum } = checkRange();
   const summary = $("#range-summary");
-  summary.classList.toggle("invalid", !valid);
+  // The summary is next to the actions and also tells why they are not
+  // available.
+  summary.classList.toggle("invalid", !valid || full);
   summary.textContent = !valid
     ? `Set an end time after the start time. The maximum is ${maximum}.`
     : full
-      ? "The range is the full video. Change the start or end time."
-      : `Selected range: ${(end - start).toFixed(2)} seconds.`;
+      ? "The selection is the full video. First set its start (I) and end (O) at the playhead, or type the times."
+      : `Selection: ${start.toFixed(2)} s to ${end.toFixed(2)} s, ${(end - start).toFixed(2)} s long.`;
   $("#trim").disabled = !valid || full;
   $("#cut").disabled = !valid || full;
   $("#timeline-range").hidden = !valid || full;
+  // The timeline shows the selection in every tool. Its button opens
+  // Trim & cut.
+  const chip = $("#selection-chip");
+  chip.hidden = !valid || full;
   if (valid && !full) {
     $("#timeline-range").style.left = `${(start / total) * 100}%`;
     $("#timeline-range").style.width = `${((end - start) / total) * 100}%`;
+    chip.textContent = `Selection ${start.toFixed(2)} to ${end.toFixed(2)} s · Trim & cut`;
   }
 }
 for (const id of ["#range-start", "#range-end"])
@@ -742,9 +820,10 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   if (context.view === "library") return perform(possible);
   // The editors queue their own command for the selected element or caption.
+  // Only the selection of the open tool: the user can see what it deletes.
   if (possible.local === "delete-element") {
-    if (captions.selected()) captions.deleteSelected();
-    else editor.deleteSelected();
+    if (tools.active() === "captions") captions.deleteSelected();
+    if (tools.active() === "elements") editor.deleteSelected();
     return;
   }
   const keys = {
@@ -774,8 +853,15 @@ function shortcutContext() {
     canUndo: Boolean(selectedVideo?.timeline.past.length),
     canRedo: Boolean(selectedVideo?.timeline.future.length),
     dialog: $("#confirm-delete").open,
-    selected: editor.selected() || captions.selected(),
+    // Delete and Backspace use the selection of the open tool only. A
+    // selection in a closed tool stays, but the keys do not change it.
+    selected: activeSelection(),
   };
+}
+function activeSelection() {
+  if (tools.active() === "elements") return editor.selected();
+  if (tools.active() === "captions") return captions.selected();
+  return null;
 }
 function perform(action) {
   if (action.local === "search") {

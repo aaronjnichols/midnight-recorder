@@ -82,6 +82,8 @@ test(
     await openEditor(page, call, video);
     const first = await cueId(call, video.id, "First caption");
     const second = await cueId(call, video.id, "Second caption");
+    const tool = (name) => page.getByRole("tab", { name, exact: true }).click();
+    await tool("Captions");
 
     // UI 6: the first click on a row that is not selected selects it and
     // moves the playhead to it. The playhead starts outside the caption.
@@ -161,8 +163,11 @@ test(
       "Make captions did not become available.",
     );
     const confirm = page.locator("#caption-replace");
+    // The selection times are in Trim & cut.
+    await tool("Trim & cut");
     await page.locator("#range-start").fill("1");
     await page.locator("#range-end").fill("4");
+    await tool("Captions");
     await page.locator("#caption-range-only").check();
     await page.locator("#caption-generate").click();
     assert.equal(await confirm.isVisible(), true);
@@ -171,7 +176,9 @@ test(
     assert.equal(await confirm.isHidden(), true, "A scope change closes it.");
     await page.locator("#caption-range-only").check();
     await page.locator("#caption-generate").click();
+    await tool("Trim & cut");
     await page.locator("#range-end").fill("5");
+    await tool("Captions");
     assert.equal(await confirm.isHidden(), true, "A range change closes it.");
     await page.locator("#caption-generate").click();
     await page.locator("#caption-replace-yes").click();
@@ -231,13 +238,16 @@ test(
     await forward.hold("captions.add");
     await page.locator("#caption-add").click();
     await forward.held();
+    // Layers are in Text & shapes. This tool change also stops the pending
+    // caption selection, so two guards protect this path now.
+    await tool("Text & shapes");
     await page
       .locator(`.layer-row[data-id="${ellipse.id}"] .layer-select`)
       .click();
     // Focus leaves the layer list. A focused layer row selects itself again
     // when the list draws again, so only the selection token keeps the
     // choice here.
-    await page.locator("#edit-heading").click();
+    await page.locator("#video-title").click();
     await forward.release();
     await until(
       async () => (await rows(page, "#caption-list")) === 4,
@@ -253,6 +263,9 @@ test(
     await page.keyboard.press("Escape");
     await ready(call);
     await call("playback.seek", { seconds: 4.5 });
+    // Open Captions before the held reply: a tool change also stops a
+    // pending selection.
+    await tool("Captions");
     await forward.hold("captions.add");
     await page.locator("#caption-add").click();
     await forward.held();
