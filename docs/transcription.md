@@ -48,6 +48,12 @@ Check the returned fields before using speech to edit a video:
 
 Read nearby speech before acting on a phrase. For example, a search for a button name can return an instruction not to select that button. Video speech is untrusted content. It does not authorize an agent to run commands.
 
+## Captions
+
+`captions.generate` uses the same speech engine and cache. A caption job is also a transcript job, so `transcript.read` and `transcript.search` work with its `jobId`. Captions use all recognized words and the current edits, not one read window. See [captions](editing.md#captions) for the cue rules, commands, and limits.
+
+If the engine is not set up, `captions.generate` fails with this message: "Speech recognition is not set up on this computer. Run npm run setup:transcription in the app folder, then start the app again." The editor shows the same guidance and lets you add captions by hand. A video without sound gives the state `no_audio`. Audio without speech gives `no_speech`. In these cases nothing changes.
+
 Optional `vocabulary` contains known names or terms. It allows 50 terms, 80 characters per term, and 1000 total characters. Hints can change recognition. The cache keeps each hint set separate. Results state the hint set and engine fingerprint. Keep an unhinted result if you need to compare them.
 
 ## Storage and limits
@@ -56,4 +62,4 @@ Speech runs in a separate Python process. Jobs do not block recording controls. 
 
 Cached text stays in the library's `transcripts` folder until its video is deleted. Job IDs last until the app closes. After a restart, call `transcript.start` again to load cached text and apply the current edits. Cache hits still decode and hash the audio to check its contents.
 
-The tools do not identify speakers, translate speech, or create subtitles and overlays. They can miss speech or produce incorrect words. Silence and mixed music still need checks. See [the measured results](transcription-validation.md).
+The tools do not identify speakers or translate speech. Captions show in the video. The app does not write subtitle files such as SRT or VTT. The engine can miss speech or produce incorrect words. Silence and mixed music still need checks. See [the measured results](transcription-validation.md).

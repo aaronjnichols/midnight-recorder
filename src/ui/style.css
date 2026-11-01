@@ -1226,6 +1226,150 @@ button.button.danger:hover:not(:disabled) {
 .layer-select[aria-pressed="true"] .layer-track i {
   background: var(--cyan);
 }
+/* Captions: one row for each cue, with its number, time, and text. */
+.caption-list {
+  max-height: 260px;
+}
+.caption-select {
+  grid-template-columns: 26px auto minmax(0, 1fr) auto auto;
+  grid-template-areas: none;
+  padding: 5px 10px;
+}
+.caption-number {
+  font:
+    11px Consolas,
+    monospace;
+  color: var(--muted);
+  text-align: right;
+}
+.caption-select .layer-time,
+.caption-select .layer-name {
+  grid-area: auto;
+}
+.caption-row.current .caption-select {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+.caption-row[data-visibility="none"] .caption-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.caption-badge {
+  padding: 0 6px;
+  border: 1px solid #ebcb8b66;
+  border-radius: 9px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--yellow);
+  white-space: nowrap;
+}
+.caption-badge.partial,
+.caption-badge.none {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.caption-panel .check {
+  font-size: 12px;
+}
+.caption-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.confirm-note,
+.caption-job {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.confirm-note[hidden],
+.caption-job[hidden] {
+  display: none;
+}
+.confirm-note p,
+.caption-job p {
+  margin: 0;
+  color: var(--text-strong);
+}
+.caption-job[data-tone="ok"] {
+  border-color: #a3be8c66;
+}
+.caption-job[data-tone="warn"] {
+  border-color: #ebcb8b66;
+}
+.caption-job[data-tone="error"] {
+  border-color: #bf616a99;
+}
+.caption-job[data-tone="error"] p {
+  color: var(--red-text);
+}
+.caption-job progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--cyan);
+}
+.caption-job progress[hidden] {
+  display: none;
+}
+.caption-job-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.caption-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--cyan);
+  border-radius: 6px;
+  background: #88c0d00d;
+}
+.caption-form[hidden] {
+  display: none;
+}
+.caption-form h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.caption-form p {
+  margin: 0;
+}
+.caption-form textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--chrome);
+  color: var(--text-strong);
+  font: inherit;
+  resize: vertical;
+}
+.caption-style summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.caption-style[open] > * + * {
+  margin-top: 8px;
+}
+.caption-style input[type="color"] {
+  width: 100%;
+  min-height: 30px;
+  padding: 2px;
+}
+#caption-remove {
+  display: block;
+}
 .element-form {
   display: flex;
   flex-direction: column;

@@ -12,6 +12,7 @@ import {
 import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { elementsOf, renderPlan } from "../domain/elements.js";
+import { captionPlan } from "../domain/captions.js";
 import { duration, videoFades } from "../domain/timeline.js";
 
 export function run(executable, args, { signal, cwd } = {}) {
@@ -165,7 +166,8 @@ export function shapeScript(op) {
 
 // drawtext options for a text element. colors gives the text, box, and
 // outline colors, so the same geometry can draw a color pass and a mask.
-function textOptions(op, files, colors) {
+// name gives the filter an instance name, for runtime commands.
+function textOptions(op, files, colors, name = "drawtext") {
   const align = { left: "L", center: "C", right: "R" }[op.align];
   const valign = { top: "T", middle: "M", bottom: "B" }[op.verticalAlign];
   const options = [
@@ -187,7 +189,71 @@ function textOptions(op, files, colors) {
   ];
   if (op.outlineWidth)
     options.push(`borderw=${op.outlineWidth}`, `bordercolor=${colors.outline}`);
-  return `drawtext=${options.join(":")}`;
+  return `${name}=${options.join(":")}`;
+}
+
+// Captions use one drawtext filter for all cues, not one drawtext filter for
+// each cue. A sendcmd script sets the text of this filter and turns it on
+// when a cue starts, and turns it off when the cue ends. sendcmd compares
+// each frame time with the time range of each cue, which is small work. sendcmd sends a command when the frame time (rounded to the
+// microsecond) is in [start, end). Cue times have microsecond precision, so
+// this is the same [start, end) rule as the enable expression of elements.
+const CAPTION_FILTER = "drawtext@captions";
+const isAlphanumeric = (byte) =>
+  (byte >= 0x30 && byte <= 0x39) ||
+  (byte >= 0x41 && byte <= 0x5a) ||
+  (byte >= 0x61 && byte <= 0x7a);
+const microseconds = (value) => {
+  const us = Math.round(value * 1e6);
+  return `${Math.floor(us / 1e6)}.${String(us % 1e6).padStart(6, "0")}`;
+};
+
+// The sendcmd script for the cues, as bytes. In the text, each byte that is
+// not an ASCII letter or digit has a backslash before it. sendcmd reads an
+// argument with av_get_token, which copies an escaped byte as it is. So no
+// byte of the text can end the argument, start a command, or be a comment,
+// and UTF-8 text stays the same bytes. The text option is a plain string,
+// and expansion is off, so drawtext shows the text as written.
+export function captionScript(cues) {
+  const bytes = [];
+  const add = (text) => bytes.push(...Buffer.from(text, "latin1"));
+  for (const cue of cues) {
+    add(
+      `${microseconds(cue.start)}-${microseconds(cue.end)} [enter] ${CAPTION_FILTER} text `,
+    );
+    for (const byte of Buffer.from(cue.text, "utf8")) {
+      if (!isAlphanumeric(byte)) bytes.push(0x5c);
+      bytes.push(byte);
+    }
+    add(`, ${CAPTION_FILTER} enable 1, [leave] ${CAPTION_FILTER} enable 0;\n`);
+  }
+  return Buffer.from(bytes);
+}
+
+// The caption filters, with their files in the work folder: the script, a
+// text file with one space for the start, and the font.
+async function captionFilters(plan, work, fonts) {
+  const source = await fontFile(fonts, plan.font, plan.bold);
+  const font = `caption-font${path.extname(source).toLowerCase()}`;
+  await copyFile(source, path.join(work, font));
+  await writeFile(path.join(work, "caption-start.txt"), " ", "utf8");
+  await writeFile(path.join(work, "captions.cmd"), captionScript(plan.cues));
+  const box = plan.background !== "none";
+  return [
+    "sendcmd=f=captions.cmd",
+    `${textOptions(
+      plan,
+      { font, text: "caption-start.txt" },
+      {
+        text: ffColor(plan.color, 1),
+        box: box
+          ? ffColor(plan.background, plan.backgroundOpacity)
+          : "0x000000@0",
+        outline: ffColor(plan.outline === "none" ? "#000000" : plan.outline, 1),
+      },
+      CAPTION_FILTER,
+    )}:enable=0`,
+  ];
 }
 
 // The output frames that show an element: n from first to last - 1, where
@@ -521,6 +587,8 @@ export class Media {
     const plan = elementsOf(video.timeline).length
       ? renderPlan(video.timeline, info.frame)
       : [];
+    // Shown caption cues and their style, or null.
+    const captions = captionPlan(video.timeline, info.frame);
     const total = duration(video.timeline);
     // Video fades from black and to black come after the elements, so the
     // elements fade with the picture. The sound fades at the same times.
@@ -535,7 +603,8 @@ export class Media {
         );
       return list;
     };
-    const decorated = plan.length > 0 || fade("v", "fade").length > 0;
+    const decorated =
+      plan.length > 0 || captions !== null || fade("v", "fade").length > 0;
     const filters = [
       `[0:v]${videoClock(segments, speed, total)}[${decorated ? "base" : "v"}]`,
     ];
@@ -609,6 +678,10 @@ export class Media {
           );
           chain = [];
         }
+        // Captions are over all elements. The video fades come after, so
+        // the captions fade with the picture.
+        if (captions)
+          chain.push(...(await captionFilters(captions, work, this.fonts)));
         chain.push(...fade("v", "fade"));
         filters.push(`[${label}]${chain.join(",") || "null"}[v]`);
       }

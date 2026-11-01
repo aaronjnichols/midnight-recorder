@@ -47,6 +47,7 @@ export function createElementEditor({
   seek,
   isReady,
   frameSize,
+  onSelect,
 }) {
   let video = null,
     elements = [],
@@ -94,6 +95,7 @@ export function createElementEditor({
   function select(id, { reveal = false } = {}) {
     selectedId = id;
     selection++;
+    if (id) onSelect?.();
     renderLayers();
     renderForm();
     renderStage();
@@ -650,7 +652,14 @@ export function createElementEditor({
       if (!gesture) renderStage();
     },
     selected: () => selectedId,
-    deselect: () => (selectedId ? (select(null), true) : false),
+    // Also without a selection, this makes a pending result unable to
+    // select, for example when the user selects a caption during an add.
+    // Returns true if an element was selected.
+    deselect: () => {
+      const had = Boolean(selectedId);
+      select(null);
+      return had;
+    },
     deleteSelected,
     cancelGesture,
     typeLabel: (type) => TYPE_LABELS[type],

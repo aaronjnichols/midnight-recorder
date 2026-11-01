@@ -7,6 +7,7 @@ import {
 } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
+import { captionCommands, CaptionJobs } from "./captions.js";
 import {
   elementCommands,
   executeElement,
@@ -123,6 +124,12 @@ export const commands = [
     ),
   ),
   define(
+    "library.revision",
+    "Read the edit revision, title, and undo and redo counts of a video. The revision changes after each edit, including elements and captions. A small result for polling.",
+    { id: string("Video ID.") },
+    ["id"],
+  ),
+  define(
     "library.rename",
     "Change a video title.",
     { id: string("Video ID."), title: string("New title.") },
@@ -163,7 +170,7 @@ export const commands = [
   ...["undo", "redo"].map((action) =>
     define(
       `edit.${action}`,
-      `${action} video edits. Trim, cut, speed, mute, and element changes use one history.`,
+      `${action} video edits. Trim, cut, speed, mute, element, and caption changes use one history. The history keeps the last ${timeline.MAX_HISTORY} steps.`,
       { id: string("Video ID.") },
       ["id"],
     ),
@@ -175,13 +182,14 @@ export const commands = [
       id: string("Video ID."),
       scope: field(
         "string",
-        "Default all. timeline resets trim, cut, speed, and mute. elements removes all elements.",
-        { enum: ["all", "timeline", "elements"] },
+        "Default all. timeline resets trim, cut, speed, mute, and video fades. elements removes all labels and shapes. captions removes the captions.",
+        { enum: timeline.RESET_SCOPES },
       ),
     },
     ["id"],
   ),
   ...elementCommands,
+  ...captionCommands,
   define(
     "export.start",
     "Export an edited MP4 with its elements. Returns a job ID. The export uses the edits at the time of this command. Later edits do not change it.",
@@ -296,6 +304,7 @@ export class Service {
     this.recording = { state: "idle" };
     this.jobs = new Map();
     this.transcriptJobs = new TranscriptJobs(this);
+    this.captionJobs = new CaptionJobs(this);
     this.queue = Promise.resolve();
   }
   execute(name, args = {}) {
@@ -306,7 +315,12 @@ export class Service {
     } catch (error) {
       return Promise.reject(error);
     }
-    const result = this.queue.then(() => this.dispatch(name, args));
+    return this.enqueue(() => this.dispatch(name, args));
+  }
+  // Commands and background work, such as a caption apply after speech
+  // recognition, run one at a time in this queue.
+  enqueue(task) {
+    const result = this.queue.then(task);
     this.queue = result.catch(() => {});
     return result;
   }
@@ -367,6 +381,20 @@ export class Service {
   async dispatch(name, args) {
     if (name.startsWith("transcript."))
       return this.transcriptJobs.execute(name, args);
+    if (name.startsWith("captions."))
+      return this.captionJobs.execute(name, args);
+    if (name === "library.revision") {
+      const video = await this.library.get(args.id);
+      return {
+        id: video.id,
+        title: video.title,
+        revision: editRevision(video),
+        history: {
+          undo: video.timeline.past.length,
+          redo: video.timeline.future.length,
+        },
+      };
+    }
     if (name === "app.status")
       return {
         recording: this.recordingStatus(),

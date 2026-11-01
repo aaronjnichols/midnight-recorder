@@ -24,7 +24,11 @@ export const elementsOf = (timeline) => timeline.elements ?? [];
 const round = (value) => Math.round(value * 1e6) / 1e6;
 
 // Convert command times to a source range. Edited times are the default.
-function sourceTimes(timeline, sourceDuration, { start, end, timeBase }) {
+export function sourceTimes(
+  timeline,
+  sourceDuration,
+  { start, end, timeBase },
+) {
   if (timeBase === "source") {
     if (
       !Number.isFinite(start) ||
@@ -46,7 +50,7 @@ function sourceTimes(timeline, sourceDuration, { start, end, timeBase }) {
 
 // The edited interval [start, end) where the element shows, or null times
 // when trim or cut removed all of its source content.
-function placement(timeline, element) {
+export function placement(timeline, element) {
   const length = element.sourceEnd - element.sourceStart;
   const kept = keptSourceSeconds(
     timeline,
@@ -74,7 +78,7 @@ export const FONTS = ["sans", "serif", "mono"];
 export const ALIGN = ["left", "center", "right"];
 export const VERTICAL_ALIGN = ["top", "middle", "bottom"];
 
-const between = (name, value, min, max) => {
+export const between = (name, value, min, max) => {
   if (
     typeof value !== "number" ||
     !Number.isFinite(value) ||
@@ -84,12 +88,12 @@ const between = (name, value, min, max) => {
     throw new Error(`${name} must be a number from ${min} to ${max}.`);
   return value;
 };
-const choice = (name, value, options) => {
+export const choice = (name, value, options) => {
   if (!options.includes(value))
     throw new Error(`Invalid ${name}. Use ${options.join(", ")}.`);
   return value;
 };
-const color = (name, value, allowNone = false) => {
+export const color = (name, value, allowNone = false) => {
   if (allowNone && value === "none") return value;
   if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value))
     throw new Error(
@@ -99,10 +103,10 @@ const color = (name, value, allowNone = false) => {
 };
 // Text goes to the renderer as data, never as filter syntax. These checks
 // keep it readable and bounded.
-function checkText(value) {
+export function checkText(value, limits = LIMITS) {
   if (typeof value !== "string")
     throw new Error(
-      `Text is necessary. Give 1 to ${LIMITS.characters} characters.`,
+      `Text is necessary. Give 1 to ${limits.characters} characters.`,
     );
   const text = value.replace(/\r\n?/g, "\n");
   if (!text.isWellFormed()) throw new Error("Text must be valid Unicode.");
@@ -114,13 +118,13 @@ function checkText(value) {
     );
   if (!/\S/u.test(text))
     throw new Error("Text must contain a visible character.");
-  if ([...text].length > LIMITS.characters)
-    throw new Error(`Text must be at most ${LIMITS.characters} characters.`);
-  if (text.split("\n").length > LIMITS.lines)
-    throw new Error(`Text must be at most ${LIMITS.lines} lines.`);
+  if ([...text].length > limits.characters)
+    throw new Error(`Text must be at most ${limits.characters} characters.`);
+  if (text.split("\n").length > limits.lines)
+    throw new Error(`Text must be at most ${limits.lines} lines.`);
   return text;
 }
-function checkBox(v) {
+export function checkBox(v) {
   between("x", v.x, 0, 1);
   between("y", v.y, 0, 1);
   between("width", v.width, 0.01, 1);
@@ -267,7 +271,7 @@ function buildElement(type, id, sourceStart, sourceEnd, values) {
 }
 
 // The range checks in sourceTimes report an end before the start.
-function checkDuration({ start, end }) {
+export function checkDuration({ start, end }) {
   if (end > start && end - start < LIMITS.minSeconds - 1e-9)
     throw new Error(
       `An element must show for at least ${LIMITS.minSeconds} seconds.`,
@@ -538,36 +542,44 @@ export function renderPlan(timeline, frame) {
                   Math.max(1, Math.floor(Math.min(width, height) / 2)),
                 ),
         };
-      const fontSize = Math.max(1, Math.round(e.size * frame.height));
-      // Padding keeps text off the box edge. The inner text box keeps at
-      // least 1 pixel.
-      const padding = Math.max(
-        0,
-        Math.min(
-          Math.round(fontSize * 0.25),
-          Math.floor((width - 1) / 2),
-          Math.floor((height - 1) / 2),
-        ),
-      );
-      return {
-        ...timing,
-        x: left,
-        y: top,
-        width,
-        height,
-        padding,
-        text: e.text,
-        font: e.font,
-        bold: e.bold,
-        fontSize,
-        color: e.color,
-        align: e.align,
-        verticalAlign: e.verticalAlign,
-        background: e.background,
-        backgroundOpacity: e.backgroundOpacity,
-        outline: e.outline,
-        outlineWidth:
-          e.outline === "none" ? 0 : Math.max(1, Math.round(fontSize / 16)),
-      };
+      return { ...timing, ...textBoxPixels(e, frame), text: e.text };
     });
+}
+
+// Pixel box and text style of a text element or the caption style. Text
+// elements and captions use the same rules, so they draw in the same way.
+export function textBoxPixels(e, frame) {
+  const left = Math.round(e.x * frame.width),
+    top = Math.round(e.y * frame.height);
+  const width = Math.max(1, Math.round((e.x + e.width) * frame.width) - left);
+  const height = Math.max(1, Math.round((e.y + e.height) * frame.height) - top);
+  const fontSize = Math.max(1, Math.round(e.size * frame.height));
+  // Padding keeps text off the box edge. The inner text box keeps at least
+  // 1 pixel.
+  const padding = Math.max(
+    0,
+    Math.min(
+      Math.round(fontSize * 0.25),
+      Math.floor((width - 1) / 2),
+      Math.floor((height - 1) / 2),
+    ),
+  );
+  return {
+    x: left,
+    y: top,
+    width,
+    height,
+    padding,
+    font: e.font,
+    bold: e.bold,
+    fontSize,
+    color: e.color,
+    align: e.align,
+    verticalAlign: e.verticalAlign,
+    background: e.background,
+    backgroundOpacity: e.backgroundOpacity,
+    outline: e.outline,
+    outlineWidth:
+      e.outline === "none" ? 0 : Math.max(1, Math.round(fontSize / 16)),
+  };
 }

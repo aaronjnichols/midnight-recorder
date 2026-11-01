@@ -34,13 +34,15 @@ export class PreviewCache {
       elements = [],
       fadeIn = 0,
       fadeOut = 0,
+      captions = null,
     } = video.timeline;
     // Render version 3 has the exact 30 fps output clock, so previews from
     // older renders are not used again. Elements and the overlay renderer
     // version are part of the key, so a cached preview cannot hide changed
     // elements. Overlay version 2 draws shapes, arrows, and fades. Video
     // fades are in the key when they are set, so a video without fades keeps
-    // its key.
+    // its key. Captions and the caption renderer version are in the key when
+    // the video has captions.
     const key = createHash("sha256")
       .update(
         JSON.stringify({
@@ -53,6 +55,7 @@ export class PreviewCache {
           muted,
           ...(elements.length ? { overlayVersion: 2, elements } : {}),
           ...(fadeIn || fadeOut ? { fadeIn, fadeOut } : {}),
+          ...(captions ? { captionVersion: 1, captions } : {}),
         }),
       )
       .digest("hex");

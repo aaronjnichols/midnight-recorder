@@ -197,6 +197,42 @@ test("video fades are part of the preview identity", async () => {
   assert.ok(level(faded.path) < 30, "The faded preview starts black.");
 });
 
+test("captions and their style are part of the preview identity", async () => {
+  const { applyCaptions, configureCaptions, updateCue } =
+    await import("../src/domain/captions.js");
+  await mkdir(".local", { recursive: true });
+  const root = await mkdtemp(path.resolve(".local", "preview-caption-"));
+  const media = new Media();
+  const metadata = { duration: 2, width: 160, height: 90, hasAudio: false };
+  const plain = createTimeline(2);
+  const captioned = applyCaptions(
+    plain,
+    [{ sourceStart: 0, sourceEnd: 1, text: "Hello." }],
+    { ids: () => "c1" },
+  ).timeline;
+  const exported = [];
+  const cache = new PreviewCache(root, {
+    probe: (file) => media.probe(file),
+    export: async (video, output) => {
+      exported.push(output);
+      return { path: output, metadata };
+    },
+  });
+  const prepare = (timeline) =>
+    cache.prepare({ id: "caption", path: "in.mp4", metadata, timeline });
+  const paths = new Set();
+  for (const timeline of [
+    plain,
+    captioned,
+    updateCue(captioned, 2, "c1", { text: "Hello!" }),
+    configureCaptions(captioned, { size: 0.06 }),
+    configureCaptions(captioned, { enabled: false }),
+  ])
+    paths.add((await prepare(timeline)).path);
+  assert.equal(paths.size, 5, "Each caption change makes a new preview.");
+  assert.equal(exported.length, 5);
+});
+
 test("an edited preview removes boundary content and reuses the cached file", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "preview-"));

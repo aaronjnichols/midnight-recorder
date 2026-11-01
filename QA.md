@@ -157,3 +157,23 @@ The disk-error test now polls `app.status` until the state is `failed`, with a l
 The final `npm test` run for this stage had 92 tests. All 92 passed. No test failed or was skipped. The run took 211 seconds. The complete log is `.local/claude-ui/final-full-test.log`.
 
 Three independent review agents checked the layout, page behavior, and state rules. Follow-up reviews checked the timing, save states, keyboard queue, range limits, and disk-error test. The final reviews found no remaining defects.
+
+## Captions and final editing integration
+
+Captions come from the local English speech engine. They have a separate track, one undo step for each change, and the same shared commands in the app, CLI, and MCP. The preview, frame inspection, and export use the same renderer and the same [start, end) frame rule as elements. See [captions](docs/editing.md#captions).
+
+Tests and verification (the regression fixes have recorded failing runs; logs and the red/green index are in `.local/claude-editing/logs.md`):
+
+- Domain: `test/captions.test.js`, `test/caption-review.test.js`. Word grouping, cuts, partial and attached words, speed, ranges, capacity, validation, unique IDs, minimum display time, history limit 100, old libraries.
+- Service: `test/caption-service.test.js`. Atomic apply and replace, full-revision guards, edits during recognition, cancel before and after a queued apply, no audio, no speech, an empty range, failure, summaries, and omission warnings.
+- CLI and MCP: `test/caption-agent.test.js`. Real commands, inspection, and export.
+- Renderer: `test/caption-render.test.js`. Text with filter and command characters renders pixel-equal to a text element. Exact frame edges and gaps, cuts, speed, shapes, fades, hidden captions, and 500 captions with cuts.
+- Desktop: `test/late-result-ui.test.js` and `test/caption-ui-review.test.js` hold real command replies to check late results after a video, layer, or caption change. A mutation run with each guard removed failed. `test/caption-ui.test.js` uses the real speech engine to generate, select, seek, correct, style, undo, redo, delete, hide, reload, and export.
+
+The full `npm test` run had 206 tests. All passed, none were skipped, in 384 seconds: `.local/claude-editing/stage3-full.log`. After one more review correction, the 43 affected tests passed: `.local/claude-editing/stage3-affected-after-full.log`.
+
+Real speech trial: a 30-second excerpt of "First Steps" (Mike Newbon, Blender Studio, CC-BY), with all steps through the CLI. Recognition took 14.5 seconds. It gave 74 words and 8 captions. A second job used the cache and took 1.3 seconds. The before, during, and after frames from inspection and from the exported MP4 show the caption only during its time. No word correction was made. This trial did not measure word accuracy. Report: `.local/claude-editing/stage3-trial.md`. Images: `output/playwright/claude-editing/stage3-trial-*`.
+
+Screenshots at 1440 × 940 and 1000 × 720: `output/playwright/claude-editing/stage3-captions-*`.
+
+Limits: English only. One speech job at a time, on a source of at most one hour. 500 captions, 200 characters, and 3 lines for each caption. Word times are estimates. The app does not write SRT or VTT files. Characters that the font does not have show as boxes. The real speech desktop test skips if the engine or the excerpt source is not on the computer.

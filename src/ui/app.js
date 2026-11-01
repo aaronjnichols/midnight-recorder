@@ -7,6 +7,7 @@ import {
 import { editRevision } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { createElementEditor } from "./element-editor.js";
+import { createCaptionEditor } from "./caption-editor.js";
 import {
   clock,
   libraryView,
@@ -120,21 +121,40 @@ function frameSize() {
   const { width, height } = selectedVideo?.metadata || {};
   return width && height ? { width, height } : null;
 }
+// A command result can arrive after the user opened another video. Show it
+// only if its video is still open. Element and caption results use this
+// check.
+function showVideo(video, id) {
+  if (selectedVideo?.id === id) renderVideo(video);
+}
+const seek = (seconds) =>
+  call("playback.seek", { seconds }).catch((error) =>
+    notice(error.message, true),
+  );
 const editor = createElementEditor({
   $,
   call,
   queue: queued,
   notice,
-  showVideo: (video, id) => {
-    if (selectedVideo?.id === id) renderVideo(video);
-  },
+  showVideo,
   playhead,
-  seek: (seconds) =>
-    call("playback.seek", { seconds }).catch((error) =>
-      notice(error.message, true),
-    ),
+  seek,
   isReady: () => previewReady,
   frameSize,
+  // One selection at a time: an element or a caption.
+  onSelect: () => captions.deselect(),
+});
+const captions = createCaptionEditor({
+  $,
+  call,
+  queue: queued,
+  notice,
+  showVideo,
+  playhead,
+  seek,
+  isReady: () => previewReady,
+  range: () => checkRange(),
+  onSelect: () => editor.deselect(),
 });
 async function refreshSources() {
   sources = await call("capture.sources");
@@ -276,6 +296,7 @@ function showLibrary({ restoreFocus = false } = {}) {
   resumeAt = 0;
   previewVideoId = "";
   editor.clear();
+  captions.clear();
   hideSourceFrame();
   $(".player-shell").classList.remove("fullscreen");
   if (restoreFocus) {
@@ -398,6 +419,7 @@ function renderVideo(video) {
   renderExports();
   renderVideoFades(video);
   editor.render(video);
+  captions.render(video);
   syncPreview();
 }
 function renderVideoFades(video) {
@@ -575,6 +597,7 @@ function syncPreview() {
   $("#preview-fullscreen .label").textContent = label;
   $("#preview-fullscreen").setAttribute("aria-label", label);
   editor.layout();
+  captions.timeChanged();
 }
 new ResizeObserver(() => editor.layout()).observe($(".player-wrap"));
 for (const event of ["play", "pause", "volumechange", "timeupdate", "seeked"])
@@ -703,7 +726,7 @@ document.addEventListener("keydown", (event) => {
     !$("#editor").hidden &&
     !$("#confirm-delete").open &&
     !["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) &&
-    editor.deselect()
+    (editor.deselect() || captions.deselect())
   )
     return;
   const context = shortcutContext();
@@ -718,9 +741,10 @@ document.addEventListener("keydown", (event) => {
   if (!possible) return;
   event.preventDefault();
   if (context.view === "library") return perform(possible);
-  // The editor queues its own command for the selected element.
+  // The editors queue their own command for the selected element or caption.
   if (possible.local === "delete-element") {
-    editor.deleteSelected();
+    if (captions.selected()) captions.deleteSelected();
+    else editor.deleteSelected();
     return;
   }
   const keys = {
@@ -750,7 +774,7 @@ function shortcutContext() {
     canUndo: Boolean(selectedVideo?.timeline.past.length),
     canRedo: Boolean(selectedVideo?.timeline.future.length),
     dialog: $("#confirm-delete").open,
-    selected: editor.selected(),
+    selected: editor.selected() || captions.selected(),
   };
 }
 function perform(action) {
@@ -998,11 +1022,23 @@ async function refreshStatus() {
   if (selectedVideo) {
     const id = selectedVideo.id,
       generation = viewGeneration;
-    const latest = await call("library.get", { id }).catch(() => null);
+    // A small result first. The full video, with its undo history, loads
+    // only when an edit, Undo, Redo, or the title changed.
+    const latest = await call("library.revision", { id }).catch(() => null);
     if (generation !== viewGeneration || selectedVideo?.id !== id) return;
-    if (!latest) showLibrary();
-    else if (JSON.stringify(latest) !== JSON.stringify(selectedVideo))
-      renderVideo(latest);
+    if (!latest) return showLibrary();
+    const { timeline, title } = selectedVideo;
+    if (
+      latest.revision === editRevision(selectedVideo) &&
+      latest.title === title &&
+      latest.history?.undo === timeline.past.length &&
+      latest.history?.redo === timeline.future.length
+    )
+      return;
+    const video = await call("library.get", { id }).catch(() => null);
+    if (generation !== viewGeneration || selectedVideo?.id !== id) return;
+    if (!video) showLibrary();
+    else renderVideo(video);
   }
 }
 try {

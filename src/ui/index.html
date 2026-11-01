@@ -392,6 +392,28 @@
               </p>
               <ol id="layer-list" class="layer-list"></ol>
             </section>
+            <section
+              id="captions"
+              class="layers captions"
+              aria-labelledby="captions-heading"
+            >
+              <div class="timeline-head">
+                <h2 id="captions-heading">Captions</h2>
+                <span id="caption-count" class="timeline-duration"
+                  >No captions</span
+                >
+              </div>
+              <p id="caption-audio" class="hint warn" hidden></p>
+              <p id="captions-empty" class="hint">
+                Make captions from the speech in Edit video, or add a caption at
+                the playhead. Captions are separate from labels and shapes.
+              </p>
+              <ol
+                id="caption-list"
+                class="layer-list caption-list"
+                aria-label="Caption list"
+              ></ol>
+            </section>
             <p
               id="preview-state"
               class="preview-state"
@@ -408,7 +430,7 @@
               <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
               <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</li>
               <li><kbd>F</kbd> Fullscreen</li>
-              <li><kbd>Delete</kbd> Delete the selected element</li>
+              <li><kbd>Delete</kbd> Delete the selected element or caption</li>
               <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
             </ul>
             <section
@@ -723,6 +745,180 @@
                   /></label>
                 </fieldset>
               </form>
+            </div>
+            <div id="caption-panel" class="edit-section caption-panel">
+              <h3 id="caption-heading">Captions</h3>
+              <p id="caption-setup" class="hint warn" hidden></p>
+              <button
+                id="caption-generate"
+                type="button"
+                class="button secondary full"
+              >
+                Make captions from speech
+              </button>
+              <label class="check"
+                ><input type="checkbox" id="caption-range-only" /> Only the
+                selected range (see Range)</label
+              >
+              <p class="hint">
+                Speech recognition runs on this computer. The words and times
+                are estimates, so check the captions before you export.
+              </p>
+              <div id="caption-replace" class="confirm-note" hidden>
+                <p id="caption-replace-text"></p>
+                <div class="two-cols">
+                  <button
+                    id="caption-replace-yes"
+                    type="button"
+                    class="button primary"
+                  >
+                    Replace captions</button
+                  ><button
+                    id="caption-replace-no"
+                    type="button"
+                    class="button secondary"
+                  >
+                    Keep captions
+                  </button>
+                </div>
+              </div>
+              <div id="caption-job" class="caption-job" hidden>
+                <p id="caption-job-text" role="status" aria-live="polite"></p>
+                <progress
+                  id="caption-progress"
+                  max="1"
+                  aria-label="Speech recognition progress"
+                ></progress>
+                <div class="caption-job-actions">
+                  <button
+                    id="caption-apply"
+                    type="button"
+                    class="button primary"
+                    hidden
+                  >
+                    Add captions</button
+                  ><button
+                    id="caption-cancel"
+                    type="button"
+                    class="text-button small"
+                    hidden
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+              <div class="caption-tools">
+                <button
+                  id="caption-add"
+                  type="button"
+                  class="button secondary"
+                  aria-label="Add a caption at the playhead"
+                >
+                  + Caption at playhead</button
+                ><label class="check"
+                  ><input type="checkbox" id="caption-enabled" /> Show
+                  captions</label
+                >
+              </div>
+              <form id="caption-form" class="caption-form" hidden novalidate>
+                <h4 id="caption-cue-heading">Selected caption</h4>
+                <label for="cap-text">Text</label>
+                <textarea id="cap-text" rows="2" maxlength="200"></textarea>
+                <p id="cap-check" class="hint warn" hidden></p>
+                <div class="two-cols">
+                  <div class="field">
+                    <label for="cap-start">Start, s</label
+                    ><input
+                      id="cap-start"
+                      data-key="start"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                    /><button
+                      type="button"
+                      id="cap-start-now"
+                      class="text-button small"
+                      aria-label="Set caption start to the playhead time"
+                    >
+                      Use playhead
+                    </button>
+                  </div>
+                  <div class="field">
+                    <label for="cap-end">End, s</label
+                    ><input
+                      id="cap-end"
+                      data-key="end"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                    /><button
+                      type="button"
+                      id="cap-end-now"
+                      class="text-button small"
+                      aria-label="Set caption end to the playhead time"
+                    >
+                      Use playhead
+                    </button>
+                  </div>
+                </div>
+                <p id="cap-visibility" class="hint"></p>
+                <button
+                  id="cap-delete"
+                  type="button"
+                  class="text-button danger"
+                >
+                  Delete caption
+                </button>
+              </form>
+              <details id="caption-style" class="caption-style">
+                <summary>Caption style for all captions</summary>
+                <div class="two-cols">
+                  <label
+                    >Size, % of the video height<input
+                      id="cap-size"
+                      type="number"
+                      min="1"
+                      max="50"
+                      step="0.1" /></label
+                  ><label
+                    >Position<select id="cap-position">
+                      <option value="bottom">Bottom</option>
+                      <option value="middle">Middle</option>
+                      <option value="top">Top</option>
+                      <option value="custom" hidden>Custom</option>
+                    </select></label
+                  >
+                </div>
+                <div class="two-cols">
+                  <label>Text color<input id="cap-color" type="color" /></label
+                  ><label class="check"
+                    ><input type="checkbox" id="cap-bold" /> Bold</label
+                  >
+                </div>
+                <div class="color-field">
+                  <label for="cap-background">Background band</label>
+                  <input id="cap-background" type="color" />
+                  <label class="check"
+                    ><input type="checkbox" id="cap-background-none" />
+                    None</label
+                  >
+                </div>
+                <label
+                  >Background opacity, %<input
+                    id="cap-background-opacity"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                /></label>
+              </details>
+              <button
+                id="caption-remove"
+                type="button"
+                class="text-button danger"
+              >
+                Remove all captions
+              </button>
             </div>
             <div class="edit-section">
               <h3>Range</h3>

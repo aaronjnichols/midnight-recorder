@@ -199,7 +199,8 @@ export class TranscriptJobs {
       const entry = { timeline: structuredClone(video.timeline), controller };
       this.data.set(job.id, entry);
       jobs.set(job.id, job);
-      Promise.resolve()
+      // Caption jobs wait for this promise. It does not reject.
+      entry.done = Promise.resolve()
         .then(() =>
           transcription.prepare(video, options, {
             signal: controller.signal,

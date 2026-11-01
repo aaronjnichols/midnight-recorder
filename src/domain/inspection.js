@@ -24,11 +24,21 @@ export function editRevision(video) {
     elements = [],
     fadeIn = 0,
     fadeOut = 0,
+    captions = null,
   } = video.timeline;
-  // Video fades are in the revision only when they are set, so a state
-  // without fades keeps the revision from before fades existed.
+  // Video fades and captions are in the revision only when they are set, so
+  // a state without them keeps the revision from before they existed.
   const fades = fadeIn || fadeOut ? { fadeIn, fadeOut } : {};
-  return hash(JSON.stringify({ segments, speed, muted, elements, ...fades }));
+  return hash(
+    JSON.stringify({
+      segments,
+      speed,
+      muted,
+      elements,
+      ...fades,
+      ...(captions ? { captions } : {}),
+    }),
+  );
 }
 
 // Revision of the time mapping only. Transcripts use it, because elements do

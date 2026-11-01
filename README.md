@@ -35,18 +35,18 @@ Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not repl
 
 Editor keys do not operate when a text field or a list has focus. A key that you press during an operation applies after the operation is complete.
 
-| Key                                       | Action                                                                            | Shared command                    |
-| ----------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------- |
-| Space or K                                | Play or pause the preview                                                         | `playback.play`, `playback.pause` |
-| Left arrow or Right arrow                 | Move the playhead 5 seconds                                                       | `playback.seek`                   |
-| Shift + Left arrow or Shift + Right arrow | Move the playhead 1 second                                                        | `playback.seek`                   |
-| I or O                                    | Set the range start or end to the playhead                                        | None. This changes a form value.  |
-| Ctrl + Z                                  | Undo an edit                                                                      | `edit.undo`                       |
-| Ctrl + Shift + Z or Ctrl + Y              | Redo an edit                                                                      | `edit.redo`                       |
-| F                                         | Enter or leave fullscreen preview                                                 | `playback.fullscreen`             |
-| / or Ctrl + F                             | Go to the library search                                                          | None                              |
-| Delete or Backspace                       | Delete the selected element                                                       | `element.remove`                  |
-| Esc                                       | Cancel a drag, clear the search, leave fullscreen, or clear the element selection | `playback.fullscreen`             |
+| Key                                       | Action                                                                    | Shared command                      |
+| ----------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------- |
+| Space or K                                | Play or pause the preview                                                 | `playback.play`, `playback.pause`   |
+| Left arrow or Right arrow                 | Move the playhead 5 seconds                                               | `playback.seek`                     |
+| Shift + Left arrow or Shift + Right arrow | Move the playhead 1 second                                                | `playback.seek`                     |
+| I or O                                    | Set the range start or end to the playhead                                | None. This changes a form value.    |
+| Ctrl + Z                                  | Undo an edit                                                              | `edit.undo`                         |
+| Ctrl + Shift + Z or Ctrl + Y              | Redo an edit                                                              | `edit.redo`                         |
+| F                                         | Enter or leave fullscreen preview                                         | `playback.fullscreen`               |
+| / or Ctrl + F                             | Go to the library search                                                  | None                                |
+| Delete or Backspace                       | Delete the selected element or caption                                    | `element.remove`, `captions.delete` |
+| Esc                                       | Cancel a drag, clear the search, leave fullscreen, or clear the selection | `playback.fullscreen`               |
 
 ## Storage
 
@@ -168,7 +168,29 @@ node src/agent/cli.js edit.configure '{"id":"VIDEO_ID","fadeIn":1,"fadeOut":1}'
 node src/agent/cli.js element.list '{"id":"VIDEO_ID"}'
 ```
 
-See [timed elements](docs/editing.md) for the editor, coordinates, time rules, fades, properties, limits, and revisions. There are no crossfades between clips and no multiple tracks.
+See [timed elements](docs/editing.md) for the editor, coordinates, time rules, fades, properties, limits, and revisions.
+
+The only transition effects are an element fade in and fade out (an opacity change), and a video fade from black at the start and to black at the end, with the sound. There are no crossfades between clips, no wipes, and no multiple video tracks.
+
+## Captions
+
+Make captions from the English speech in a video. Speech recognition runs on this computer. In the editor, select Make captions from speech in the Captions section of the Edit video panel. The panel shows the progress, and Cancel stops the job. When recognition is complete, the captions are added as one undo step. Labels and shapes do not change.
+
+The Captions list below Layers shows each caption with its time and text. Select a caption to move the playhead to it and to show its text, start, and end in the panel. Correct the text, or use Use playhead to change a time. Check marks the captions where recognition was not sure of a word, or where a cut removed part of a word. Caption style for all captions sets the size, position, color, and an optional background band. Show captions turns the captions on or off in the preview and export. + Caption at playhead adds a caption by hand. Delete removes the selected caption. Remove all captions removes the track. Each change is one undo step.
+
+If the video has captions, Make new captions from speech asks you to confirm the replacement first. Only the selected range uses the times in Range, so the other captions stay. The confirmation shows the exact scope.
+
+Agents use the same commands:
+
+```powershell
+node src/agent/cli.js captions.generate '{"id":"VIDEO_ID","apply":true}'
+node src/agent/cli.js captions.status '{"jobId":"JOB_ID"}'
+node src/agent/cli.js captions.list '{"id":"VIDEO_ID","start":0,"end":30,"limit":50}'
+node src/agent/cli.js captions.update '{"id":"VIDEO_ID","cueId":"CUE_ID","text":"Click Save."}'
+node src/agent/cli.js captions.configure '{"id":"VIDEO_ID","background":"#000000","backgroundOpacity":0.55}'
+```
+
+See [captions](docs/editing.md#captions) for the cue rules, the commands, and the limits. Word times are estimates. Check the text before you export.
 
 Run `npm run practice:inspection` to test the workflow. It opens a separate app with a test library, makes a sample video, calls the CLI and MCP, and saves images and a JSON report under `.local`. The sample Save button changes position at source time 3. The practice then cuts source time 1 to 2 and sets speed to 0.5. The button changes position at edited time 4. The normal library stays unchanged.
 
@@ -176,7 +198,7 @@ Run `npm run practice:inspection` to test the workflow. It opens a separate app 
 
 Run `npm run setup:transcription` once to install local English speech recognition. Start the app, then use `transcript.start`, `transcript.status`, `transcript.read`, and `transcript.search`. Search results include edited timestamps for frame inspection. Speech jobs support cancellation, bounded reads, cached results, and cut-word warnings.
 
-See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. Captions from transcripts are not yet available.
+See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. To make captions from speech, see [Captions](#captions).
 
 ## MCP
 
@@ -202,27 +224,28 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 
 ## Commands
 
-| Task               | Commands                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| App state and view | `app.status`, `app.view`                                                                                                                   |
-| Capture selection  | `capture.sources`, `capture.devices`                                                                                                       |
-| Recording          | `recording.countdown`, `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail`    |
-| Library            | `library.list`, `library.get`, `library.import`, `library.rename`, `library.delete`                                                        |
-| Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                          |
-| Timed elements     | `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`; video fades with `edit.configure` |
-| Export             | `export.start`, `export.status`                                                                                                            |
-| Preview rendering  | `preview.start`, with job state from `export.status`                                                                                       |
-| Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                     |
-| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`            |
-| Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen`        |
+| Task               | Commands                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App state and view | `app.status`, `app.view`                                                                                                                                                                                      |
+| Capture selection  | `capture.sources`, `capture.devices`                                                                                                                                                                          |
+| Recording          | `recording.countdown`, `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail`                                                                       |
+| Library            | `library.list`, `library.get`, `library.revision`, `library.import`, `library.rename`, `library.delete`                                                                                                       |
+| Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                                                                                             |
+| Timed elements     | `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`; video fades with `edit.configure`                                                                    |
+| Export             | `export.start`, `export.status`                                                                                                                                                                               |
+| Preview rendering  | `preview.start`, with job state from `export.status`                                                                                                                                                          |
+| Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                                                                                        |
+| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`                                                                               |
+| Captions           | `captions.generate`, `captions.status`, `captions.cancel`, `captions.draft`, `captions.apply`, `captions.list`, `captions.update`, `captions.add`, `captions.delete`, `captions.configure`, `captions.remove` |
+| Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen`                                                                           |
 
 ## Code structure
 
-- `src/domain` has time-range edits, time conversion, timed elements, and the element render plan. It has no Electron or file-system dependencies.
+- `src/domain` has time-range edits, time conversion, timed elements, captions from words, and the render plans. It has no Electron or file-system dependencies.
 - `src/application` has command schemas, validation, and workflow state. It uses injected adapters.
 - `src/adapters` has file storage and FFmpeg operations.
 - `src/desktop` has Electron setup, capture, permissions, and IPC.
-- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. These three have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles.
+- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. `src/ui/caption-view.js` has the caption panel rules. These have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles. `src/ui/caption-editor.js` has the caption jobs, list, and panel.
 - `src/agent` has the local server, CLI, and MCP adapters.
 
 The command service serializes changes. Exports run as background jobs. Each export uses the edit state from the time the job starts.
@@ -243,4 +266,6 @@ The current agent execution session reports Windows capture access errors and pr
 
 The app uses Electron 45.2.1. It disables the Windows D3D11 camera capture path because that path caused the video capture service to stop during the combined camera and screen test. GPU rendering remains enabled.
 
-There is no cloud upload, hosted share link, or account system. Share an exported MP4 through a file-sharing method of your choice. Timed English transcripts are local.
+`test/caption-ui.test.js` uses the local speech engine and a short excerpt of a public tutorial video in `.local/transcript-validation`. It skips if the engine or the video is not on the computer. Other caption tests use word fixtures and do not need the engine.
+
+There is no cloud upload, hosted share link, or account system. Share an exported MP4 through a file-sharing method of your choice. Timed English transcripts and captions are local.

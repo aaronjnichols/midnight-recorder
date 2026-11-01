@@ -1,6 +1,6 @@
-// One history entry. Entries from before elements or video fades existed
-// have no such keys. Those states had none, so restore() reads them as empty
-// or 0.
+// One history entry. Entries from before elements, video fades, or captions
+// existed have no such keys. Those states had none, so restore() reads them
+// as empty, 0, or no captions.
 const snapshot = ({
   segments,
   speed,
@@ -8,6 +8,7 @@ const snapshot = ({
   elements = [],
   fadeIn = 0,
   fadeOut = 0,
+  captions = null,
 }) => ({
   segments: structuredClone(segments),
   speed,
@@ -15,6 +16,7 @@ const snapshot = ({
   elements: structuredClone(elements),
   fadeIn,
   fadeOut,
+  captions: structuredClone(captions),
 });
 const restore = (timeline, state) => ({
   ...timeline,
@@ -24,6 +26,7 @@ const restore = (timeline, state) => ({
   elements: state.elements ?? [],
   fadeIn: state.fadeIn ?? 0,
   fadeOut: state.fadeOut ?? 0,
+  captions: state.captions ?? null,
 });
 
 export const MAX_VIDEO_FADE = 10;
@@ -74,7 +77,8 @@ export function isEdited(timeline, sourceDuration) {
     !timeline.muted &&
     !timeline.elements?.length &&
     !timeline.fadeIn &&
-    !timeline.fadeOut
+    !timeline.fadeOut &&
+    !timeline.captions
   );
 }
 
@@ -83,11 +87,22 @@ export function withElements(timeline, elements) {
   return change(timeline, { elements });
 }
 
+// Replace the caption track (or null) and record one history entry.
+export function withCaptions(timeline, captions) {
+  return change(timeline, { captions });
+}
+
+// Undo keeps the latest steps. Each step stores a full copy of the edit
+// state, including captions, so a limit keeps the library file and its
+// reads bounded.
+export const MAX_HISTORY = 100;
+const remember = (past, state) => [...past, state].slice(-MAX_HISTORY);
+
 function change(timeline, value) {
   return {
     ...timeline,
     ...value,
-    past: [...timeline.past, snapshot(timeline)],
+    past: remember(timeline.past, snapshot(timeline)),
     future: [],
   };
 }
@@ -132,7 +147,7 @@ export function redo(timeline) {
   if (!timeline.future.length) return timeline;
   return {
     ...restore(timeline, timeline.future[0]),
-    past: [...timeline.past, snapshot(timeline)],
+    past: remember(timeline.past, snapshot(timeline)),
     future: timeline.future.slice(1),
   };
 }
@@ -161,15 +176,17 @@ export function configure(
   return change(timeline, { speed, muted, fadeIn, fadeOut });
 }
 
+export const RESET_SCOPES = ["all", "timeline", "elements", "captions"];
+
 // Return to the original video. Scope "timeline" resets segments, speed,
-// mute, and video fades. Scope "elements" removes all elements. Scope "all"
-// does both.
+// mute, and video fades. Scope "elements" removes all labels and shapes.
+// Scope "captions" removes the captions. Scope "all" does all of these.
 export function reset(timeline, sourceDuration, scope = "all") {
-  if (!["all", "timeline", "elements"].includes(scope))
-    throw new Error("Invalid scope. Use all, timeline, or elements.");
+  if (!RESET_SCOPES.includes(scope))
+    throw new Error("Invalid scope. Use all, timeline, elements, or captions.");
   const fresh = createTimeline(sourceDuration);
   const value = {};
-  if (scope !== "elements")
+  if (scope === "all" || scope === "timeline")
     Object.assign(value, {
       segments: fresh.segments,
       speed: fresh.speed,
@@ -177,7 +194,8 @@ export function reset(timeline, sourceDuration, scope = "all") {
       fadeIn: 0,
       fadeOut: 0,
     });
-  if (scope !== "timeline") value.elements = [];
+  if (scope === "all" || scope === "elements") value.elements = [];
+  if (scope === "all" || scope === "captions") value.captions = null;
   return change(timeline, value);
 }
 
