@@ -502,8 +502,8 @@
             >
               <h3 class="tool-title">Trim &amp; cut</h3>
               <p class="hint">
-                Drag on the timeline to select a part of the video. Drag the
-                gold handles to change it.
+                Drag on the timeline, or use Set start and Set end above it.
+                Drag the gold handles to change the selection.
               </p>
               <div class="two-cols">
                 <div class="field">
@@ -514,37 +514,14 @@
                     value="0"
                     min="0"
                     step="0.01"
-                  /><button
-                    id="range-start-now"
-                    class="text-button small"
-                    aria-label="Set selection start to the playhead"
-                    aria-keyshortcuts="I"
-                  >
-                    Set to playhead <kbd aria-hidden="true">I</kbd>
-                  </button>
+                  />
                 </div>
                 <div class="field">
                   <label for="range-end">Selection end, s</label
-                  ><input
-                    type="number"
-                    id="range-end"
-                    min="0"
-                    step="0.01"
-                  /><button
-                    id="range-end-now"
-                    class="text-button small"
-                    aria-label="Set selection end to the playhead"
-                    aria-keyshortcuts="O"
-                  >
-                    Set to playhead <kbd aria-hidden="true">O</kbd>
-                  </button>
+                  ><input type="number" id="range-end" min="0" step="0.01" />
                 </div>
               </div>
-              <p
-                id="range-summary"
-                class="range-summary"
-                aria-live="polite"
-              ></p>
+              <p id="range-summary" class="range-summary"></p>
               <dl class="action-legend">
                 <div>
                   <dt>
@@ -1334,6 +1311,11 @@
           </div>
         </section>
         <section class="timeline-dock" aria-label="Timeline">
+          <p
+            id="selection-status"
+            class="visually-hidden"
+            aria-live="polite"
+          ></p>
           <div class="dock-bar">
             <div class="dock-transport">
               <button
@@ -1354,15 +1336,20 @@
               >
             </div>
             <div class="dock-selection">
-              <p id="range-hint" class="range-hint"></p>
+              <p
+                id="range-hint"
+                class="range-hint"
+                title="Drag on the timeline to select a part. Or move the playhead, then use Set start and Set end (keys I and O)."
+              ></p>
               <div id="selection-group" class="selection-group" hidden>
                 <button
                   id="selection-chip"
                   type="button"
                   class="selection-chip"
-                  title="Open Trim &amp; cut to change the exact times"
                   hidden
-                ></button
+                >
+                  <span class="selection-word">Selection </span
+                  ><span id="selection-times"></span></button
                 ><button
                   id="selection-clear"
                   type="button"
@@ -1373,6 +1360,32 @@
                   <svg class="icon" aria-hidden="true">
                     <use href="#i-close" />
                   </svg>
+                </button>
+              </div>
+              <div class="dock-marks">
+                <button
+                  id="range-start-now"
+                  type="button"
+                  class="dock-mark"
+                  aria-label="Set start of the selection to the playhead"
+                  aria-describedby="range-summary"
+                  aria-keyshortcuts="I"
+                  title="Set the selection start to the playhead. Shortcut: I"
+                >
+                  <span class="dock-mark-label">Set start</span>
+                  <kbd aria-hidden="true">I</kbd>
+                </button>
+                <button
+                  id="range-end-now"
+                  type="button"
+                  class="dock-mark"
+                  aria-label="Set end of the selection to the playhead"
+                  aria-describedby="range-summary"
+                  aria-keyshortcuts="O"
+                  title="Set the selection end to the playhead. Shortcut: O"
+                >
+                  <span class="dock-mark-label">Set end</span>
+                  <kbd aria-hidden="true">O</kbd>
                 </button>
               </div>
               <button

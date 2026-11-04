@@ -869,26 +869,35 @@ function renderRange() {
   if (!selectedVideo) return;
   const { start, end, valid, full, maximum } = checkRange();
   const summary = $("#range-summary");
+  const length = `${(end - start).toFixed(2)} s long`;
   // The summary is in Trim & cut and tells why the actions are not available.
   summary.classList.toggle("invalid", !valid || full);
   summary.textContent = !valid
     ? `Set an end time after the start time. The maximum is ${maximum}.`
     : full
-      ? "The selection is the full video. Drag on the timeline, press I and O at the playhead, or type the times."
-      : `Selection: ${start.toFixed(2)} s to ${end.toFixed(2)} s, ${(end - start).toFixed(2)} s long.`;
+      ? "The selection is the full video. Drag on the timeline, use Set start and Set end (keys I and O), or type the times."
+      : `Selection: ${start.toFixed(2)} s to ${end.toFixed(2)} s, ${length}.`;
+  // The dock buttons work in every tool, so the dock tells a screen reader.
+  $("#selection-status").textContent = summary.textContent;
   const usable = valid && !full;
   $("#trim").disabled = !usable;
   $("#cut").disabled = !usable;
   $("#range-hint").hidden = usable;
   $("#range-hint").textContent = valid
-    ? "Drag on the timeline to select a part."
+    ? "Drag on the timeline, or use Set start and Set end."
     : "The end must be after the start.";
   // The dock shows the selection in every tool. Its button opens Trim & cut.
+  // A small window shows only the times. The tip and the name have all of it.
   const chip = $("#selection-chip");
   chip.hidden = !usable;
   $("#selection-group").hidden = !usable;
-  if (usable)
-    chip.textContent = `Selection ${start.toFixed(2)} to ${end.toFixed(2)} s`;
+  if (usable) {
+    const times = `${start.toFixed(2)} to ${end.toFixed(2)} s`;
+    const detail = `Selection ${times}, ${length}. Open Trim & cut to change the exact times.`;
+    $("#selection-times").textContent = times;
+    chip.title = detail;
+    chip.setAttribute("aria-label", detail);
+  }
   timeline.renderRange();
 }
 for (const id of ["#range-start", "#range-end"])

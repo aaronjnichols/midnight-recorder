@@ -234,3 +234,40 @@ Limits:
 - More than two overlapping elements share a lane row without their names. Layers lists all of them.
 - There is no stitch, no second video track, no crop, no generated voice, and no background effect. These were not requested.
 - This pass does not change the open desktop capture and physical device checks above.
+
+## Set start and Set end on the dock
+
+A user asked for buttons in place of only the keys I and O. Set to playhead was only in Trim & cut, so the other four tools had only the keys.
+
+Set start and Set end are now on the dock row, beside Keep and Remove, in every tool. They use the same handlers and the same draft selection. There is no new command, no new media operation, and no change to the edit rules. Keep and Remove are still the only edits. I and O stay as optional keys. The exact fields stay in Trim & cut. Fullscreen hides the buttons. The buttons are not available until the preview is ready, as before.
+
+Other changes:
+
+- The buttons stay at the right of the free space. The first click makes the selection show, and the next button does not move under the pointer.
+- Under 1200 px, the selection button shows only the times, and the buttons do not show the keys. The tip and the accessible name of the selection button have the times, the length, and what it does. The tip of each button has its key.
+- The accessible names start with the visible labels: "Set start of the selection to the playhead" and "Set end of the selection to the playhead".
+- The live selection text moved from Trim & cut to the dock. The buttons work in tools where Trim & cut is hidden, and a hidden live region is not read.
+- The instructions in the dock and in Trim & cut name the buttons. The first longer text made the inspector scroll by 1 px at 1000 × 720. A test found this, and a shorter text removed the scroll.
+
+| Measured                    | 66cc4bf at 1000 × 720 | Now at 1000 × 720 | 66cc4bf at 1440 × 940 | Now at 1440 × 940 |
+| --------------------------- | --------------------- | ----------------- | --------------------- | ----------------- |
+| Video area                  | 643 × 363.5           | 643 × 363.5       | 1019 × 560.4          | 1019 × 560.4      |
+| Dock height                 | 209.5                 | 209.5             | 232.6                 | 232.6             |
+| Control row height          | 44                    | 44                | 44                    | 44                |
+| Inspector scroll, Trim tool | 0                     | 0                 | 0                     | 0                 |
+
+At 1000 × 720 with a video of more than one hour and the selection 1234.56 to 3456.78 s, the selection button is 126 px wide and 37 px of the row stay free. A selection with more digits can show an ellipsis in the selection button only. The test did not measure this case. Set start, Set end, Keep, and Remove do not shrink.
+
+Tests:
+
+- `test/dock-selection-buttons.test.js` has 4 tests. They use real clicks. The first test uses all five tools at 1000 × 720 and 1440 × 940. It checks the exact draft, that a selection sends no edit command and adds no history or new preview, and that the video and dock sizes do not change. It also checks Keep and Remove, with the exact stored segments, one command, and one undo step, at both sizes. The other tests check short and hour-long selections, the instructions, an end before the start, I and O, the preview-not-ready state, the exact end at 1.5x speed, and fullscreen. A check looks for hidden, cut, covered, or overlapping controls on the row.
+- All 4 tests failed first, because the buttons were not on the dock: `.local/loom-buttons/logs/01-red.log`. That run also showed an error in the test. Corner points missed the round Play button, so the test now uses points inside the shape. Play did not change. The inspector scroll failed first too: `.local/loom-buttons/logs/04-red-inspector-scroll.log`.
+- Targeted run, in sequence: 94 tests in 16 files. All passed, none failed, and none were skipped, in 524 seconds: `.local/loom-buttons/logs/06-ui-regression.log`. The files are the new test, `editor-navigation`, `editor-workspace`, `ui`, `timeline-lanes`, `editor-ui`, `element-ui`, `caption-ui`, `caption-ui-review`, `late-result-ui`, `timeline-visual`, `visual`, `ui-view-model`, `timeline-view`, `ui-captions`, and `ui-stage`.
+- Seven mutations, each with one behavior removed, all made the new test fail: `.local/loom-buttons/logs/07-mutations.log`.
+- Earlier tests changed only for the new copy: two accessible names in `editor-navigation`, the visible selection text at 1000 × 720 in `editor-workspace`, which also now checks the accessible name, and one comment in `ui`.
+
+After the 94 test run, Prettier changed only the format of `src/ui/index.html` and the new test file. The 94 tests were not run again after this. The only later test runs are the seven mutation runs, which use changed source and a selected test. The 300 tests of the last full `npm test` run were not run again. Media, speech, and recording test files were not run for this change.
+
+Two independent reviews, of the function and of the screenshots, gave no findings: `.local/loom-buttons/review-inbox.md`.
+
+Screenshots at 1440 × 940 and 1000 × 720: `output/playwright/loom-buttons`. They show a selection in all five tools, short and hour-long selections, and a long video with no selection. The instruction and an end before the start are at 1000 × 720. They were inspected. A mutation run replaced `short-selection-1000.png` and `long-no-selection-1000.png`, so these two were taken again from the restored source with `.local/loom-buttons/recapture.mjs`.

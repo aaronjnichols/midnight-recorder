@@ -261,8 +261,13 @@ test(
     near(start, 2, 0.03, "Start");
     near(end, 5, 0.03, "End");
     assert.equal(await remove.isEnabled(), true);
+    // A small window shows only the times. The name has all of the words.
     assert.match(
       await page.locator("#selection-chip").innerText(),
+      /^\d\.\d\d to \d\.\d\d s/,
+    );
+    assert.match(
+      await page.locator("#selection-chip").getAttribute("aria-label"),
       /^Selection \d\.\d\d to \d\.\d\d s/,
     );
     assert.deepEqual(await editLog(forward), [], "A draft sends no edit.");

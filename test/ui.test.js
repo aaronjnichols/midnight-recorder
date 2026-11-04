@@ -387,7 +387,7 @@ test(
       "Keep range must accept the playhead end.",
     );
 
-    // The Use playhead button sets the same end.
+    // The Set end button sets the same end.
     await page.locator("#range-end").fill("3");
     await page.locator("#range-end-now").click();
     assert.equal(Number(await page.locator("#range-end").inputValue()), end);

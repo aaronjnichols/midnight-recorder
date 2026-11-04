@@ -159,13 +159,13 @@ test(
         [
           "set start",
           page.getByRole("button", {
-            name: "Set selection start to the playhead",
+            name: "Set start of the selection to the playhead",
           }),
         ],
         [
           "set end",
           page.getByRole("button", {
-            name: "Set selection end to the playhead",
+            name: "Set end of the selection to the playhead",
           }),
         ],
         ["keep", keep],
@@ -270,8 +270,8 @@ test(
       "No undo 3.",
     );
 
-    // A fractional end at 1.5x speed: Set to playhead at the end gives the
-    // exact end. Speed is in Speed & sound.
+    // A fractional end at 1.5x speed: Set end at the end gives the exact end.
+    // Speed is in Speed & sound.
     await tab(page, "Speed & sound").click();
     await page.getByLabel("Playback speed").selectOption("1.5");
     await until(
@@ -288,7 +288,7 @@ test(
       "No seek to the end.",
     );
     await page
-      .getByRole("button", { name: "Set selection end to the playhead" })
+      .getByRole("button", { name: "Set end of the selection to the playhead" })
       .click();
     await field(page, "Selection start").fill("1");
     const kept = (await stored(call, video.id)).past.length;

@@ -1388,35 +1388,44 @@ body.editing .topbar {
   margin: 0 5px;
   color: var(--selection);
 }
+/* The buttons stay at the right, so a new selection does not move them under
+   the pointer. The instruction and the selection use the space to the left. */
 .dock-selection {
   display: flex;
   flex: 1;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
 }
 .range-hint {
+  display: -webkit-box;
   min-width: 0;
   margin: 0;
   overflow: hidden;
   font-size: 12px;
+  line-height: 15px;
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: right;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .selection-group {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
+  min-width: 0;
   height: 28px;
   border: 1px solid #ebcb8b66;
   border-radius: 6px;
   background: #ebcb8b14;
 }
 .selection-chip {
+  min-width: 0;
   height: 100%;
   padding: 0 4px 0 10px;
+  overflow: hidden;
   border: 0;
   border-radius: 5px 0 0 5px;
   background: transparent;
@@ -1424,10 +1433,12 @@ body.editing .topbar {
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .selection-clear {
   display: grid;
+  flex: none;
   place-items: center;
   width: 24px;
   height: 100%;
@@ -1444,6 +1455,37 @@ body.editing .topbar {
 .selection-chip:hover,
 .selection-clear:hover {
   background: #ebcb8b1f;
+}
+/* Set start and Set end only change the draft. Keep and Remove have the gold
+   color, because they are the edits. */
+.dock-marks {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.dock-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dock-mark:hover:not(:disabled) {
+  background: #ffffff12;
+}
+.dock-mark kbd {
+  min-width: 16px;
+  margin: 0;
+  padding: 0 3px;
+  font-size: 10px;
 }
 .dock-action {
   display: inline-flex;
@@ -1929,12 +1971,6 @@ body.editing .topbar {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
-}
-.field kbd {
-  min-width: 16px;
-  margin: 0;
-  padding: 0 3px;
-  font-size: 10px;
 }
 .range-summary {
   margin: 0;
@@ -2423,7 +2459,9 @@ body.editing .topbar {
   }
 }
 @media (max-width: 1199px) {
-  .toolbar-label {
+  .toolbar-label,
+  .selection-word,
+  .dock-mark kbd {
     display: none;
   }
 }
