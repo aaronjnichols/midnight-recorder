@@ -52,6 +52,8 @@ Read nearby speech before acting on a phrase. For example, a search for a button
 
 `captions.generate` uses the same speech engine and cache. A caption job is also a transcript job, so `transcript.read` and `transcript.search` work with its `jobId`. Captions use all recognized words and the current edits, not one read window. See [captions](editing.md#captions) for the cue rules, commands, and limits.
 
+`transcript.words`, `transcript.selection`, and `transcript.cut` use a complete job with the current edits, so they need no new recognition after a cut, undo, or speed change. See [cut by words](editing.md#cut-by-words).
+
 If the engine is not set up, `captions.generate` fails with this message: "Speech recognition is not set up on this computer. Run npm run setup:transcription in the app folder, then start the app again." The editor shows the same guidance and lets you add captions by hand. A video without sound gives the state `no_audio`. Audio without speech gives `no_speech`. In these cases nothing changes.
 
 Optional `vocabulary` contains known names or terms. It allows 50 terms, 80 characters per term, and 1000 total characters. Hints can change recognition. The cache keeps each hint set separate. Results state the hint set and engine fingerprint. Keep an unhinted result if you need to compare them.

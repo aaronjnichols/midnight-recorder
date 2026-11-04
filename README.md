@@ -25,13 +25,17 @@ Use Import video to add an existing MP4, WebM, MOV, or MKV file. The app copies 
 
 Type in Search by title to find a video. The library count always shows all videos. If no title matches, select Clear search. An Edited label shows on a video that has edits.
 
-Open a video to edit it. The editor fills the window, and the page does not scroll. The top bar has Library, the title, the save and preview state, Undo, Redo, and Export MP4. The Add buttons are above the video. The inspector is to the right of the video, and the tool rail is at the far right. The tools are **Trim & cut**, **Text & shapes**, **Captions**, **Speed & sound**, and **Details**. A video opens with Trim & cut. The timeline is below the video and is as wide as the window.
+Open a video to edit it. The editor fills the window, and the page does not scroll. The top bar has Library, the title, the save and preview state, Undo, Redo, and Export MP4. The Add buttons are above the video. The inspector is to the right of the video, and the tool rail is at the far right. The tools are **Trim & cut**, **Transcript**, **Text & shapes**, **Captions**, **Speed & sound**, and **Details**. A video opens with Trim & cut. The timeline is below the video and is as wide as the window.
 
 To trim or cut, drag on the timeline to select a part of the video. Drag a gold handle to change the selection, or drag the selection to move it. A drag changes only the draft selection. The video does not change until you select an action. **Keep** (Keep only the selection) removes the video before and after the selection. **Remove** (Remove the selection) removes it and joins the parts around it. Each is one undo step. Esc during a drag restores the earlier selection. After a drag, Esc first clears a selected element or caption. If none is selected, Esc clears the selection on the timeline. The X beside the selection also clears it.
 
 You can also use buttons, in every tool. Move the playhead, then select **Set start** or **Set end** beside Keep and Remove. These buttons change only the draft selection. The keys I and O do the same, and you do not have to use them. To type exact times, use the fields in Trim & cut. With a handle in focus, the arrow keys move it 0.1 seconds, and Shift with an arrow key moves it 1 second. All times refer to the current edited video. The fields show two decimals. At some speeds, the edited end has more decimals. For example, a 10 second video at 1.5x speed ends at 6.666... seconds. A handle at the end of the track, a playhead at the end, or an end value up to 0.005 seconds after the end selects the exact end.
 
-The timeline has a time ruler, the kept parts of the video, real frames, a real sound wave, the playhead, the selection, and one bar for each element and caption. Select a point on the ruler or the track to move the playhead, or drag the ruler. Use Zoom in, Zoom out, and Fit, or hold Ctrl and turn the mouse wheel over the timeline. A selection shows in every tool, and its button opens Trim & cut. The selection stays when you change elements or captions. A trim, cut, or speed change resets it. Speed, mute, and the video fades are in Speed & sound and also apply to export. The title, the Exports list, the keyboard shortcuts, Reset all edits, and Delete video are in Details. Undo, Redo, and Reset all edits keep the source file unchanged. A tool change does not change the video or the undo history.
+To divide the video, move the playhead, then select **Split at playhead**, or press S. A split removes no time and does not change the rendered video, elements, or captions. It shows as a pale blue line on the track. Select a part on the track, or in the Parts list of Trim & cut, then use Keep or Remove. Each split and each Keep or Remove is one undo step. See [split and parts](docs/editing.md#split-and-parts).
+
+To cut by words, open **Transcript** and select **Make transcript**. Speech recognition runs on this computer. Drag across words to select them. The time range shows in gold on the timeline. **Cut selected words** removes that footage as one undo step. Word times are estimates. Play the join after each cut. If a part of a word stays, undo the cut, widen the gold selection, then select Remove. See [cut by words](docs/editing.md#cut-by-words).
+
+The timeline has a time ruler, the kept parts of the video, real frames, a real sound wave, the playhead, the selection, and one bar for each element and caption. Select a point on the ruler or the track to move the playhead, or drag the ruler. If the video has two or more parts and no manual selection, a click on the track also selects the part. Use Zoom in, Zoom out, and Fit, or hold Ctrl and turn the mouse wheel over the timeline. A selection shows in every tool, and its button opens Trim & cut. The selection stays when you change elements or captions. A trim, cut, or speed change resets it. Speed, mute, and the video fades are in Speed & sound and also apply to export. The title, the Exports list, the keyboard shortcuts, Reset all edits, and Delete video are in Details. Undo, Redo, and Reset all edits keep the source file unchanged. A tool change does not change the video or the undo history.
 
 The frames and the sound wave on the track come from the source video, mapped through your cuts and speed. They do not show text, shapes, or captions. The rendered preview above the timeline shows those. The track tells you when the app reads the source, when a video has no sound, when the sound is silent or muted, or when a read failed. Retry reads the source again. Trimming works in all of these states. See [timeline overview](docs/editing.md#timeline-overview).
 
@@ -51,6 +55,7 @@ Editor keys do not operate when a text field or a list has focus. A key that you
 | Left arrow or Right arrow                 | Move the playhead 5 seconds                                               | `playback.seek`                     |
 | Shift + Left arrow or Shift + Right arrow | Move the playhead 1 second                                                | `playback.seek`                     |
 | I or O                                    | The same as Set start or Set end, in any tool                             | None. This changes a form value.    |
+| S                                         | Split at the playhead                                                     | `edit.split`                        |
 | + or -                                    | Zoom the timeline in or out                                               | None. This changes the page view.   |
 | 0                                         | Fit the video in the timeline                                             | None. This changes the page view.   |
 | Ctrl + Z                                  | Undo an edit                                                              | `edit.undo`                         |
@@ -59,6 +64,8 @@ Editor keys do not operate when a text field or a list has focus. A key that you
 | / or Ctrl + F                             | Go to the library search                                                  | None                                |
 | Delete or Backspace                       | Delete the selected element or caption of the open tool                   | `element.remove`, `captions.delete` |
 | Esc                                       | Cancel a drag, clear the search, leave fullscreen, or clear the selection | `playback.fullscreen`               |
+
+When the words of the Transcript tool have focus, the arrow keys move a word caret. Up and Down go to the next paragraph. Shift with an arrow key selects words. Enter moves the playhead to the word. Esc clears the word selection. Delete does not cut words. Tab goes to Cut selected words.
 
 ## Storage
 
@@ -212,6 +219,8 @@ Run `npm run practice:inspection` to test the workflow. It opens a separate app 
 
 Run `npm run setup:transcription` once to install local English speech recognition. Start the app, then use `transcript.start`, `transcript.status`, `transcript.read`, and `transcript.search`. Search results include edited timestamps for frame inspection. Speech jobs support cancellation, bounded reads, cached results, and cut-word warnings.
 
+`transcript.read` and `transcript.search` use the edits from the start of the job, and they report `stale`. `transcript.words` reads the same result through the current edits, so a cut, undo, or speed change needs no new recognition. `transcript.selection` previews a word range. `transcript.cut` removes it as one undo step. See [cut by words](docs/editing.md#cut-by-words).
+
 See [setup and agent instructions](docs/transcription.md) and [tests on downloaded public videos](docs/transcription-validation.md). Audio stays on this computer. Word times and text are estimates. To make captions from speech, see [Captions](#captions).
 
 ## MCP
@@ -245,22 +254,23 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | Recording          | `recording.countdown`, `recording.start`, `recording.pause`, `recording.resume`, `recording.stop`, `recording.cancel`, `recording.fail`                                                                       |
 | Library            | `library.list`, `library.get`, `library.revision`, `library.import`, `library.rename`, `library.delete`                                                                                                       |
 | Editing            | `edit.trim`, `edit.cut`, `edit.configure`, `edit.undo`, `edit.redo`, `edit.reset`                                                                                                                             |
+| Split and parts    | `edit.split`, `edit.unsplit`, `edit.keepPart`, `edit.removePart`, `parts.list`                                                                                                                                |
 | Timed elements     | `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`; video fades with `edit.configure`                                                                    |
 | Export             | `export.start`, `export.status`                                                                                                                                                                               |
 | Preview rendering  | `preview.start`, with job state from `export.status`                                                                                                                                                          |
 | Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                                                                                        |
 | Timeline overview  | `overview.start`, `overview.cancel`, `overview.result`, with job state from `export.status`                                                                                                                   |
-| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`                                                                               |
+| Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`, `transcript.words`, `transcript.selection`, `transcript.cut`                 |
 | Captions           | `captions.generate`, `captions.status`, `captions.cancel`, `captions.draft`, `captions.apply`, `captions.list`, `captions.update`, `captions.add`, `captions.delete`, `captions.configure`, `captions.remove` |
 | Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen`                                                                           |
 
 ## Code structure
 
-- `src/domain` has time-range edits, time conversion, timed elements, captions from words, the render plans, and the overview plan and mapping. It has no Electron or file-system dependencies.
+- `src/domain` has time-range edits, split marks and parts, time conversion, timed elements, human words and their current view, captions from words, the render plans, and the overview plan and mapping. It has no Electron or file-system dependencies.
 - `src/application` has command schemas, validation, and workflow state. It uses injected adapters.
 - `src/adapters` has file storage and FFmpeg operations. `src/adapters/overview.js` reads the sound levels and frames of a source.
 - `src/desktop` has Electron setup, capture, permissions, and IPC.
-- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. `src/ui/caption-view.js` has the caption panel rules. These have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/timeline-view.js` has the timeline rules: pixels and times, zoom, the ruler, drags, snapping, and lanes. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles. `src/ui/caption-editor.js` has the caption jobs, list, and panel. `src/ui/tools.js` has the editing tool rail. `src/ui/timeline.js` has the timeline dock and its pointer gestures. `src/ui/timeline-overview.js` loads the overview of the open video.
+- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. `src/ui/caption-view.js` has the caption panel rules. `src/ui/transcript-view.js` has the Transcript and Parts rules. These have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/timeline-view.js` has the timeline rules: pixels and times, zoom, the ruler, drags, snapping, and lanes. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles. `src/ui/caption-editor.js` has the caption jobs, list, and panel. `src/ui/transcript-editor.js` has the speech job, the words, and the word selection. `src/ui/parts-panel.js` has the Parts list. `src/ui/range-player.js` plays a selection and stops at its end. `src/ui/tools.js` has the editing tool rail. `src/ui/timeline.js` has the timeline dock and its pointer gestures. `src/ui/timeline-overview.js` loads the overview of the open video.
 - `src/agent` has the local server, CLI, and MCP adapters.
 
 The command service serializes changes. Exports run as background jobs. Each export uses the edit state from the time the job starts.
@@ -281,6 +291,6 @@ The current agent execution session reports Windows capture access errors and pr
 
 The app uses Electron 45.2.1. It disables the Windows D3D11 camera capture path because that path caused the video capture service to stop during the combined camera and screen test. GPU rendering remains enabled.
 
-`test/caption-ui.test.js` uses the local speech engine and a short excerpt of a public tutorial video in `.local/transcript-validation`. It skips if the engine or the video is not on the computer. Other caption tests use word fixtures and do not need the engine.
+`test/caption-ui.test.js` and three tests of `test/transcript-ui.test.js` use the local speech engine and a short excerpt of a public tutorial video in `.local/transcript-validation`. They skip if the engine or the video is not on the computer. Other caption and transcript tests use word fixtures and do not need the engine.
 
 There is no cloud upload, hosted share link, or account system. Share an exported MP4 through a file-sharing method of your choice. Timed English transcripts and captions are local.

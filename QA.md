@@ -271,3 +271,72 @@ After the 94 test run, Prettier changed only the format of `src/ui/index.html` a
 Two independent reviews, of the function and of the screenshots, gave no findings: `.local/loom-buttons/review-inbox.md`.
 
 Screenshots at 1440 × 940 and 1000 × 720: `output/playwright/loom-buttons`. They show a selection in all five tools, short and hour-long selections, and a long video with no selection. The instruction and an end before the start are at 1000 × 720. They were inspected. A mutation run replaced `short-selection-1000.png` and `long-no-selection-1000.png`, so these two were taken again from the restored source with `.local/loom-buttons/recapture.mjs`.
+
+## Split, word cuts, and the Loom reference pass
+
+Baseline 576500f. The backend is commit 49c4029. Evidence index: `.local/loom-next/evidence.md`. Logs: `.local/loom-next/logs`. Screenshots: `output/playwright/loom-next`. Media: "First Steps", Mike Newbon, Blender Studio, CC-BY.
+
+Added:
+
+- Split at playhead: a persistent mark, one undo step, with parts that you can select, keep, remove, or join. It uses source-anchored metadata beside `timeline.segments`, so it is not in the render, the preview key, or the transcript and caption maps.
+- The Transcript tool: real local speech, native text selection over wrapped lines, keys, copy, Play selection, and Cut selected words.
+- `edit.split`, `edit.unsplit`, `edit.keepPart`, `edit.removePart`, `parts.list`, `transcript.words`, `transcript.selection`, and `transcript.cut`, in the shared service, so also in the CLI and MCP.
+- `structureRevision` in `library.revision`. The undo count alone does not show an external split when the history is full.
+- A visual pass against the Loom references: a wider inspector at large sizes, a pale blue playhead, a clear active tool, calmer surfaces. The Midnight colors and own icons stay. No Loom asset is in the app.
+
+| Measured                | 576500f at 1000 × 720 | Now at 1000 × 720 | 576500f at 1440 × 940 | Now at 1440 × 940 |
+| ----------------------- | --------------------- | ----------------- | --------------------- | ----------------- |
+| Video area              | 643 × 364             | 643 × 364         | 1019 × 560            | 1003 × 560        |
+| Dock height             | 210                   | 210               | 233                   | 233               |
+| Control row height      | 44                    | 44                | 44                    | 44                |
+| Page scroll             | 0                     | 0                 | 0                     | 0                 |
+| Transcript words height | none                  | 254               | none                  | 449               |
+
+At 1440 × 940 the video area is 16 px narrower. A 16:9 video there is limited by the 560 px height, so its picture size does not change.
+
+Proof that a split changes no output: `test/split-render.test.js` renders the same edits with and without marks, at speed 1.25, with marks off the 30 fps grid. The decoded frame hashes and sound hashes are the same. The preview path, `editRevision`, and `timingRevision` are also the same.
+
+Real trial through the desktop UI, on a 45 second clip (`.local/loom-next/trial-report.json`):
+
+- A mouse selection of an 18 word sentence, 2.98 to 8.58 s. Play selection stopped at 8.58 s. Cut selected words sent one `transcript.cut` and no `edit.cut`, as one history step. Undo and Redo returned the same segments.
+- A label, a caption, speed 1.25, two splits at fractional times with no new preview, and a selected part removed with Remove.
+- The export is 26.333333 s. The expected length is 26.310124 s. The difference is less than one frame.
+- Frames near both joins differ from the expected source frames by 0.29 to 0.50 of 255. They differ from the removed footage by 38.84 and 60.73. This second number is the negative control.
+- The label and the caption show in the exported frames. A new recognition of the export does not have the removed sentence. The source hashes did not change.
+
+The parent ran the same commands through the real CLI and MCP with the real engine, in an isolated service: `.local/loom-next/parent-agent-trial.json`. That trial cut one word, refused an old revision, used undo and redo, a fractional split, parts, and an export within one frame.
+
+Limit found by the trial: word times are estimates, and a word cut can leave a short part of a word. At the first join a new recognition of the export heard an extra word, "Ladies,". The app does not pad a cut, because the range is defined as first kept start to last kept end.
+
+Sound levels in 40 ms windows (`.local/loom-next/boundary-audio.json`) suggest the reason. These numbers are estimates inferred from sound levels. They are not exact speech boundaries. Sound rises near 2.84 s, and the word start estimate is 2.98 s. Sound continues to about 8.78 s, and the word end estimate is 8.58 s. So about 0.14 s and 0.2 s of sound can stay at the join.
+
+A control then used one clip and the real engine, with no Electron app (`.local/loom-next/control-report.json`). The earlier wider trial (`trial-widen-report.json`) used speed 1 and a shorter clip, so it did not separate the range from the speed. In the control, only the range and the speed change:
+
+| Range                             | Speed 1          | Speed 1.25       |
+| --------------------------------- | ---------------- | ---------------- |
+| Exact word range, 2.98 to 8.58 s  | Extra: "Please." | Extra: "Ladies," |
+| Wider manual range, 2.82 to 8.8 s | No extra word    | No extra word    |
+
+So the extra word follows the range, not the speed, in this test. The wider range no longer gave the extra recognized word. This is a recognition result for one sentence of one clip. It does not prove a clean join to the ear, and it does not give a general size for the error. No person listened to these joins. Play each join.
+
+Other limits:
+
+- A word selection is one contiguous range. There is no multiple selection.
+- The Transcript tool is English only, and the source can be at most 3600 seconds, the same as captions.
+- After an app restart, a transcript needs Make transcript again. The cache makes this fast, but the audio is read and hashed again.
+- Screenshots show portrait in the idle and reading states. No screenshot shows selected words on a portrait video.
+- `after-fullscreen-1440.png` is real fullscreen on a 1920 × 1080 monitor.
+- The real engine ran on this computer only, with the `small.en` model.
+
+Independent reviews found 13 issues, and each has a regression that failed first. Backend: an empty parts crash, the shortest part after rounding, tokens with spaces, the truncated flag, unverifiable source files, further clips of a partial caption, and source order after token expansion. UI: overlapping word times, a final seek after a stop, Stop that did not pause, seek ownership in Play selection, job adoption, and a cancelled drag of a word selection. Both reviews then closed all of them: `.local/loom-next/review-inbox.md`. One run (log 28) hung on a live timer in a test and was stopped. It is not evidence.
+
+Earlier tests changed only for the new tool and the new button: the tool lists, ArrowRight from Trim & cut, and `#split` in the dock check.
+
+Full suite: one `npm test`: 423 tests, 423 passed, 0 failed, 0 skipped, in 976 seconds, with a normal process exit: `.local/loom-next/logs/50-full.log`. This count includes the tests that use the real speech engine.
+
+Changes after that run, so that run does not cover them:
+
+- `src/ui/app.js` and `test/parts-ui.test.js`: a selected part now keeps its true number on the dock after an earlier split. Keep and Remove always used the correct part. Only the label was old. The new test failed first with "Part 2" (log 45). Then all 8 tests of `test/parts-ui.test.js` passed (log 46). The full suite did not run again, as the review asked.
+- README.md, QA.md, `docs/editing.md`, and `scripts/practice-transcription.mjs`. `npm test` does not read these files.
+
+Separate from the 13 findings: `scripts/practice-transcription.mjs` required exactly 6 transcript tools. The catalog now has 9, so `npm run practice:transcription` stopped before its workflow. It now checks for the named commands that it uses, and more tools are permitted. Against the real catalog, the old check fails with 9, and the new check passes: `.local/loom-next/logs/42-practice-catalog.log`. The practice script itself was not run again, because it starts its own app. The parent trial covers the real CLI and MCP path.

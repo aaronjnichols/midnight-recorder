@@ -23,6 +23,7 @@ const SIZES = [
 ];
 const TOOLS = [
   "Trim & cut",
+  "Transcript",
   "Text & shapes",
   "Captions",
   "Speed & sound",
@@ -94,6 +95,7 @@ const dockProblems = (page) =>
     };
     const problems = [];
     const names = {
+      "#split": "Split",
       "#range-start-now": "Set start",
       "#range-end-now": "Set end",
       "#trim": "Keep",

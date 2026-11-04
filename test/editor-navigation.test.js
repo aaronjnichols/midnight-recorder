@@ -16,6 +16,7 @@ import {
 const SHOTS = path.resolve("output/playwright/loom-redesign/tests");
 const TOOLS = [
   "Trim & cut",
+  "Transcript",
   "Text & shapes",
   "Captions",
   "Speed & sound",
@@ -338,7 +339,7 @@ test(
     }
     await tab(page, "Trim & cut").focus();
     await page.keyboard.press("ArrowRight");
-    assert.equal(await activeTool(page), "Text & shapes");
+    assert.equal(await activeTool(page), "Transcript");
     await page.keyboard.press("End");
     assert.equal(await activeTool(page), "Details");
     await page.keyboard.press("ArrowRight");

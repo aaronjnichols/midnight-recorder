@@ -354,6 +354,7 @@ export function shortcut(event, context) {
     if (!context.ready) return null;
     return { local: key === "i" ? "range-start" : "range-end" };
   }
+  if (key === "s") return context.ready ? { local: "split" } : null;
   if (key === "f")
     return {
       command: "playback.fullscreen",

@@ -150,6 +150,17 @@
         <path d="m10 3.5-7 4 7 4 7-4-7-4Z" />
         <path d="m3 12 7 4 7-4" />
       </symbol>
+      <symbol id="i-split" viewBox="0 0 20 20">
+        <path d="M10 3v14" />
+        <path d="M7 6.5H3.5v7H7M13 6.5h3.5v7H13" />
+      </symbol>
+      <symbol id="i-transcript" viewBox="0 0 20 20">
+        <path d="M4 5.5h12M4 10h12M4 14.5h7.5" />
+      </symbol>
+      <symbol id="i-follow" viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="2.25" />
+        <path d="M10 2.75v3M10 14.25v3M2.75 10h3M14.25 10h3" />
+      </symbol>
     </svg>
     <aside class="sidebar">
       <div class="brand">
@@ -546,7 +557,104 @@
                   </dd>
                 </div>
               </dl>
-              <p id="kept-parts" class="hint kept-parts"></p>
+              <section
+                id="parts"
+                class="parts"
+                aria-labelledby="parts-heading"
+                hidden
+              ></section>
+            </div>
+            <div
+              role="tabpanel"
+              id="tool-transcript"
+              class="tool-panel transcript-panel"
+              aria-labelledby="tab-transcript"
+              hidden
+            >
+              <div class="panel-head">
+                <h3 class="tool-title">Transcript</h3>
+                <button
+                  id="transcript-follow"
+                  type="button"
+                  class="text-button small with-icon"
+                  hidden
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-follow" />
+                  </svg>
+                  Follow playhead
+                </button>
+              </div>
+              <div id="transcript-state" class="state-card" data-tone="note">
+                <h4 id="transcript-state-title"></h4>
+                <p id="transcript-state-text"></p>
+                <progress
+                  id="transcript-progress"
+                  max="1"
+                  aria-label="Transcript progress"
+                  hidden
+                ></progress>
+                <div class="state-actions">
+                  <button
+                    id="transcript-start"
+                    type="button"
+                    class="button primary compact"
+                    hidden
+                  >
+                    Make transcript
+                  </button>
+                  <button
+                    id="transcript-cancel"
+                    type="button"
+                    class="button secondary compact"
+                    hidden
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+              <div
+                id="transcript-words"
+                class="transcript-words"
+                role="textbox"
+                aria-readonly="true"
+                aria-multiline="true"
+                aria-label="Transcript words. Arrow keys move, Shift and arrow keys select."
+                tabindex="0"
+                data-loaded="false"
+                hidden
+              ></div>
+              <div id="transcript-footer" class="transcript-footer" hidden>
+                <p
+                  id="transcript-selection"
+                  class="transcript-selection"
+                  aria-live="polite"
+                ></p>
+                <div class="transcript-actions">
+                  <button
+                    id="transcript-play"
+                    type="button"
+                    class="button secondary compact"
+                    aria-label="Play selection"
+                    title="Play selection"
+                  >
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#i-play" />
+                    </svg>
+                    <span class="transcript-play-label">Play</span>
+                  </button>
+                  <button
+                    id="transcript-cut"
+                    type="button"
+                    class="button edit compact"
+                  >
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#i-cut" />
+                    </svg>
+                    Cut selected words
+                  </button>
+                </div>
+              </div>
             </div>
             <div
               role="tabpanel"
@@ -1215,6 +1323,11 @@
                   <li><kbd>←</kbd><kbd>→</kbd> Move 5 s</li>
                   <li><kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> Move 1 s</li>
                   <li><kbd>I</kbd><kbd>O</kbd> Set selection start or end</li>
+                  <li><kbd>S</kbd> Split at the playhead</li>
+                  <li>
+                    <kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> In the
+                    transcript: select words
+                  </li>
                   <li>
                     <kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom in, out, Fit
                   </li>
@@ -1232,8 +1345,8 @@
               </details>
               <p class="hint">
                 Reset all edits returns to the original video: it removes trim,
-                cuts, speed, mute, fades, elements, and captions. You can undo
-                it.
+                cuts, splits, speed, mute, fades, elements, and captions. You
+                can undo it.
               </p>
               <button id="reset" class="text-button">Reset all edits</button>
               <button id="delete" class="text-button danger">
@@ -1257,6 +1370,19 @@
             >
               <svg class="icon" aria-hidden="true"><use href="#i-cut" /></svg>
               Trim &amp; cut</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-transcript"
+              data-tool="transcript"
+              aria-controls="tool-transcript"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-transcript" />
+              </svg>
+              Transcript</button
             ><button
               type="button"
               role="tab"
@@ -1334,6 +1460,21 @@
                 ><span class="timecode-gap" aria-hidden="true">/</span
                 ><span id="duration">0:00</span></span
               >
+              <button
+                id="split"
+                type="button"
+                class="dock-mark dock-split"
+                aria-label="Split at playhead"
+                aria-keyshortcuts="S"
+                disabled
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-split" />
+                </svg>
+                <span class="dock-mark-label"
+                  >Split<span class="split-more"> at playhead</span></span
+                >
+              </button>
             </div>
             <div class="dock-selection">
               <p
@@ -1348,7 +1489,8 @@
                   class="selection-chip"
                   hidden
                 >
-                  <span class="selection-word">Selection </span
+                  <span id="selection-word" class="selection-word"
+                    >Selection </span
                   ><span id="selection-times"></span></button
                 ><button
                   id="selection-clear"
@@ -1507,10 +1649,16 @@
                   id="timeline-track"
                   class="timeline-track"
                   data-zone="track"
-                  title="Drag to select a part. The frames and the sound come from the source video, without text and shapes."
+                  title="Drag to select a time range. A click moves the playhead, and with split parts it selects the part. The frames and the sound come from the source video, without text and shapes."
                 >
                   <div id="timeline-bars"></div>
                   <canvas id="timeline-canvas"></canvas>
+                  <div
+                    id="timeline-part-hover"
+                    class="timeline-part-hover"
+                    hidden
+                  ></div>
+                  <div id="timeline-marks" class="timeline-marks"></div>
                   <div
                     id="timeline-shade-before"
                     class="timeline-shade"

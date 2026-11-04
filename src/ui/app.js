@@ -2,14 +2,24 @@ import {
   duration,
   isEdited,
   sourceTime,
+  splitCheck,
+  timelineParts,
   videoFades,
 } from "../domain/timeline.js";
-import { editRevision } from "../domain/inspection.js";
+import {
+  editRevision,
+  structureRevision,
+  timingRevision,
+} from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { createElementEditor } from "./element-editor.js";
 import { createCaptionEditor } from "./caption-editor.js";
+import { createPartsPanel } from "./parts-panel.js";
+import { createRangePlayer } from "./range-player.js";
 import { createTools } from "./tools.js";
 import { createTimeline } from "./timeline.js";
+import { createTranscriptEditor } from "./transcript-editor.js";
+import { cutNotice } from "./transcript-view.js";
 import {
   clock,
   clockTenths,
@@ -26,7 +36,7 @@ import {
 const $ = (selector) => document.querySelector(selector);
 // Commands that change saved edits. The top bar shows their true state.
 const SAVED_EDIT =
-  /^(edit\.|element\.(add|update|remove|duplicate|order)$|captions\.(add|update|delete|configure|remove|apply)$|library\.rename$)/;
+  /^(edit\.|element\.(add|update|remove|duplicate|order)$|captions\.(add|update|delete|configure|remove|apply)$|library\.rename$|transcript\.cut$)/;
 // Each state belongs to one video, so a late reply cannot change the state of
 // another open video.
 const pendingEdits = new Map(),
@@ -71,7 +81,15 @@ let selectedVideo,
   recordingDisplay = recordingView(),
   // The playhead time to use again after an edit loads a new preview.
   resumeAt = 0,
-  previewVideoId = "";
+  // The join after a cut of a part or of words. The playhead goes there, so the
+  // user can check the join at once.
+  pendingResume = null,
+  previewVideoId = "",
+  // What owns the draft selection: a part or selected words. Null for a manual
+  // draft. Dock Keep and Remove then use the guarded command of the owner.
+  rangeOwner = null,
+  rangeEpoch = 0,
+  writingRange = false;
 let lastRecordingError;
 const loadedAt = Date.now();
 // The service keeps the timing fields. A reloaded page reads the same values.
@@ -169,9 +187,10 @@ const seek = (seconds) =>
 // pending add result unable to select, so a late result cannot change the
 // tool that the user opened. The current selection stays.
 const tools = createTools({
-  onChange: () => {
+  onChange: (name) => {
     editor.invalidate();
     captions.invalidate();
+    if (name === "transcript") transcript.opened();
   },
 });
 // Show the properties of a new selection in the edit panel. The panel
@@ -246,6 +265,61 @@ const captions = createCaptionEditor({
   },
   onChange: () => timeline.renderLanes(),
 });
+const rangePlayer = createRangePlayer({
+  player: $("#player"),
+  call,
+  onChange: () => transcript.renderFooter(),
+});
+const transcript = createTranscriptEditor({
+  $,
+  call,
+  notice,
+  playhead,
+  seek,
+  isReady: () => previewReady,
+  isOpen: () => tools.active() === "transcript",
+  range: rangePlayer,
+  draft: {
+    // A word selection is the draft selection, with all digits. A manual
+    // change ends it. See setOwner.
+    show: (selection, { jobId, timing }) =>
+      writeRange(
+        { start: String(selection.start), end: String(selection.end) },
+        {
+          kind: "words",
+          videoId: selectedVideo.id,
+          jobId,
+          timing,
+          from: selection.from,
+          to: selection.to,
+          label: `${selection.keptWords} word${selection.keptWords === 1 ? "" : "s"}`,
+        },
+      ),
+    clear: () => {
+      if (rangeOwner?.kind === "words") clearRange();
+    },
+  },
+  onCut: (video, selection, id) => {
+    if (selectedVideo?.id !== id) return;
+    pendingResume = selection.start;
+    renderVideo(video);
+    notice(cutNotice(selection, video.captionPlacement));
+    return refreshLibrary();
+  },
+});
+const parts = createPartsPanel({
+  $,
+  select: (row) => selectPart(row, { seekTo: true }),
+  keep: (row) => run(() => partEdit("keepPart", row)),
+  remove: (row) => run(() => partEdit("removePart", row)),
+  join: (row) =>
+    run(() =>
+      edit("unsplit", {
+        splitId: row.splitAfter,
+        revision: structureRevision(selectedVideo),
+      }),
+    ),
+});
 // Moves the playhead for a click on the timeline. It waits for the current
 // action, so the click is not lost.
 function seekFromTimeline(time) {
@@ -290,9 +364,20 @@ const timeline = createTimeline({
     fields: () => ({
       start: $("#range-start").value,
       end: $("#range-end").value,
+      owner: rangeOwner,
     }),
-    write: writeRange,
-    restore: writeRange,
+    write: (values) => writeRange(values),
+    // A cancelled drag returns the selection from before it. Selected words
+    // return with their owner, or the owner does not return.
+    restore: ({ owner, ...values }) => {
+      writeRange(values, owner);
+      if (owner?.kind === "words" && !transcript.restoreSelection(owner))
+        rangeOwner = null;
+    },
+  },
+  parts: {
+    selectable: () => partSelectable(),
+    click: (time) => selectPartAt(time),
   },
   items: {
     elements: () => editor.timelineItems(),
@@ -443,10 +528,14 @@ function showLibrary({ restoreFocus = false } = {}) {
   previewKey = "";
   previewReady = false;
   rangeKey = "";
+  rangeOwner = null;
+  pendingResume = null;
   resumeAt = 0;
   previewVideoId = "";
+  rangePlayer.stop();
   editor.clear();
   captions.clear();
+  transcript.clear();
   timeline.clear();
   failedEdits.delete(previous);
   hideSourceFrame();
@@ -538,6 +627,7 @@ function renderVideo(video) {
   if (selectedVideo?.id !== video.id) {
     tools.show("trim");
     failedEdits.delete(video.id);
+    rangePlayer.stop();
   }
   selectedVideo = video;
   const id = video.id;
@@ -557,9 +647,13 @@ function renderVideo(video) {
   // The revision includes elements, so an element change loads a new preview.
   const key = id + editRevision(video);
   if (previewKey !== key) {
-    // An edit keeps the playhead time. Another video starts at 0.
+    // An edit keeps the playhead time. Another video starts at 0. A cut of a
+    // part or of words goes to its join.
+    rangePlayer.stop();
     if (previewVideoId !== id) resumeAt = 0;
+    else if (pendingResume !== null) resumeAt = pendingResume;
     else if (previewReady) resumeAt = player.currentTime;
+    pendingResume = null;
     previewVideoId = id;
     previewKey = key;
     previewReady = false;
@@ -590,14 +684,11 @@ function renderVideo(video) {
   const timing = id + JSON.stringify([segments, speed]);
   if (rangeKey !== timing) {
     rangeKey = timing;
+    rangeOwner = null;
     $("#range-start").value = 0;
     $("#range-end").value = total;
   }
-  // The dock shows the length. This line adds what it does not show.
-  const parts = segments.length;
-  $("#kept-parts").hidden = parts === 1;
-  $("#kept-parts").textContent =
-    `The edited video has ${parts} kept parts. Undo restores a removed part.`;
+  updatePartOwner(video);
   $("#range-start").max = total;
   $("#range-end").max = total;
   $("#speed").value = video.timeline.speed;
@@ -614,6 +705,8 @@ function renderVideo(video) {
   renderVideoFades(video);
   editor.render(video);
   captions.render(video);
+  transcript.render(video);
+  parts.render(video, selectedPartId());
   timeline.renderLanes();
   syncPreview();
   renderSaveState();
@@ -780,6 +873,7 @@ function syncPreview() {
   $("#preview-volume").value = player.volume;
   $("#range-start-now").disabled = !previewReady;
   $("#range-end-now").disabled = !previewReady;
+  renderSplit();
   const fullscreen = $(".player-shell").classList.contains("fullscreen");
   const label = fullscreen ? "Exit fullscreen" : "Fullscreen";
   $("#preview-fullscreen").setAttribute("aria-label", label);
@@ -790,6 +884,33 @@ function syncPreview() {
   );
   editor.layout();
   captions.timeChanged();
+  transcript.timeChanged();
+}
+// The Split button uses the same check as the command. The tip tells why it is
+// not available.
+function renderSplit() {
+  const button = $("#split");
+  const time = $("#player").currentTime;
+  const check = previewReady
+    ? splitCheck(selectedVideo.timeline, time)
+    : {
+        ok: false,
+        reason: "Wait for the preview. Then split at the playhead.",
+      };
+  button.disabled = !check.ok;
+  button.title = check.ok
+    ? `Split at ${clockTenths(time)}. This makes two parts and removes no time. Shortcut: S`
+    : check.reason;
+}
+function splitAtPlayhead() {
+  if (!selectedVideo || !previewReady) return;
+  const seconds = $("#player").currentTime;
+  const check = splitCheck(selectedVideo.timeline, seconds);
+  if (!check.ok) return notice(check.reason);
+  return edit("split", {
+    seconds,
+    revision: structureRevision(selectedVideo),
+  });
 }
 // The time and the playhead. A new preview starts at 0, so until it is ready
 // the page shows the time that the preview resumes at.
@@ -865,6 +986,81 @@ function rangeValues() {
   const { start, end } = checkRange();
   return { start, end };
 }
+// The owner of the draft, if it still applies to this video and these times.
+function activeOwner() {
+  const owner = rangeOwner;
+  if (!owner || !selectedVideo || owner.videoId !== selectedVideo.id)
+    return null;
+  if (owner.kind === "part")
+    return owner.structure === structureRevision(selectedVideo) ? owner : null;
+  return owner.jobId === transcript.jobId() &&
+    owner.timing === timingRevision(selectedVideo)
+    ? owner
+    : null;
+}
+const selectedPartId = () => {
+  const owner = activeOwner();
+  return owner?.kind === "part" ? owner.id : null;
+};
+// One change of the owner. Selected words end with their draft.
+function setOwner(owner) {
+  const before = rangeOwner;
+  rangeOwner = owner ? { ...owner, epoch: ++rangeEpoch } : null;
+  if (before?.kind === "words" && owner?.kind !== "words")
+    transcript.ownerEnded();
+  // A drag writes many manual drafts. The list changes only with a part.
+  if (selectedVideo && (before?.kind === "part" || owner?.kind === "part"))
+    parts.render(selectedVideo, selectedPartId());
+}
+// A click on the track selects a part only if the draft is free: no selection,
+// or a part. So a manual draft and selected words stay.
+function partSelectable() {
+  if (!selectedVideo || timelineParts(selectedVideo.timeline).length < 2)
+    return false;
+  return checkRange().full || Boolean(selectedPartId());
+}
+function selectPart(part, { seekTo = false } = {}) {
+  const exact = (value) => String(Math.round(value * 1e6) / 1e6);
+  writeRange(
+    {
+      start: exact(part.start),
+      end:
+        part.end >= seconds(selectedVideo) ? String(part.end) : exact(part.end),
+    },
+    {
+      kind: "part",
+      id: part.id,
+      videoId: selectedVideo.id,
+      structure: structureRevision(selectedVideo),
+      label: `Part ${(part.index ?? part.number - 1) + 1}`,
+    },
+  );
+  if (seekTo && previewReady) seek(part.start);
+}
+function selectPartAt(time) {
+  if (!partSelectable()) return;
+  const list = timelineParts(selectedVideo.timeline);
+  selectPart(list.find((part) => time < part.end) ?? list.at(-1));
+}
+// A change of the marks. A part that still exists stays selected, and its
+// number can change. A part that a split divided is gone, so the next click can
+// select a new part.
+function updatePartOwner(video) {
+  const owner = rangeOwner;
+  if (owner?.kind !== "part" || owner.videoId !== video.id) return;
+  const structure = structureRevision(video);
+  if (owner.structure === structure) return;
+  const part = timelineParts(video.timeline).find(
+    (item) => item.id === owner.id,
+  );
+  if (part)
+    rangeOwner = { ...owner, structure, label: `Part ${part.index + 1}` };
+  else {
+    rangeOwner = null;
+    $("#range-start").value = 0;
+    $("#range-end").value = duration(video.timeline);
+  }
+}
 function renderRange() {
   if (!selectedVideo) return;
   const { start, end, valid, full, maximum } = checkRange();
@@ -894,20 +1090,30 @@ function renderRange() {
   if (usable) {
     const times = `${start.toFixed(2)} to ${end.toFixed(2)} s`;
     const detail = `Selection ${times}, ${length}. Open Trim & cut to change the exact times.`;
+    const owner = activeOwner();
     $("#selection-times").textContent = times;
+    $("#selection-word").textContent = `${owner?.label ?? "Selection"} `;
     chip.title = detail;
     chip.setAttribute("aria-label", detail);
   }
   timeline.renderRange();
 }
+// A typed time, Set start, and Set end are manual changes, also when the text
+// stays the same. Only writeRange can keep an owner.
 for (const id of ["#range-start", "#range-end"])
-  $(id).addEventListener("input", renderRange);
+  $(id).addEventListener("input", () => {
+    if (!writingRange) setOwner(null);
+    renderRange();
+  });
 // Changes the draft selection. The input event reaches all that depend on it,
 // for example the caption replace confirmation. No edit command runs.
-function writeRange({ start, end }) {
+function writeRange({ start, end }, owner = null) {
+  writingRange = true;
+  setOwner(owner);
   $("#range-start").value = start;
   $("#range-end").value = end;
   $("#range-start").dispatchEvent(new Event("input", { bubbles: true }));
+  writingRange = false;
 }
 // Returns true if a selection was cleared.
 function clearRange() {
@@ -1017,6 +1223,7 @@ function perform(action) {
     $("#search").select();
   } else if (action.local === "range-start") setRangeFromPlayhead("start");
   else if (action.local === "range-end") setRangeFromPlayhead("end");
+  else if (action.local === "split") return splitAtPlayhead();
   else if (action.local === "zoom-in") timeline.zoomIn();
   else if (action.local === "zoom-out") timeline.zoomOut();
   else if (action.local === "zoom-fit") timeline.zoomFit();
@@ -1095,8 +1302,38 @@ handle("#import", "click", async () => {
     $("#import .label").textContent = "Import video";
   }
 });
-handle("#trim", "click", () => edit("trim", rangeValues()));
-handle("#cut", "click", () => edit("cut", rangeValues()));
+// A part or selected words use their guarded command, with their exact source
+// times. A manual draft uses the times of the fields.
+function partEdit(action, part) {
+  if (action === "removePart") pendingResume = part.start;
+  return edit(action, {
+    partId: part.id,
+    revision: structureRevision(selectedVideo),
+  }).catch((error) => {
+    pendingResume = null;
+    throw /parts\.list/.test(error.message)
+      ? new Error("The video changed. Select the part again.")
+      : error;
+  });
+}
+const ownedPart = (owner) =>
+  timelineParts(selectedVideo.timeline).find((part) => part.id === owner.id);
+function keepSelection() {
+  const owner = activeOwner();
+  if (owner?.kind === "part") return partEdit("keepPart", ownedPart(owner));
+  return edit("trim", rangeValues());
+}
+function removeSelection() {
+  const owner = activeOwner();
+  if (owner?.kind === "part") return partEdit("removePart", ownedPart(owner));
+  if (owner?.kind === "words") return transcript.cutSelected();
+  return edit("cut", rangeValues());
+}
+handle("#trim", "click", keepSelection);
+handle("#cut", "click", removeSelection);
+handle("#split", "click", splitAtPlayhead);
+handle("#transcript-cut", "click", () => transcript.cutSelected());
+handle("#transcript-play", "click", () => transcript.playSelection());
 handle("#speed", "change", () =>
   edit("configure", { speed: Number($("#speed").value) }),
 );
@@ -1260,6 +1497,7 @@ async function refreshStatus() {
     );
   renderExports();
   if (selectedVideo) {
+    transcript.syncJobs(status.jobs);
     const id = selectedVideo.id,
       generation = viewGeneration;
     // A small result first. The full video, with its undo history, loads
@@ -1270,6 +1508,7 @@ async function refreshStatus() {
     const { timeline, title } = selectedVideo;
     if (
       latest.revision === editRevision(selectedVideo) &&
+      latest.structureRevision === structureRevision(selectedVideo) &&
       latest.title === title &&
       latest.history?.undo === timeline.past.length &&
       latest.history?.redo === timeline.future.length

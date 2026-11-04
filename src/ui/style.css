@@ -1127,8 +1127,8 @@ body.editing .topbar {
   align-self: center;
   gap: 2px;
   padding: 3px 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid #ffffff0a;
+  border-radius: 10px;
   background: var(--chrome);
 }
 .toolbar-label {
@@ -1159,13 +1159,27 @@ body.editing .topbar {
 .tool:hover:not(:disabled) {
   background: #ffffff12;
 }
+.tool,
+.icon-button,
+.dock-mark,
+.dock-action,
+.fit-button,
+.part-row,
+.layer-select,
+.tool-tabs [role="tab"] {
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
 .player-shell {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #0f1115;
+  box-shadow: 0 0 0 1px #ffffff0a;
 }
 .player-wrap {
   position: relative;
@@ -1333,6 +1347,7 @@ body.editing .topbar {
 }
 #editor:has(.player-shell.fullscreen) .timeline-body,
 #editor:has(.player-shell.fullscreen) .dock-selection,
+#editor:has(.player-shell.fullscreen) .dock-split,
 #editor:has(.player-shell.fullscreen) .zoom-group {
   display: none;
 }
@@ -1350,6 +1365,7 @@ body.editing .topbar {
   gap: 12px;
   height: 44px;
   padding: 0 12px 0 10px;
+  border-bottom: 1px solid #ffffff08;
 }
 .dock-transport,
 .dock-view {
@@ -1480,6 +1496,11 @@ body.editing .topbar {
 }
 .dock-mark:hover:not(:disabled) {
   background: #ffffff12;
+}
+.dock-split .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--cyan);
 }
 .dock-mark kbd {
   min-width: 16px;
@@ -1685,6 +1706,43 @@ body.editing .topbar {
   height: 100%;
   pointer-events: none;
 }
+/* A click selects this part. */
+.timeline-part-hover {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  border-radius: 6px;
+  background: #88c0d01a;
+  box-shadow: inset 0 0 0 1px #88c0d080;
+  pointer-events: none;
+}
+/* A split removes no time, so a mark is a line over the frames, not a gap. */
+.timeline-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.split-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--cyan);
+  box-shadow: 0 0 0 1px #11141a80;
+}
+.split-mark::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 7px;
+  border-radius: 0 0 4px 4px;
+  background: var(--cyan);
+}
 .timeline-shade {
   position: absolute;
   top: 0;
@@ -1847,13 +1905,14 @@ body.editing .topbar {
   outline: none;
   pointer-events: none;
 }
+/* Pale blue is playback. Gold is the selection. */
 .playhead-line {
   position: absolute;
   top: 2px;
   bottom: 0;
   left: -1px;
   width: 2px;
-  background: #eceff4;
+  background: #cfe9f1;
   box-shadow: 0 0 0 1px #11141a99;
 }
 .playhead-cap {
@@ -1863,7 +1922,7 @@ body.editing .topbar {
   width: 12px;
   height: 13px;
   border-radius: 3px 3px 6px 6px;
-  background: #eceff4;
+  background: #cfe9f1;
   cursor: ew-resize;
   pointer-events: auto;
 }
@@ -1895,11 +1954,16 @@ body.editing .topbar {
   background: var(--bg);
 }
 .tool-panels {
+  display: flex;
+  flex-direction: column;
   width: var(--inspector);
   padding: 12px 12px 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+.tool-panel {
+  flex: none;
 }
 .tool-tabs {
   display: flex;
@@ -1914,13 +1978,14 @@ body.editing .topbar {
   scrollbar-width: none;
 }
 .tool-tabs [role="tab"] {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   padding: 7px 2px 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
   font-size: 11px;
@@ -1939,6 +2004,16 @@ body.editing .topbar {
 .tool-tabs [role="tab"][aria-selected="true"] .icon {
   color: var(--cyan);
 }
+.tool-tabs [role="tab"][aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -4px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--cyan);
+}
 .tool-panel[hidden] {
   display: none;
 }
@@ -1949,6 +2024,7 @@ body.editing .topbar {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
   color: var(--text-strong);
 }
 .section-head {
@@ -2006,9 +2082,90 @@ body.editing .topbar {
   margin: 2px 0 0 20px;
   color: var(--muted);
 }
-.kept-parts {
-  padding-top: 8px;
+/* Parts: exact times, so a part too small to click has a row. The list scrolls
+   by itself. The actions stay below it. */
+#tool-trim:has(#parts:not([hidden])) .action-legend {
+  display: none;
+}
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
+}
+.section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.parts .section-head {
+  min-height: 20px;
+}
+.part-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 168px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.part-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--surface);
+  font:
+    11px Consolas,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+.part-row:hover {
+  border-color: var(--selection);
+}
+.part-row[aria-pressed="true"] {
+  border-color: #ebcb8b99;
+  background: #ebcb8b14;
+}
+.part-number {
+  color: var(--muted);
+  text-align: center;
+}
+.part-range {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.part-length {
+  color: var(--text);
+}
+.part-row[aria-pressed="true"] .part-length {
+  color: var(--yellow);
+}
+.part-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+.button.small {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 .disclosure {
   border-top: 1px solid var(--border);
@@ -2189,6 +2346,199 @@ body.editing .topbar {
 .hint.warn:empty {
   display: none;
 }
+/* Transcript: a focused reading panel. The words scroll. The selection and its
+   actions stay below them. Pale blue is the playhead. Gold is the selection. */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+.transcript-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.transcript-panel[hidden] {
+  display: none;
+}
+.transcript-panel > * + * {
+  margin-top: 0;
+}
+.state-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.state-card h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.state-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.state-card[data-tone="error"] {
+  border-color: #bf616a99;
+}
+.state-card[data-tone="error"] p {
+  color: var(--red-text);
+}
+.state-card[data-tone="warn"] {
+  border-color: #ebcb8b66;
+}
+.state-card progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--cyan);
+}
+.state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.state-actions:not(:has(button:not([hidden]))) {
+  display: none;
+}
+.state-actions .button.compact {
+  margin-left: 0;
+}
+.transcript-words {
+  flex: 1;
+  min-height: 0;
+  margin-inline: -4px;
+  padding: 2px 8px 2px 4px;
+  overflow-y: auto;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--text-strong);
+  outline: none;
+  scrollbar-width: thin;
+}
+.transcript-words:focus-visible {
+  box-shadow: inset 0 0 0 1px #88c0d066;
+}
+.transcript-words ::selection {
+  background: transparent;
+  color: inherit;
+}
+::highlight(transcript-selection) {
+  background-color: #ebcb8b4d;
+  color: #fff6e0;
+}
+.tw-paragraph {
+  margin: 0 0 12px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 110px;
+}
+.tw-time {
+  display: block;
+  font:
+    11px/18px Consolas,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  user-select: none;
+}
+.tw {
+  border-radius: 3px;
+  cursor: text;
+}
+.tw:hover {
+  background: #ffffff0f;
+}
+.tw.current {
+  background: #88c0d033;
+  box-shadow: 0 0 0 1px #88c0d033;
+  color: #e8f6fa;
+}
+.transcript-words:focus-visible .tw.caret {
+  outline: 1.5px solid var(--cyan);
+  outline-offset: 1px;
+}
+.tw[data-state="partial"] {
+  text-decoration: underline dotted var(--yellow);
+  text-underline-offset: 3px;
+}
+.tw[data-state="removed"] {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: #8490a7b3;
+  cursor: default;
+  user-select: none;
+}
+.transcript-footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-inline: -4px;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+/* Room for two lines, so a selection does not move the buttons. */
+.transcript-selection {
+  min-height: 34px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.transcript-selection[data-state="selected"] {
+  color: var(--yellow);
+}
+.transcript-selection[data-state="none"] {
+  color: var(--text);
+}
+.transcript-actions {
+  display: flex;
+  gap: 6px;
+}
+.transcript-actions .button.compact {
+  margin-left: 0;
+  padding: 0 10px;
+}
+.transcript-actions .icon {
+  width: 16px;
+  height: 16px;
+}
+.transcript-actions #transcript-cut {
+  flex: 1 1 auto;
+}
+/* Gold is an edit of the footage. */
+.button.edit {
+  color: #11141a;
+  background: var(--yellow);
+}
+.button.edit:hover:not(:disabled) {
+  background: #f3dca9;
+}
+.button.edit:disabled {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.button.edit .icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* Captions read like a transcript: the time, then the words. */
 .caption-panel {
   display: flex;
@@ -2448,7 +2798,7 @@ body.editing .topbar {
 @media (min-width: 1200px) {
   #editor {
     --rail: 68px;
-    --inspector: 320px;
+    --inspector: 336px;
   }
   .tool-panels {
     padding: 14px 16px 16px;
@@ -2457,12 +2807,47 @@ body.editing .topbar {
     margin-inline: -16px;
     padding-inline: 16px;
   }
+  /* There is room for the time beside the words. */
+  .transcript-words {
+    font-size: 14px;
+    line-height: 24px;
+  }
+  .tw-paragraph {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .tw-time {
+    line-height: 24px;
+  }
 }
 @media (max-width: 1199px) {
   .toolbar-label,
   .selection-word,
+  .split-more,
+  .zoom-level,
+  .transcript-play-label,
   .dock-mark kbd {
     display: none;
+  }
+  .dock-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .dock-selection {
+    gap: 4px;
+  }
+  .dock-mark {
+    padding: 0 8px;
+  }
+  .dock-action {
+    padding: 0 8px 0 6px;
+  }
+  .volume input {
+    width: 44px;
+  }
+  .zoom-group {
+    padding-left: 4px;
   }
 }
 

@@ -420,6 +420,9 @@ test("keyboard shortcuts use shared commands and keep native keys", () => {
   );
   assert.deepEqual(shortcut(key("i"), editor), { local: "range-start" });
   assert.deepEqual(shortcut(key("o"), editor), { local: "range-end" });
+  assert.deepEqual(shortcut(key("s"), editor), { local: "split" });
+  assert.equal(shortcut(key("s"), { ...editor, ready: false }), null);
+  assert.equal(shortcut(key("s", { ctrlKey: true }), editor), null);
   assert.deepEqual(shortcut(key("f"), editor), {
     command: "playback.fullscreen",
     args: { enabled: true },

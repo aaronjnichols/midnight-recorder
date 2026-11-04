@@ -69,11 +69,17 @@ try {
       env,
     }),
   );
-  const listed = await client.listTools();
-  assert.equal(
-    listed.tools.filter((t) => t.name.startsWith("transcript.")).length,
-    6,
-  );
+  // The commands that this practice uses. The catalog can have more.
+  const listed = new Set((await client.listTools()).tools.map((t) => t.name));
+  for (const name of [
+    "transcript.capabilities",
+    "transcript.start",
+    "transcript.status",
+    "transcript.read",
+    "transcript.search",
+    "transcript.cancel",
+  ])
+    assert.ok(listed.has(name), `MCP does not have ${name}.`);
   let video = (
     await cli("library.list", { query: "Speech validation viewport" })
   )[0];

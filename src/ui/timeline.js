@@ -1,7 +1,7 @@
 // The timeline dock: ruler, track, selection with handles, playhead, zoom, and
 // the pointer gestures. A drag changes the draft selection on the page only.
 // Keep and Remove are the edits. The rules are in timeline-view.js.
-import { duration } from "../domain/timeline.js";
+import { duration, timelineParts } from "../domain/timeline.js";
 import { editedLevels, frameAtEdited } from "../domain/overview.js";
 import { createOverview } from "./timeline-overview.js";
 import {
@@ -42,6 +42,7 @@ export function createTimeline({
   call,
   range,
   items,
+  parts: partRules,
   seek,
   scrub,
   isReady,
@@ -60,6 +61,7 @@ export function createTimeline({
   const after = $("#timeline-shade-after");
   const head = $("#timeline-playhead");
   const tip = $("#timeline-tip");
+  const partHover = $("#timeline-part-hover");
   let video = null,
     total = 0,
     zoom = 1,
@@ -68,7 +70,8 @@ export function createTimeline({
     rulerKey = "",
     barsKey = "",
     lanesKey = "",
-    lastTime = -1;
+    lastTime = -1,
+    parts = [];
 
   const paddingLeft = () => parseFloat(getComputedStyle(scroller).paddingLeft);
   // The width of the track at zoom 1, in pixels.
@@ -141,10 +144,11 @@ export function createTimeline({
   }
 
   function renderBars() {
-    const { segments, speed } = video.timeline;
-    const key = JSON.stringify([segments, speed]);
+    const { segments, speed, splits = [] } = video.timeline;
+    const key = JSON.stringify([segments, speed, splits]);
     if (key === barsKey) return;
     barsKey = key;
+    parts = timelineParts(video.timeline);
     let elapsed = 0;
     $("#timeline-bars").replaceChildren(
       ...segments.map((segment) => {
@@ -156,6 +160,33 @@ export function createTimeline({
         return bar;
       }),
     );
+    // A split mark is a line over the frames. It is not a gap, because a split
+    // removes no time. A cut join keeps its gap.
+    $("#timeline-marks").replaceChildren(
+      ...parts
+        .filter((part) => part.seamBefore === "split")
+        .map((part) => {
+          const mark = document.createElement("i");
+          mark.className = "split-mark";
+          mark.style.left = percent(part.start, total);
+          return mark;
+        }),
+    );
+    hidePartHover();
+  }
+
+  // The part that a click selects. It shows only when a click can select it.
+  function showPartHover(event) {
+    if (gesture || !partRules.selectable()) return hidePartHover();
+    const time = timeAt(event.clientX, box(), total);
+    const part = parts.find((item) => time < item.end) ?? parts.at(-1);
+    if (!part) return hidePartHover();
+    partHover.hidden = false;
+    partHover.style.left = percent(part.start, total);
+    partHover.style.width = percent(part.end - part.start, total);
+  }
+  function hidePartHover() {
+    partHover.hidden = true;
   }
 
   // One bar for each element and caption, at its edited time. The bars
@@ -310,17 +341,8 @@ export function createTimeline({
     context.fill();
   }
 
-  // The edited time of each join between two kept parts.
-  function seams() {
-    const { segments, speed } = video.timeline;
-    const times = [];
-    let elapsed = 0;
-    for (const segment of segments.slice(0, -1)) {
-      elapsed += (segment.end - segment.start) / speed;
-      times.push(elapsed);
-    }
-    return times;
-  }
+  // The edited time of each join and split mark.
+  const seams = () => parts.slice(1).map((part) => part.start);
 
   function render(next) {
     const opened = video?.id !== next.id;
@@ -353,9 +375,12 @@ export function createTimeline({
     total = 0;
     zoom = 1;
     rulerKey = barsKey = lanesKey = "";
+    parts = [];
     overview.clear();
     ruler.replaceChildren();
     $("#timeline-bars").replaceChildren();
+    $("#timeline-marks").replaceChildren();
+    hidePartHover();
     $("#lane-elements").replaceChildren();
     $("#lane-captions").replaceChildren();
     canvas.width = canvas.height = 0;
@@ -457,6 +482,8 @@ export function createTimeline({
       fields: range.fields(),
       from: playhead(),
       handled,
+      // A click on the track, not on a lane or the selection.
+      partClick: target === track,
       timing: timingOf(video),
       sent: false,
     };
@@ -627,7 +654,11 @@ export function createTimeline({
     if (g.moved) return;
     // A press on a handle moves the playhead to that end. The handle is
     // beside the time, so the pointer time is not exact there.
-    seek(g.handled ? g.origin[g.mode] : timeAt(event.clientX, box(), total));
+    const time = g.handled
+      ? g.origin[g.mode]
+      : timeAt(event.clientX, box(), total);
+    seek(time);
+    if (g.partClick) partRules.click(time);
   }
 
   // A press selects. A drag sends one command with only the changed times. A
@@ -666,6 +697,8 @@ export function createTimeline({
   }
 
   scroller.addEventListener("pointerdown", begin);
+  track.addEventListener("pointermove", showPartHover);
+  track.addEventListener("pointerleave", hidePartHover);
   scroller.addEventListener(
     "wheel",
     (event) => {
