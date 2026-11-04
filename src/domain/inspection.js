@@ -2,7 +2,7 @@ import { duration } from "./timeline.js";
 
 // 64-bit text hash from two 32-bit hashes. It finds changed edit states. It
 // is not for security. Pure JS, so the UI can use the same function.
-function hash(text) {
+export function textHash(text) {
   let a = 0x811c9dc5,
     b = 0x9e3779b9 ^ text.length;
   for (let i = 0; i < text.length; i++) {
@@ -29,7 +29,7 @@ export function editRevision(video) {
   // Video fades and captions are in the revision only when they are set, so
   // a state without them keeps the revision from before they existed.
   const fades = fadeIn || fadeOut ? { fadeIn, fadeOut } : {};
-  return hash(
+  return textHash(
     JSON.stringify({
       segments,
       speed,

@@ -44,6 +44,25 @@ export function run(executable, args, { signal, cwd } = {}) {
   });
 }
 
+// Like run, for binary output. Each chunk goes to onData, so a long stream
+// does not stay in memory. Resolves with the end of the log output.
+export function stream(executable, args, onData, { signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const process = spawn(executable, args, { windowsHide: true, signal });
+    let error = "";
+    process.stdout.on("data", onData);
+    process.stderr.on("data", (chunk) => {
+      error = (error + chunk).slice(-4000);
+    });
+    process.on("error", reject);
+    process.on("close", (code) =>
+      code === 0
+        ? resolve(error)
+        : reject(new Error(error || `${executable} exited with code ${code}.`)),
+    );
+  });
+}
+
 // Font files for each family, regular then bold. The first file that exists
 // is used. Each font covers a fixed character set. There is no fallback.
 const windowsFonts = path.join(process.env.WINDIR || "C:\\Windows", "Fonts");
@@ -465,16 +484,13 @@ export class Media {
     return (await this.renderInfo(file)).frame;
   }
   // The rendered frame size and the sample rate of the first audio stream.
-  async renderInfo(file) {
+  async renderInfo(file, { signal } = {}) {
     const info = JSON.parse(
-      await run(this.ffprobe, [
-        "-v",
-        "error",
-        "-show_streams",
-        "-of",
-        "json",
-        file,
-      ]),
+      await run(
+        this.ffprobe,
+        ["-v", "error", "-show_format", "-show_streams", "-of", "json", file],
+        { signal },
+      ),
     );
     const stream = info.streams?.find((s) => s.codec_type === "video");
     if (!stream) throw new Error("The file has no video track.");
@@ -499,6 +515,8 @@ export class Media {
         height: Math.floor(height / 2) * 2,
       },
       sampleRate: sampleRate > 0 ? sampleRate : undefined,
+      // FFmpeg reads an input from this time, as the zero of its clock.
+      start: Number(info.format?.start_time) || 0,
     };
   }
   async extractAudio(video, output, { signal } = {}) {

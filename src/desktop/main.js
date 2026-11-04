@@ -17,6 +17,7 @@ import { Library } from "../adapters/library.js";
 import { Media } from "../adapters/media.js";
 import { PreviewCache } from "../adapters/preview.js";
 import { FrameInspection } from "../adapters/inspection.js";
+import { TimelineOverview } from "../adapters/overview.js";
 import { LocalTranscriber } from "../adapters/transcriber.js";
 import { PythonSpeechRunner } from "../adapters/transcription-worker.js";
 import { serve } from "../agent/server.js";
@@ -253,6 +254,7 @@ else
         media,
         previews,
         inspection: new FrameInspection(media, previews),
+        overview: new TimelineOverview(media, previews),
         transcription: new LocalTranscriber(root, media, {
           runner: new PythonSpeechRunner(),
         }),
@@ -370,9 +372,13 @@ else
       ui.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       ui.webContents.on("will-navigate", (event) => event.preventDefault());
       ui.on("close", (event) => {
+        // An overview read is not the user's work, so it does not hold the
+        // window open.
         if (
           service.recording.state !== "idle" ||
-          [...service.jobs.values()].some((j) => j.state === "running")
+          [...service.jobs.values()].some(
+            (j) => j.state === "running" && j.kind !== "overview",
+          )
         ) {
           event.preventDefault();
           ui.webContents.send(
@@ -384,6 +390,7 @@ else
         }
       });
       ui.on("closed", () => {
+        service.overviewJobs.cancelAll();
         feedback.dispose();
         server.close();
         worker.destroy();

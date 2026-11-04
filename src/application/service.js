@@ -8,6 +8,7 @@ import {
 import { recordedSeconds } from "../domain/recording.js";
 import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
 import { captionCommands, CaptionJobs } from "./captions.js";
+import { overviewCommands, OverviewJobs } from "./overview.js";
 import {
   elementCommands,
   executeElement,
@@ -35,6 +36,7 @@ const define = (name, description, properties = {}, required = []) => ({
 
 export const commands = [
   ...transcriptCommands,
+  ...overviewCommands,
   define(
     "inspect.result",
     "Read a completed inspection. Returns PNG images and frame coordinates. Check stale before placing elements. Use includeImages false for paths only. Images total at most 8 MiB.",
@@ -284,6 +286,7 @@ export class Service {
     playback,
     previews,
     inspection,
+    overview,
     transcription,
     recordingFeedback,
     scheduler = { setTimeout, clearTimeout },
@@ -296,6 +299,7 @@ export class Service {
       playback,
       previews,
       inspection,
+      overview,
       transcription,
       recordingFeedback,
       scheduler,
@@ -305,6 +309,7 @@ export class Service {
     this.jobs = new Map();
     this.transcriptJobs = new TranscriptJobs(this);
     this.captionJobs = new CaptionJobs(this);
+    this.overviewJobs = new OverviewJobs(this);
     this.queue = Promise.resolve();
   }
   execute(name, args = {}) {
@@ -383,6 +388,8 @@ export class Service {
       return this.transcriptJobs.execute(name, args);
     if (name.startsWith("captions."))
       return this.captionJobs.execute(name, args);
+    if (name.startsWith("overview."))
+      return this.overviewJobs.execute(name, args);
     if (name === "library.revision") {
       const video = await this.library.get(args.id);
       return {
@@ -425,18 +432,22 @@ export class Service {
     if (name === "library.rename")
       return this.library.update(args.id, { title: args.title.trim() });
     if (name === "library.delete") {
+      // An overview read is not the user's work. The delete stops it.
       if (
         [...this.jobs.values()].some(
           (j) =>
             j.videoId === args.id &&
+            j.kind !== "overview" &&
             ["running", "cancelling"].includes(j.state),
         )
       )
         throw new Error("Wait for the export before deleting this video.");
+      await this.overviewJobs.stop(args.id);
       await this.previews?.remove(args.id);
       await this.transcription?.remove(args.id);
       const result = await this.library.remove(args.id);
       this.transcriptJobs.remove(args.id);
+      this.overviewJobs.remove(args.id);
       for (const [id, job] of this.jobs)
         if (job.videoId === args.id) this.jobs.delete(id);
       return result;
