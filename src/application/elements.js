@@ -7,12 +7,14 @@ import {
   ALIGN,
   VERTICAL_ALIGN,
   LIMITS,
+  TEXT_CONFLICT,
   addElement,
   updateElement,
   duplicateElement,
   orderElement,
   removeElement,
   describeElements,
+  elementsOf,
 } from "../domain/elements.js";
 
 const define = (name, description, properties = {}, required = []) => ({
@@ -190,7 +192,7 @@ const elementProperties = {
 export const elementCommands = [
   define(
     "element.add",
-    `Add a timed element to the edited video: text, rectangle, ellipse, or arrow. Returns the element with its ID. The original file does not change. ${COORDINATES} Text can extend outside its box if it is too large. At most ${LIMITS.elements} elements. Undo with edit.undo.`,
+    `Add a timed element to the edited video: text, rectangle, ellipse, or arrow. Returns the element with its ID. The original file does not change. ${COORDINATES} Text does not wrap. Text that is too large for its box is cut at the box. At most ${LIMITS.elements} elements. Undo with edit.undo.`,
     {
       id: ids.id,
       type: {
@@ -208,7 +210,14 @@ export const elementCommands = [
   define(
     "element.update",
     "Change one or more properties of an element. Properties that you do not give stay the same. If you give only start or only end, the other time stays the same. Undo with edit.undo.",
-    { ...ids, ...times, ...elementProperties },
+    {
+      ...ids,
+      ...times,
+      ...elementProperties,
+      expectedText: string(
+        "Text only. Optional guard. The update saves nothing and fails if the stored text is not this text, so a slow client cannot overwrite a newer change. It is not stored.",
+      ),
+    },
     ["id", "elementId"],
   ),
   define(
@@ -265,7 +274,13 @@ export async function executeElement(service, name, args) {
       timing: TIMING,
       elements: describeElements(timeline),
     };
-  const { id, elementId, ...values } = args;
+  const { id, elementId, expectedText, ...values } = args;
+  if (expectedText !== undefined) {
+    const stored = elementsOf(timeline).find((e) => e.id === elementId);
+    if (stored && stored.type !== "text")
+      throw new Error(`A ${stored.type} element does not use expectedText.`);
+    if (stored && stored.text !== expectedText) throw new Error(TEXT_CONFLICT);
+  }
   let edited,
     target = elementId;
   if (name === "element.add") {

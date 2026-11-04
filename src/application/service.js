@@ -23,6 +23,11 @@ import {
   elementPlacement,
 } from "./elements.js";
 
+const previewFrameEdge = 1920;
+// Finished draft frame jobs that stay readable. One job is about one key
+// press in the worst case, so they must not fill app.status.
+const FINISHED_FRAME_JOBS = 15;
+
 const field = (type, description, extra = {}) => ({
   type,
   description,
@@ -231,6 +236,19 @@ export const commands = [
     ["id"],
   ),
   define(
+    "preview.frame",
+    `Prepare the picture around one element at one frame, for a draft of that element. This reads only. Poll export.status with the returned job ID. The result gives under, the source frame and the layers below the element, and over, the layers above it with the captions on a transparent canvas, or null. Both are PNG paths, not image data. The element is in neither image, so the images stay valid while its text, style, or box changes. fadeOpacity is the black level of the video fades at this frame, and it is not in the images. The images are at most ${previewFrameEdge} pixels on the long edge. displayColor is bt709, smpte170m, or null. The PNG colors are the colors that Chromium shows for the exact preview, so they can differ from a plain FFmpeg RGB decode of the same frame: bt709 is the BT.709 matrix of an untagged video from 720 lines, smpte170m is SMPTE 170M primaries converted to sRGB, and null is no change. The exact picture is preview.start or export.start.`,
+    {
+      id: string("Video ID."),
+      seconds: number("Edited time in seconds. The frame at or before it."),
+      elementId: string("Element ID from element.add or element.list."),
+      revision: string(
+        "Optional edit revision from element.list. Reject a stale edit state.",
+      ),
+    },
+    ["id", "seconds", "elementId"],
+  ),
+  define(
     "app.view",
     "Select the library or recorder view.",
     { view: field("string", "App view.", { enum: ["library", "recorder"] }) },
@@ -338,6 +356,15 @@ export class Service {
     this.queue = result.catch(() => {});
     return result;
   }
+  // Draft frames are short reads, so only the latest stay in the job list. A
+  // running job stays until it ends.
+  forgetFrameJobs() {
+    const finished = [...this.jobs.values()].filter(
+      (job) => job.kind === "frame" && job.state !== "running",
+    );
+    for (const job of finished.slice(0, -FINISHED_FRAME_JOBS))
+      this.jobs.delete(job.id);
+  }
   setRecording(recording) {
     this.recording = recording;
     this.recordingFeedback?.update(recording);
@@ -442,12 +469,13 @@ export class Service {
     if (name === "library.rename")
       return this.library.update(args.id, { title: args.title.trim() });
     if (name === "library.delete") {
-      // An overview read is not the user's work. The delete stops it.
+      // An overview read or a draft frame is not the user's work. The delete
+      // stops an overview, and the preview cache drops a late frame.
       if (
         [...this.jobs.values()].some(
           (j) =>
             j.videoId === args.id &&
-            j.kind !== "overview" &&
+            !["overview", "frame"].includes(j.kind) &&
             ["running", "cancelling"].includes(j.state),
         )
       )
@@ -511,6 +539,7 @@ export class Service {
     if (
       name === "export.start" ||
       name === "preview.start" ||
+      name === "preview.frame" ||
       name === "inspect.start"
     ) {
       // A deep copy of the edit state at this command. Later edits do not
@@ -525,19 +554,29 @@ export class Service {
         !revisionMatches(video, args.revision)
       )
         throw new Error(
-          name === "preview.start"
-            ? "The video edits changed. Open the video again."
-            : "The video edits changed. Read element.list or inspect the video again.",
+          name === "export.start"
+            ? "The video edits changed. Read element.list or inspect the video again."
+            : "The video edits changed. Open the video again.",
         );
+      if (name === "preview.frame") {
+        if (!video.timeline.elements?.some((e) => e.id === args.elementId))
+          throw new Error("Element was not found.");
+        if (
+          args.seconds < 0 ||
+          args.seconds > timeline.duration(video.timeline)
+        )
+          throw new Error("Seek time is outside the edited range.");
+        this.forgetFrameJobs();
+      }
       const job = {
         id: randomUUID(),
         videoId: args.id,
-        kind:
-          name === "inspect.start"
-            ? "inspection"
-            : name === "preview.start"
-              ? "preview"
-              : "export",
+        kind: {
+          "inspect.start": "inspection",
+          "preview.start": "preview",
+          "preview.frame": "frame",
+          "export.start": "export",
+        }[name],
         path: args.path,
         revision,
         state: "running",
@@ -550,20 +589,21 @@ export class Service {
             ? this.inspection.prepare(video, plan)
             : name === "preview.start"
               ? this.previews.prepare(video)
-              : this.media.export(video, args.path),
+              : name === "preview.frame"
+                ? this.previews.frame(video, {
+                    seconds: args.seconds,
+                    elementId: args.elementId,
+                  })
+                : this.media.export(video, args.path),
         )
         .then(
-          (result) => {
-            this.jobs.set(job.id, { ...job, state: "complete", result });
-          },
-          (error) => {
-            this.jobs.set(job.id, {
-              ...job,
-              state: "failed",
-              error: error.message,
-            });
-          },
-        );
+          (result) => ({ ...job, state: "complete", result }),
+          (error) => ({ ...job, state: "failed", error: error.message }),
+        )
+        .then((ended) => {
+          // A delete removes the jobs of a video, so a late end stays out.
+          if (this.jobs.has(job.id)) this.jobs.set(job.id, ended);
+        });
       return job;
     }
     if (name === "export.status") {

@@ -54,6 +54,28 @@ export function videoFades(timeline) {
   };
 }
 
+// The part of a fade that is complete at an output frame, 0 to 1. The FFmpeg
+// fade filter counts whole frames: it rounds the start and the length to
+// frames, and a fade has at least one frame. This is measured against real
+// exports, so a short fade is not a smooth line in seconds.
+export function fadeShare(frame, rate, start, length) {
+  const frames = Math.max(1, Math.round(length * rate));
+  const share = (frame - Math.round(start * rate)) / frames;
+  return Math.min(1, Math.max(0, share));
+}
+
+// The level of the picture at an output frame: 1 is full and 0 is black.
+export function videoFadeLevel(timeline, frame, rate) {
+  const { actualFadeIn, actualFadeOut } = videoFades(timeline);
+  const fadeOutStart = Math.max(0, duration(timeline) - actualFadeOut);
+  return (
+    (actualFadeIn > 0 ? fadeShare(frame, rate, 0, actualFadeIn) : 1) *
+    (actualFadeOut > 0
+      ? 1 - fadeShare(frame, rate, fadeOutStart, actualFadeOut)
+      : 1)
+  );
+}
+
 export function createTimeline(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0)
     throw new Error("Video duration must be positive.");

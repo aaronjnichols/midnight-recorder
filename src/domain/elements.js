@@ -65,6 +65,15 @@ export function placement(timeline, element) {
   };
 }
 
+// Frames with a time in [start, end) show an element. Element times have
+// microsecond precision. An offset of half a microsecond compares the frame
+// time at that precision and absorbs floating-point error.
+export const FRAME_EDGE = 0.0000005;
+
+// The error of element.update when expectedText does not match. A client can
+// find this text in the error and keep its draft.
+export const TEXT_CONFLICT = "The text changed after this edit started.";
+
 export const LIMITS = {
   elements: 100,
   characters: 500,

@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { elementsOf, renderPlan } from "../domain/elements.js";
+import { elementsOf, renderPlan, FRAME_EDGE } from "../domain/elements.js";
 import { captionPlan } from "../domain/captions.js";
 import { duration, videoFades } from "../domain/timeline.js";
 
@@ -124,10 +124,8 @@ async function fontFile(fonts, family, bold) {
 const ffColor = (hex, alpha) => `0x${hex.slice(1)}@${alpha}`;
 const seconds = (value) => value.toFixed(7);
 // Frames with a time in [start, end) show the element. Elements are drawn on
-// the final output clock, so frame n is at n / 30 seconds. Element times
-// have microsecond precision. An offset of half a microsecond compares the
-// frame time at microsecond precision and absorbs floating-point error.
-const EDGE = 0.0000005;
+// the final output clock, so frame n is at n / 30 seconds.
+const EDGE = FRAME_EDGE;
 
 const enable = (op) =>
   `enable='gte(t,${seconds(op.start - EDGE)})*lt(t,${seconds(op.end - EDGE)})'`;
@@ -294,12 +292,27 @@ const frameRange = (op) => {
 // opacity and fades then apply once to the whole layer. So overlapping
 // parts of one element, for example a line over its fill or a letter over
 // its box, do not get brighter.
-async function overlayFilters(plan, work, fonts, frame) {
+//
+// Options for one frame of a draft picture:
+// - only: the output frame. Each layer has this frame only, so a long element
+//   costs one frame.
+// - layered: every element goes on its own layer. Direct filters expect
+//   opaque video, so a transparent canvas needs this.
+// - prefix: makes file names and labels unique in a graph with two chains.
+async function overlayFilters(
+  plan,
+  work,
+  fonts,
+  frame,
+  { only = null, layered = false, prefix = "" } = {},
+) {
   const copied = new Map();
   const steps = [];
-  for (const [index, op] of plan.entries()) {
-    const direct = op.opacity >= 1 && !op.fadeIn && !op.fadeOut;
-    const { first, count } = frameRange(op);
+  for (const [position, op] of plan.entries()) {
+    const index = `${prefix}${position}`;
+    const direct = !layered && op.opacity >= 1 && !op.fadeIn && !op.fadeOut;
+    const { first, count } =
+      only === null ? frameRange(op) : { first: only, count: 1 };
     if (count <= 0) continue;
     // A transparent or colored canvas for the element frames only, on the
     // same 30 fps clock as the video.
@@ -339,7 +352,7 @@ async function overlayFilters(plan, work, fonts, frame) {
     const key = `${op.font}-${op.bold ? "bold" : "regular"}`;
     if (!copied.has(key)) {
       const source = await fontFile(fonts, op.font, op.bold);
-      const name = `font-${copied.size}${path.extname(source).toLowerCase()}`;
+      const name = `font-${prefix}${copied.size}${path.extname(source).toLowerCase()}`;
       await copyFile(source, path.join(work, name));
       copied.set(key, name);
     }
@@ -383,6 +396,31 @@ async function overlayFilters(plan, work, fonts, frame) {
   return steps;
 }
 
+// Puts the steps on a video label, bottom first. Direct filters run on the
+// video in order. Each layer closes the current chain and goes over it with
+// overlay. Returns the last label and the filters that follow it.
+function composeSteps(filters, steps, start, prefix = "") {
+  let label = start,
+    chain = [],
+    count = 0;
+  for (const step of steps) {
+    if (step.filter) {
+      chain.push(step.filter);
+      continue;
+    }
+    const under = `${prefix}s${count++}`;
+    filters.push(`[${label}]${chain.join(",") || "null"}[${under}]`);
+    const layer = `${prefix}l${count}`;
+    filters.push(`${step.layer}[${layer}]`);
+    label = `${prefix}s${count++}`;
+    filters.push(
+      `[${under}][${layer}]overlay=eof_action=pass:format=auto[${label}]`,
+    );
+    chain = [];
+  }
+  return { label, chain };
+}
+
 // Output clock. The exported video has 30 frames per second from edited time
 // 0. Frame n is at exactly n / 30 seconds. There are ceil(duration x 30)
 // frames, so the last frame starts before the edited end. Frame n shows the
@@ -397,7 +435,11 @@ const TICKS = 30000000;
 const NEAR = TICKS / 1000000;
 const term = (value) => (value < 0 ? `-${-value}` : `+${value}`);
 
-export function videoClock(segments, speed, total) {
+// With `only`, the clock gives that one output frame and nothing else, by the
+// same steps: the timestamps go back by a whole number of frames, so `only`
+// is the first frame of the same fps filter. A last setpts returns the frame
+// to its true time, so the filters after it see the output clock.
+export function videoClock(segments, speed, total, only = null) {
   const frames = Math.max(1, Math.ceil(total * FRAME_RATE - 1e-6));
   const select = [],
     timing = [];
@@ -429,14 +471,18 @@ export function videoClock(segments, speed, total) {
     `settb=1/${TICKS}`,
     // The select filter names the timestamp pts. The setpts filter names it PTS.
     `select='${select.join("+").replaceAll("PTS", "pts")}'`,
-    `setpts='max(0,${timing.join("+")}-${NEAR})'`,
+    `setpts='max(0,${timing.join("+")}-${NEAR}${only === null ? "" : `-${only * (TICKS / FRAME_RATE)}`})'`,
+    // All frames of a video track that ends before `only` are at time 0, and
+    // so is the end of the input. One clone gives fps a frame after time 0.
+    ...(only === null ? [] : ["tpad=stop_mode=clone:stop=1"]),
     // Each output frame shows the last source frame at or before its time.
     `fps=${FRAME_RATE}:start_time=0:round=up`,
     // Hold the last frame if the video track ends before the edited end.
     "tpad=stop_mode=clone:stop=-1",
-    `trim=end_frame=${frames}`,
+    `trim=end_frame=${only === null ? frames : 1}`,
     "scale=trunc(iw/2)*2:trunc(ih/2)*2",
     "setsar=1",
+    ...(only === null ? [] : [`setpts=PTS+${only}`]),
   ].join(",");
 }
 
@@ -509,11 +555,24 @@ export class Media {
     const turned = ((degrees % 180) + 180) % 180 === 90;
     const width = turned ? stream.height : stream.width;
     const height = turned ? stream.width : stream.height;
+    const tagged = stream.color_space && stream.color_space !== "unknown";
     return {
       frame: {
         width: Math.floor(width / 2) * 2,
         height: Math.floor(height / 2) * 2,
       },
+      // How Chromium shows the exact preview, so a draft image can look the
+      // same. FFmpeg draws on an untagged video as BT.601, and the preview has
+      // no tag either. Chromium reads untagged H.264 as BT.709 from 720 lines,
+      // and below that as BT.601 with SMPTE 170M primaries, which it converts
+      // to sRGB primaries. Measured: #E02020 shows as 240,51,28 and 218,47,30.
+      displayColor: tagged
+        ? stream.color_primaries === "smpte170m"
+          ? "smpte170m"
+          : null
+        : height >= 720
+          ? "bt709"
+          : "smpte170m",
       sampleRate: sampleRate > 0 ? sampleRate : undefined,
       // FFmpeg reads an input from this time, as the zero of its clock.
       start: Number(info.format?.start_time) || 0,
@@ -671,31 +730,11 @@ export class Media {
     const work = await mkdtemp(path.join(os.tmpdir(), "midnight-render-"));
     try {
       if (decorated) {
-        // Direct filters run on the video in order. Each layer closes the
-        // current chain and goes over it with overlay.
-        let label = "base",
-          chain = [],
-          count = 0;
-        for (const step of await overlayFilters(
-          plan,
-          work,
-          this.fonts,
-          info.frame,
-        )) {
-          if (step.filter) {
-            chain.push(step.filter);
-            continue;
-          }
-          const under = `s${count++}`;
-          filters.push(`[${label}]${chain.join(",") || "null"}[${under}]`);
-          const layer = `l${count}`;
-          filters.push(`${step.layer}[${layer}]`);
-          label = `s${count++}`;
-          filters.push(
-            `[${under}][${layer}]overlay=eof_action=pass:format=auto[${label}]`,
-          );
-          chain = [];
-        }
+        const { label, chain } = composeSteps(
+          filters,
+          await overlayFilters(plan, work, this.fonts, info.frame),
+          "base",
+        );
         // Captions are over all elements. The video fades come after, so
         // the captions fade with the picture.
         if (captions)
@@ -710,6 +749,107 @@ export class Media {
       return { path: path.resolve(output), metadata };
     } finally {
       await rm(temporary, { force: true }).catch(() => {});
+      await rm(work, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+  // The images of one draft frame, from draftFramePlan. The base image has the
+  // source frame and the layers below the element. The top image has the
+  // layers above it, on a transparent canvas, or files.over is null.
+  //
+  // The input seek starts at a keyframe at or before the time, so the source
+  // frame that the export holds is always decoded. copyts and start_at_zero
+  // keep the timestamps of a run without a seek, so videoClock rounds each
+  // frame in the same way as the export.
+  async draftFrame(
+    video,
+    { plan, frame, image, displayColor },
+    files,
+    { signal } = {},
+  ) {
+    const { segments, speed } = video.timeline;
+    const size = `${frame.width}x${frame.height}`;
+    const fit =
+      image.width === frame.width
+        ? []
+        : [`scale=${image.width}:${image.height}:flags=bicubic`];
+    // The colors that the player shows: see renderInfo. The pixels go through
+    // YUV as in the export, because drawvg and the top image are RGB.
+    const toYuv = "scale=out_color_matrix=bt601:out_range=tv,format=yuv444p";
+    const shown = {
+      bt709: [toYuv, "scale=in_color_matrix=bt709"],
+      smpte170m: [
+        toYuv,
+        "setparams=colorspace=smpte170m:color_primaries=smpte170m:color_trc=iec61966-2-1:range=tv",
+        "colorspace=space=bt709:primaries=bt709:trc=iec61966-2-1:range=tv:format=yuv444p",
+        "scale=in_color_matrix=bt709",
+      ],
+    }[displayColor];
+    const filters = [
+      `[0:v]${videoClock(segments, speed, duration(video.timeline), plan.frameIndex)}[base]`,
+    ];
+    const png = ["-frames:v", "1", "-update", "1", "-compression_level", "1"];
+    const work = await mkdtemp(path.join(os.tmpdir(), "midnight-draft-"));
+    try {
+      const below = composeSteps(
+        filters,
+        await overlayFilters(plan.below, work, this.fonts, frame, {
+          only: plan.frameIndex,
+        }),
+        "base",
+      );
+      filters.push(
+        `[${below.label}]${[...below.chain, ...fit, ...(shown ?? []), "format=rgb24"].join(",")}[under]`,
+      );
+      const outputs = ["-map", "[under]", ...png, files.under];
+      if (files.over) {
+        filters.push(
+          `color=c=black@0:s=${size}:r=${FRAME_RATE}:d=${2 / FRAME_RATE},trim=end_frame=1,setpts=PTS+${plan.frameIndex},format=rgba[clear]`,
+        );
+        const above = composeSteps(
+          filters,
+          await overlayFilters(plan.above, work, this.fonts, frame, {
+            only: plan.frameIndex,
+            layered: true,
+            prefix: "top",
+          }),
+          "clear",
+          "top",
+        );
+        // The color filters have no alpha, so it goes around them.
+        const top = [...above.chain, ...fit];
+        if (shown)
+          filters.push(
+            `[${above.label}]${[...top, "split"].join(",")}[topcolor][topalpha]`,
+            "[topalpha]alphaextract[topmask]",
+            `[topcolor]${[...shown, "format=rgb24"].join(",")}[toprgb]`,
+            "[toprgb][topmask]alphamerge,format=rgba[over]",
+          );
+        else
+          filters.push(
+            `[${above.label}]${[...top, "format=rgba"].join(",")}[over]`,
+          );
+        outputs.push("-map", "[over]", ...png, files.over);
+      }
+      await writeFile(path.join(work, "graph.txt"), filters.join(";"), "utf8");
+      await run(
+        this.ffmpeg,
+        [
+          "-v",
+          "error",
+          "-noaccurate_seek",
+          "-ss",
+          seconds(Math.max(0, plan.sourceSeconds - 1)),
+          "-copyts",
+          "-start_at_zero",
+          "-i",
+          path.resolve(video.path),
+          "-/filter_complex",
+          "graph.txt",
+          ...outputs,
+        ],
+        { cwd: work, signal },
+      );
+    } finally {
       await rm(work, { recursive: true, force: true }).catch(() => {});
     }
   }

@@ -41,6 +41,31 @@ export function editRevision(video) {
   );
 }
 
+// Revision of the picture around one element: all that changes the images of
+// a draft frame. A change to the element itself keeps this revision, so its
+// text, style, and box can change without new images. Its layer stays in the
+// list. Mute is not in the picture.
+export function draftBaseRevision(video, elementId) {
+  const {
+    segments,
+    speed,
+    elements = [],
+    fadeIn = 0,
+    fadeOut = 0,
+    captions = null,
+  } = video.timeline;
+  return textHash(
+    JSON.stringify({
+      segments,
+      speed,
+      fadeIn,
+      fadeOut,
+      captions,
+      elements: elements.map((e) => (e.id === elementId ? { id: e.id } : e)),
+    }),
+  );
+}
+
 // Revision of the time mapping only. Transcripts use it, because elements do
 // not change speech times. This is the same format as before elements.
 export function timingRevision(video) {
