@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file: blob:"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: file:; media-src 'self' file: blob:"
     />
     <title>Midnight Recorder</title>
     <link rel="stylesheet" href="style.css" />
@@ -497,7 +497,58 @@
                 aria-hidden="true"
                 hidden
               ></video>
+              <!-- A draft of one text element: the layers below it, the
+                   text, the layers above it, and the video fade. -->
+              <div id="draft-view" class="draft-view" aria-hidden="true" hidden>
+                <img id="draft-under" class="draft-image" alt="" hidden />
+                <div id="draft-plate" class="draft-plate" hidden></div>
+                <div id="draft-box" class="draft-box">
+                  <div id="draft-text" class="draft-text"></div>
+                </div>
+                <img id="draft-over" class="draft-image" alt="" hidden />
+                <div id="draft-fade" class="draft-fade" hidden></div>
+              </div>
               <div id="stage" class="stage" hidden></div>
+              <div id="draft-editor" class="draft-editor" hidden>
+                <textarea
+                  id="draft-input"
+                  class="draft-input"
+                  aria-label="Text on the video"
+                  spellcheck="false"
+                  wrap="off"
+                  rows="1"
+                  hidden
+                ></textarea>
+                <div
+                  id="draft-actions"
+                  class="draft-actions"
+                  role="toolbar"
+                  aria-label="Text edit"
+                >
+                  <button
+                    type="button"
+                    id="draft-done"
+                    class="text-button small"
+                    title="Save the text (Ctrl+Enter)"
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    id="draft-cancel"
+                    class="text-button small"
+                    title="Return to the saved text (Escape)"
+                  >
+                    Cancel
+                  </button>
+                  <p
+                    id="draft-problem"
+                    class="draft-problem"
+                    role="alert"
+                    hidden
+                  ></p>
+                </div>
+              </div>
               <p id="stage-note" class="stage-note" hidden></p>
             </div>
           </div>
@@ -736,8 +787,18 @@
                 </p>
                 <form id="element-form" class="element-form" hidden novalidate>
                   <div class="field-group" data-types="text">
-                    <label for="el-text">Text</label>
-                    <textarea id="el-text" rows="2" maxlength="500"></textarea>
+                    <div class="text-field-head">
+                      <label for="el-text">Text</label>
+                      <button
+                        type="button"
+                        id="edit-text"
+                        class="text-button small"
+                        title="Type on the video. You can also double-click the text on the video, or press F2."
+                      >
+                        Edit on video
+                      </button>
+                    </div>
+                    <textarea id="el-text" rows="2"></textarea>
                     <div id="el-fit" class="fit-note" hidden>
                       <p id="el-fit-text"></p>
                       <button

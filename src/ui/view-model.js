@@ -293,6 +293,19 @@ const textEntry = (target) => {
   ].includes(String(target.type || "text").toLowerCase());
 };
 
+// Why the player cannot play or seek now, or null. The picture of a text
+// session or of a saved draft is one still frame, so the player must not move
+// under it. A saved draft holds until the exact frame is on the screen, which
+// is after the preview data loads.
+export function playbackBlock(action, { ready, typing, holding }) {
+  if (!["seek", "play"].includes(action)) return null;
+  if (typing)
+    return "A text edit is open. Select Done or Cancel, then try again.";
+  if (!ready || holding)
+    return "The edited preview is still being prepared. Poll playback.status until ready is true.";
+  return null;
+}
+
 // Maps a key press to a shared command or a page action. Returns null when
 // the key belongs to a text field or a native control.
 export function shortcut(event, context) {
@@ -316,6 +329,7 @@ export function shortcut(event, context) {
   // text and not the layers.
   if ((key === "Delete" || key === "Backspace") && !control)
     return context.selected ? { local: "delete-element" } : null;
+  if (key === "F2") return context.selected ? { local: "edit-text" } : null;
   if (control) {
     if (key === "z" && !event.shiftKey)
       return context.canUndo ? { command: "edit.undo" } : null;

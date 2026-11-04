@@ -28,6 +28,7 @@ import {
   finishedExports,
   recordingView,
   readableError,
+  playbackBlock,
   playheadValue,
   rangeCheck,
   saveState,
@@ -41,6 +42,7 @@ const SAVED_EDIT =
 // another open video.
 const pendingEdits = new Map(),
   failedEdits = new Set();
+const PREVIEW_WAIT_MS = 300;
 function call(name, args = {}, id = args.id) {
   const result = window.midnight.execute(name, args);
   if (!SAVED_EDIT.test(name)) return result;
@@ -89,7 +91,10 @@ let selectedVideo,
   // draft. Dock Keep and Remove then use the guarded command of the owner.
   rangeOwner = null,
   rangeEpoch = 0,
-  writingRange = false;
+  writingRange = false,
+  // The state of the exact preview. A draft view can show over it.
+  exactState = ["Preview ready", "ready", "Preview ready."],
+  previewTimer;
 let lastRecordingError;
 const loadedAt = Date.now();
 // The service keeps the timing fields. A reloaded page reads the same values.
@@ -173,6 +178,15 @@ function frameSize() {
   const { width, height } = selectedVideo?.metadata || {};
   return width && height ? { width, height } : null;
 }
+// The picture on the screen is a rendered frame, with its elements in it.
+function hasRenderedPicture() {
+  const player = $("#player");
+  return (
+    Boolean(player.getAttribute("src")) &&
+    player.readyState >= 2 &&
+    $("#source-frame").hidden
+  );
+}
 // A command result can arrive after the user opened another video. Show it
 // only if its video is still open. Element and caption results use this
 // check.
@@ -183,6 +197,17 @@ const seek = (seconds) =>
   call("playback.seek", { seconds }).catch((error) =>
     notice(error.message, true),
   );
+// Moves the playhead for a text session. This is local to the page, because
+// the shared seek waits for the session to end. Without a loaded preview, the
+// time is the time that the next preview resumes at.
+function moveTo(seconds) {
+  if (previewReady) $("#player").currentTime = seconds;
+  else {
+    resumeAt = seconds;
+    if (!$("#source-frame").hidden) showSourceFrame(selectedVideo);
+  }
+  showTime();
+}
 // The editing tools. A tool change only changes the page. It also makes a
 // pending add result unable to select, so a late result cannot change the
 // tool that the user opened. The current selection stays.
@@ -238,7 +263,10 @@ const editor = createElementEditor({
   showVideo,
   playhead,
   seek,
+  moveTo,
   isReady: () => previewReady,
+  hasRenderedPicture,
+  paused: () => $("#player").paused,
   frameSize,
   // One selection at a time: an element or a caption.
   onSelect: () => {
@@ -246,6 +274,10 @@ const editor = createElementEditor({
     showSelection("elements", "#element-heading");
   },
   onChange: () => timeline.renderLanes(),
+  onDraft: () => {
+    renderPreviewState();
+    renderSaveState();
+  },
 });
 const captions = createCaptionEditor({
   $,
@@ -580,9 +612,47 @@ async function openVideo(id, { focus = false } = {}) {
   if (focus) $("#video-title").focus();
 }
 function previewStatus(text, state, detail = text) {
-  $("#preview-state").textContent = text;
-  $("#preview-state").dataset.state = state;
-  $("#preview-state").title = detail;
+  exactState = [text, state, detail];
+  renderPreviewState();
+}
+// The state of the picture on the screen. A text draft is an approximation of
+// a change that the exact preview does not have yet, so the page never calls
+// it ready.
+function renderPreviewState() {
+  const mode = editor.draftMode();
+  const [text, state, detail] =
+    mode && editor.typing()
+      ? [
+          "Draft view",
+          "draft",
+          "This text is a draft. It is close to the video, but it is not exact. The exact preview renders after you apply it.",
+        ]
+      : mode && exactState[1] === "ready"
+        ? [
+            "Draft view",
+            "draft",
+            "This text is a draft until the exact preview is ready.",
+          ]
+        : exactState;
+  const node = $("#preview-state");
+  if (node.textContent !== text) node.textContent = text;
+  node.dataset.state = state;
+  node.title =
+    mode && state === "preparing"
+      ? `${detail} Until then, the text on the picture is a draft.`
+      : detail;
+  renderStageNote(mode);
+}
+function renderStageNote(mode) {
+  const note = $("#stage-note");
+  const text =
+    mode === "plate"
+      ? "The clean frame is not ready. A plate covers the old text."
+      : mode === "clean" || $("#source-frame").hidden
+        ? ""
+        : "Preparing the preview. This picture is the original video without elements. Outlines show the elements.";
+  if (note.textContent !== text) note.textContent = text;
+  note.hidden = !text;
 }
 // The true state of the edits: a command in progress, a field that is not
 // saved yet, or a rejected change. A draft selection is not an edit.
@@ -593,6 +663,7 @@ function renderSaveState() {
     failed: failedEdits.has(selectedVideo?.id),
     dirty:
       Boolean($("#editor [data-dirty='1']")) ||
+      editor.unsaved() ||
       (Boolean(selectedVideo) &&
         Boolean(title) &&
         title !== selectedVideo.title),
@@ -644,6 +715,7 @@ function renderVideo(video) {
   $("#delete-name").textContent = video.title;
   renderVideoInfo(video);
   const player = $("#player");
+  editor.observe(video);
   // The revision includes elements, so an element change loads a new preview.
   const key = id + editRevision(video);
   if (previewKey !== key) {
@@ -660,8 +732,13 @@ function renderVideo(video) {
     previewError = null;
     player.dataset.original = "false";
     player.pause();
-    player.removeAttribute("src");
-    player.load();
+    // A saved text change stays on the picture. The old frame has all other
+    // layers, so it stays under the draft until the next preview replaces it.
+    const keepFrame = editor.holding() && player.getAttribute("src");
+    if (!keepFrame) {
+      player.removeAttribute("src");
+      player.load();
+    }
     if (!isEdited(video.timeline, video.metadata.duration)) {
       hideSourceFrame();
       setPreview(video.url, true);
@@ -671,8 +748,8 @@ function renderVideo(video) {
         "preparing",
         "Preparing the edited preview. You can continue to edit.",
       );
-      showSourceFrame(video);
-      Promise.resolve().then(() => preparePreview(video, key));
+      if (!keepFrame) showSourceFrame(video);
+      startPreview(video, key);
     }
   }
   const total = seconds(video);
@@ -762,20 +839,19 @@ for (const [id, key] of [
 }
 // While the edited preview renders, the player shows the source frame at
 // the playhead without elements. The stage shows element outlines. The
-// rendered preview replaces this picture when it is ready.
+// rendered preview replaces this picture when it is ready. A draft view can
+// cover this picture with a true picture of the frame.
 function showSourceFrame(video) {
   const frame = $("#source-frame");
   const total = seconds(video);
   if (frame.getAttribute("src") !== video.url) frame.src = video.url;
   frame.currentTime = sourceTime(video.timeline, Math.min(resumeAt, total));
   frame.hidden = false;
-  $("#stage-note").textContent =
-    "Preparing the preview. This picture is the original video without elements. Outlines show the elements.";
-  $("#stage-note").hidden = false;
+  renderStageNote(editor.draftMode());
 }
 function hideSourceFrame() {
   $("#source-frame").hidden = true;
-  $("#stage-note").hidden = true;
+  renderStageNote(editor.draftMode());
 }
 $("#source-frame").addEventListener("error", () => {
   $("#source-frame").hidden = true;
@@ -791,6 +867,21 @@ function setPreview(url, original = false) {
   previewReady = false;
   previewStatus("Loading preview", "preparing");
   syncPreview();
+}
+// A render is long, so text edits start as few as possible. A draft view keeps
+// the picture true, so a short wait costs nothing, and quick changes start one
+// render. Nothing renders during a text session. A render that already runs
+// goes on, and its result stays in the cache for Undo.
+function startPreview(video, key) {
+  clearTimeout(previewTimer);
+  const start = () => {
+    if (previewKey !== key) return;
+    if (editor.typing()) previewTimer = setTimeout(start, PREVIEW_WAIT_MS);
+    else preparePreview(video, key);
+  };
+  if (editor.holding() || editor.typing())
+    previewTimer = setTimeout(start, PREVIEW_WAIT_MS);
+  else Promise.resolve().then(start);
 }
 async function preparePreview(video, key) {
   try {
@@ -814,6 +905,11 @@ async function preparePreview(video, key) {
     }
   }
 }
+const playbackState = () => ({
+  ready: previewReady,
+  typing: editor.typing(),
+  holding: editor.holding(),
+});
 window.midnight.onPlayback(async ({ id, action, args }) => {
   try {
     const player = $("#player");
@@ -827,10 +923,8 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
     } else {
       if (!selectedVideo)
         throw new Error("Open a video before you control playback.");
-      if (["seek", "play"].includes(action) && !previewReady)
-        throw new Error(
-          "The edited preview is still being prepared. Poll playback.status until ready is true.",
-        );
+      const blocked = playbackBlock(action, playbackState());
+      if (blocked) throw new Error(blocked);
       if (action === "seek") {
         if (args.seconds > seconds(selectedVideo))
           throw new Error("Seek time is outside the edited range.");
@@ -849,7 +943,9 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
         paused: player.paused,
         volume: player.volume,
         muted: player.muted,
-        ready: previewReady,
+        // Ready means that a client can play the picture on the screen, by
+        // the same rule as a play command.
+        ready: !playbackBlock("play", playbackState()),
         error: previewError,
         seconds: selectedVideo ? player.currentTime : 0,
         duration: selectedVideo ? seconds(selectedVideo) : 0,
@@ -940,7 +1036,22 @@ $("#player").addEventListener("loadeddata", () => {
     "Preview ready. Your edits match the exported video.",
   );
   syncPreview();
+  whenFrameShows(previewKey, () => editor.exactShown());
 });
+// The player can still seek to the resume time when its data loads. A draft
+// view stays until the player shows that frame, so no other frame flashes.
+function whenFrameShows(key, action) {
+  const player = $("#player");
+  const painted = () =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (previewKey === key && previewReady) action();
+      }),
+    );
+  if (player.seeking)
+    player.addEventListener("seeked", painted, { once: true });
+  else painted();
+}
 $("#player").addEventListener("error", () => {
   const player = $("#player");
   if (!selectedVideo || !player.getAttribute("src")) return;
@@ -1224,6 +1335,7 @@ function perform(action) {
   } else if (action.local === "range-start") setRangeFromPlayhead("start");
   else if (action.local === "range-end") setRangeFromPlayhead("end");
   else if (action.local === "split") return splitAtPlayhead();
+  else if (action.local === "edit-text") editor.editSelected();
   else if (action.local === "zoom-in") timeline.zoomIn();
   else if (action.local === "zoom-out") timeline.zoomOut();
   else if (action.local === "zoom-fit") timeline.zoomFit();

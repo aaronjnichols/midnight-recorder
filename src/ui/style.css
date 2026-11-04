@@ -1022,10 +1022,12 @@ body.editing .topbar {
   background: transparent;
   animation: spin 0.9s linear infinite;
 }
-.save-state[data-state="dirty"] {
+.save-state[data-state="dirty"],
+.preview-state[data-state="draft"] {
   color: var(--yellow);
 }
-.save-state[data-state="dirty"]::before {
+.save-state[data-state="dirty"]::before,
+.preview-state[data-state="draft"]::before {
   background: var(--yellow);
 }
 .save-state[data-state="failed"],
@@ -1324,6 +1326,104 @@ body.editing .topbar {
   font-size: 12px;
   color: var(--text-strong);
   pointer-events: none;
+}
+
+/* A draft of one text element. It sits exactly on the displayed frame, under
+   the stage, so outlines and handles stay on top. */
+.draft-view {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.draft-image,
+.draft-fade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.draft-fade {
+  background: #000;
+}
+/* Opaque, so that no old letter shows through. */
+.draft-plate {
+  position: absolute;
+  background: #14171c;
+}
+/* The video cuts text at its box, so the draft does also. */
+.draft-box {
+  position: absolute;
+  overflow: hidden;
+}
+.draft-text,
+.draft-input {
+  position: absolute;
+  white-space: pre;
+  tab-size: 4;
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+}
+.draft-text {
+  paint-order: stroke fill;
+}
+/* The field above the stage has the caret and the selection. The draft view
+   under it draws the letters, so upper layers can cover them. */
+.draft-editor {
+  position: absolute;
+  z-index: 3;
+  /* The field can be larger than the frame. With clip, a caret past the frame
+     edge cannot make the browser scroll the player. */
+  overflow: clip;
+  pointer-events: none;
+}
+.draft-input {
+  box-sizing: content-box;
+  margin: 0 0 0 -2px;
+  padding: 0 2px;
+  border: 0;
+  outline: 0;
+  overflow: hidden;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--cyan);
+  pointer-events: auto;
+}
+.draft-input::selection {
+  background: #88c0d066;
+}
+.draft-actions {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid #88c0d066;
+  border-radius: 6px;
+  background: #191c22f2;
+  pointer-events: auto;
+}
+.draft-problem {
+  flex-basis: 100%;
+  max-width: 420px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-strong);
+}
+.stage-item.editing {
+  cursor: text;
+  border-style: solid;
+}
+.text-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* Fullscreen: the video and the playback controls fill the window. */

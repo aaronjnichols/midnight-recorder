@@ -1,9 +1,25 @@
 // Element editing on the desktop page: toolbar, layer list, properties, and
-// direct editing on the displayed video. Every change uses a shared command.
-// The rendered preview stays the exact picture. The stage shows only
-// outlines and handles, never a second copy of text or shapes.
+// direct editing on the displayed video. Every saved change uses a shared
+// command. The rendered preview stays the exact picture. The stage shows
+// outlines and handles. A text draft shows in the draft view, in place of the
+// rendered text and never over it, until the exact preview is ready.
 import { duration } from "../domain/timeline.js";
 import { describeElements } from "../domain/elements.js";
+import { draftBaseRevision } from "../domain/inspection.js";
+import { createDraftView } from "./draft-view.js";
+import {
+  applyPlan,
+  cleanPaste,
+  draftFromIntent,
+  editTime,
+  followSaved,
+  liveProblem,
+  openDraft,
+  saveFailed,
+  startSave,
+  typeDraft,
+} from "./text-draft.js";
+import { readableError } from "./view-model.js";
 import {
   contentRect,
   moveBox,
@@ -37,6 +53,15 @@ const HANDLE_NAMES = {
 const COLOR_KEYS = ["background", "outline", "fill", "stroke"];
 const MIN_SIZE = 0.01;
 const SVG = "http://www.w3.org/2000/svg";
+// A press that moves less than this is a click, so a double-click on a box
+// does not save a small move.
+const DRAG_PIXELS = 3;
+// The wait after a selection before the page asks for the draft images, so a
+// fast pass over the layers does not start FFmpeg for each row.
+const PREPARE_MS = 120;
+
+const quoted = (text) =>
+  `“${text.length > 40 ? `${text.slice(0, 39)}…` : text}”`;
 
 export function createElementEditor({
   $,
@@ -46,10 +71,14 @@ export function createElementEditor({
   showVideo,
   playhead,
   seek,
+  moveTo,
   isReady,
+  hasRenderedPicture,
+  paused,
   frameSize,
   onSelect,
   onChange,
+  onDraft,
 }) {
   let video = null,
     elements = [],
@@ -59,30 +88,67 @@ export function createElementEditor({
     selection = 0,
     gesture = null,
     stageKey = "",
-    layerKey = "";
+    layerKey = "",
+    // The text session, from text-draft.js, with the time that it shows.
+    draft = null,
+    // True while the field on the video is open.
+    boxOpen = false,
+    // A saved change of a text element waits for its exact preview. The draft
+    // view keeps it on the picture until then.
+    hold = null,
+    // The apply in progress. Its change holds also if the user selects another
+    // element before the reply.
+    applied = null,
+    prepareTimer;
+  // Failed drafts of sessions that the page left, by video and element. They
+  // come back when the element is selected. They stay in memory only.
+  const parked = new Map();
+  const cancelled = new Set();
   const form = $("#element-form");
   const stage = $("#stage");
+  const field = $("#el-text");
+  const input = $("#draft-input");
+  const editor = $("#draft-editor");
+  const actions = $("#draft-actions");
+  const problem = $("#draft-problem");
+  const editButton = $("#edit-text");
   const total = () => (video ? duration(video.timeline) : 0);
   const selected = () => elements.find((e) => e.id === selectedId) || null;
   const nameOf = (id) =>
     layerRows(elements, null, total()).find((r) => r.id === id)?.name || "";
+  const parkKey = (videoId, elementId) => `${videoId}/${elementId}`;
+  const view = createDraftView({
+    $,
+    call,
+    frameSize,
+    onChange: () => onDraft?.(),
+  });
 
   function render(next) {
     if (!next) return clear();
     if (video?.id !== next.id) {
+      leaveDraft();
+      hold = null;
       selectedId = null;
       selection++;
     }
     video = next;
     elements = describeElements(video.timeline);
     if (selectedId && !selected()) selectedId = null;
+    followDraft();
+    resumeDraft();
     renderLayers();
     renderForm();
     renderStage();
     renderToolbar();
+    paintDraft();
+    prepareFrame();
   }
 
   function clear() {
+    leaveDraft();
+    hold = null;
+    clearTimeout(prepareTimer);
     video = null;
     elements = [];
     selectedId = null;
@@ -92,20 +158,32 @@ export function createElementEditor({
     stage.replaceChildren();
     stage.hidden = true;
     form.hidden = true;
+    paintDraft();
   }
 
   function select(id, { reveal = false } = {}) {
+    if (id !== selectedId) leaveDraft();
     selectedId = id;
     selection++;
     if (id) onSelect?.();
+    resumeDraft();
     renderLayers();
     renderForm();
     renderStage();
     renderToolbar();
+    paintDraft();
+    prepareFrame();
     onChange?.();
     const element = selected();
-    // Show the selected element: move the playhead into its time.
-    if (reveal && element && element.visibility !== "none" && isReady()) {
+    // Show the selected element: move the playhead into its time. An open
+    // draft has its own time.
+    if (
+      reveal &&
+      !draft &&
+      element &&
+      element.visibility !== "none" &&
+      isReady()
+    ) {
       const now = playhead();
       if (now < element.start || now >= element.end) seek(element.start);
     }
@@ -135,6 +213,353 @@ export function createElementEditor({
     if (!element || !Object.keys(changes).length) return Promise.resolve();
     return command("element.update", { elementId: element.id, ...changes });
   }
+
+  // Text draft. The field on the video and the field in the panel are two
+  // views of one draft. Only an apply sends a command, so one session is one
+  // update and one undo step. The rules are in text-draft.js.
+
+  function beginDraft(element, base = element) {
+    const seconds = editTime(element, playhead());
+    draft = { ...openDraft(video.id, base), seconds };
+    if (!paused()) call("playback.pause").catch(() => {});
+    if (seconds !== playhead()) moveTo(seconds);
+    view.prepare(video, element.id, seconds);
+  }
+
+  // Continues from a save in progress: the new base is the text that it
+  // saves. The reply of that save cannot end this session, and if it fails,
+  // the guard of the next save reports it.
+  function continueDraft(element) {
+    if (!draft) return beginDraft(element);
+    if (draft.state !== "saving") return;
+    const text = draft.text;
+    draft = null;
+    beginDraft(element, { ...element, text });
+  }
+
+  function typed(value, source) {
+    const element = selected();
+    if (element?.type !== "text") return;
+    continueDraft(element);
+    draft = typeDraft(draft, value);
+    for (const surface of [input, field])
+      if (surface !== source && surface.value !== value) surface.value = value;
+    checkFit({ ...element, text: value });
+    paintDraft();
+  }
+
+  function openBox(element, point) {
+    if (selectedId !== element.id) select(element.id);
+    continueDraft(element);
+    boxOpen = true;
+    input.value = draft.text;
+    paintDraft();
+    renderStage({ force: true });
+    input.focus({ preventScroll: true });
+    const caret = point
+      ? document.caretPositionFromPoint(point.x, point.y)
+      : null;
+    const offset =
+      caret?.offsetNode === input ? caret.offset : input.value.length;
+    input.setSelectionRange(offset, offset);
+  }
+
+  function closeBox() {
+    if (!boxOpen) return;
+    boxOpen = false;
+    renderStage({ force: true });
+  }
+
+  function endDraft() {
+    draft = null;
+    closeBox();
+    renderForm({ force: true });
+    paintDraft();
+  }
+
+  // Sends the frozen intent of an apply. It runs in the page queue, so it
+  // stays in order with other commands. Other pages can change the text, so
+  // fresh reads the saved text in the same queued step and keeps the guard.
+  function saveIntent(intent, fresh, seconds) {
+    applied = { ...intent, seconds };
+    const ended = () => {
+      if (applied?.token === intent.token) applied = null;
+      cancelled.delete(intent.token);
+    };
+    queue(async () => {
+      if (cancelled.has(intent.token)) return;
+      const { videoId: id, elementId, text } = intent;
+      const list = fresh ? (await call("element.list", { id })).elements : [];
+      const stored = list.find((e) => e.id === elementId);
+      const result = await call("element.update", {
+        id,
+        elementId,
+        text,
+        expectedText: stored?.text ?? intent.baseText,
+      });
+      showVideo(result.video, id);
+    }).then(
+      () => {
+        ended();
+        if (draft?.token === intent.token) endDraft();
+      },
+      (error) => {
+        ended();
+        saveError(intent, readableError(error.message));
+      },
+    );
+  }
+
+  function saveError(intent, message) {
+    if (draft?.token === intent.token) {
+      draft = saveFailed(draft, message);
+      notice(message, true);
+      return paintDraft();
+    }
+    // The page left this session. A newer draft of the element stays as it
+    // is, and its own save reports the conflict.
+    const here = video?.id === intent.videoId;
+    const exists =
+      !here || elements.some((element) => element.id === intent.elementId);
+    const newer =
+      (draft?.videoId === intent.videoId &&
+        draft.elementId === intent.elementId) ||
+      parked.has(parkKey(intent.videoId, intent.elementId));
+    if (exists && !newer)
+      parked.set(
+        parkKey(intent.videoId, intent.elementId),
+        draftFromIntent(intent, message),
+      );
+    notice(
+      exists
+        ? `The text ${quoted(intent.text)} was not saved: ${message} Select its element to try again.`
+        : `The text ${quoted(intent.text)} was not saved. Its element is gone.`,
+      true,
+    );
+    resumeDraft();
+    paintDraft();
+  }
+
+  function applyDraft({ fresh = false } = {}) {
+    if (!draft || draft.state === "saving") return;
+    const plan = applyPlan(draft);
+    if (plan.kind === "none") return endDraft();
+    if (plan.kind === "refuse") {
+      draft = saveFailed(draft, plan.message);
+      return paintDraft();
+    }
+    draft = startSave(draft);
+    closeBox();
+    paintDraft();
+    saveIntent(plan.intent, fresh, draft.seconds);
+  }
+
+  // Cancel keeps the saved text. A save that did not start yet stays unsent.
+  function cancelDraft() {
+    if (!draft) return;
+    if (draft.state === "saving") cancelled.add(draft.token);
+    endDraft();
+  }
+
+  // The user goes to another element, tool, or video. An edit applies. A
+  // failed draft waits for its element. A save in progress goes on.
+  function leaveDraft() {
+    if (draft?.state === "editing") applyDraft();
+    if (!draft) return;
+    if (draft.state === "failed") {
+      const key = parkKey(draft.videoId, draft.elementId);
+      if (!parked.has(key)) parked.set(key, draft);
+      notice(
+        `The text ${quoted(draft.text)} was not saved: ${draft.message} Select its element to try again.`,
+        true,
+      );
+    }
+    draft = null;
+    closeBox();
+  }
+
+  function resumeDraft() {
+    const key = parkKey(video?.id, selectedId);
+    const element = selected();
+    if (draft || !element || !parked.has(key)) return;
+    const waiting = parked.get(key);
+    parked.delete(key);
+    beginDraft(element);
+    draft = { ...waiting, seconds: draft.seconds };
+    paintDraft();
+  }
+
+  // A saved change: an untouched session shows it, and a touched session
+  // keeps its text. If the element is gone, the text must not vanish.
+  function followDraft() {
+    if (!draft || draft.videoId !== video.id) return;
+    const element = elements.find((e) => e.id === draft.elementId);
+    if (element) {
+      draft = followSaved(draft, element);
+      if (input.value !== draft.text) input.value = draft.text;
+      return;
+    }
+    if (draft.state !== "saving" && draft.touched)
+      notice(
+        `The text ${quoted(draft.text)} was not saved. Its element is gone.`,
+        true,
+      );
+    draft = null;
+    closeBox();
+  }
+
+  // After a saved change of the selected text element, the images around it
+  // are still valid. The draft view shows the change, from any client, until
+  // the exact preview is ready. Any other change makes the images old. The
+  // page calls this first, so it can keep the picture that is on the screen.
+  function observe(next) {
+    if (video?.id !== next.id) return;
+    const id = applied?.videoId === next.id ? applied.elementId : selectedId;
+    const before = elements.find((e) => e.id === id);
+    const after = describeElements(next.timeline).find((e) => e.id === id);
+    const same = (elementId) =>
+      draftBaseRevision(video, elementId) ===
+      draftBaseRevision(next, elementId);
+    if (hold && !same(hold.id)) hold = null;
+    if (
+      before?.type !== "text" ||
+      !after ||
+      JSON.stringify(before) === JSON.stringify(after) ||
+      !same(id)
+    )
+      return;
+    hold = { id, seconds: draft?.seconds ?? applied?.seconds ?? playhead() };
+  }
+
+  function paintDraft() {
+    const id = draft?.elementId ?? hold?.id;
+    const element = elements.find((e) => e.id === id);
+    if (hold && !elements.some((e) => e.id === hold.id)) hold = null;
+    const moved =
+      gesture?.moved && gesture.id === id ? gesture.current : hold?.moved;
+    const bar = Boolean(draft) && draft.state !== "saving";
+    editor.hidden = !bar && !boxOpen;
+    input.hidden = !boxOpen;
+    actions.hidden = !bar;
+    if (bar) {
+      const failed = draft.state === "failed";
+      $("#draft-done").textContent = draft.conflict
+        ? "Save my text"
+        : failed
+          ? "Try again"
+          : "Done";
+      $("#draft-cancel").textContent = failed ? "Discard" : "Cancel";
+      problem.textContent = draft.message ?? liveProblem(draft.text) ?? "";
+      problem.hidden = !problem.textContent;
+    }
+    const text = draft?.text ?? element?.text;
+    view.paint(
+      element
+        ? {
+            video,
+            element: { ...element, ...moved },
+            text,
+            seconds: draft?.seconds ?? hold?.seconds ?? playhead(),
+            baked: hasRenderedPicture(),
+            show:
+              Boolean(hold) ||
+              Boolean(moved) ||
+              text !== element.text ||
+              draft?.state === "failed",
+            // A drag does not need a plate. The outline shows the box.
+            cleanOnly: Boolean(moved) && !draft,
+          }
+        : null,
+    );
+    onDraft?.();
+  }
+
+  // Asks for the images early, so a double-click normally finds them ready.
+  function prepareFrame() {
+    clearTimeout(prepareTimer);
+    prepareTimer = setTimeout(() => {
+      const element = selected();
+      // A hold needs its own images, so it keeps them until it ends.
+      if (element?.type === "text" && video && paused() && !draft && !hold)
+        view.prepare(video, element.id, editTime(element, playhead()));
+    }, PREPARE_MS);
+  }
+
+  function leaveSurface(event) {
+    const next = event.relatedTarget;
+    if (draft?.state !== "editing") return;
+    // These controls are part of the session.
+    if ([input, field, editButton].includes(next) || actions.contains(next))
+      return;
+    // Another window: the user can come back and type on.
+    if (!document.hasFocus()) return;
+    applyDraft();
+  }
+
+  function surfaceKey(event) {
+    if (!draft || event.isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelDraft();
+    } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyDraft();
+    }
+  }
+
+  // A text field pastes plain text. This only cleans characters that the
+  // shared command refuses. execCommand keeps the native undo of the paste.
+  function surfacePaste(event) {
+    const text = event.clipboardData?.getData("text/plain");
+    if (!text || cleanPaste(text) === text.replace(/\r\n?/g, "\n")) return;
+    event.preventDefault();
+    document.execCommand("insertText", false, cleanPaste(text));
+  }
+
+  for (const surface of [field, input]) {
+    surface.addEventListener("input", () => typed(surface.value, surface));
+    surface.addEventListener("keydown", surfaceKey);
+    surface.addEventListener("blur", leaveSurface);
+    surface.addEventListener("paste", surfacePaste);
+  }
+  // A press on the controls does not take focus from the text, so Cancel
+  // runs without a blur that saves first. From the keyboard, Tab reaches them
+  // as part of the session, and app shortcuts do not run on them.
+  for (const control of [actions, editButton]) {
+    control.addEventListener("mousedown", (event) => event.preventDefault());
+    control.addEventListener("focusout", leaveSurface);
+  }
+  actions.addEventListener("keydown", (event) => {
+    surfaceKey(event);
+    event.stopPropagation();
+  });
+  editButton.addEventListener("keydown", surfaceKey);
+  $("#draft-done").addEventListener("click", () =>
+    applyDraft({ fresh: draft?.conflict }),
+  );
+  $("#draft-cancel").addEventListener("click", cancelDraft);
+  editButton.addEventListener("click", () => {
+    const element = selected();
+    if (element?.type === "text") openBox(element);
+  });
+  stage.addEventListener("dblclick", (event) => {
+    const { clientX: x, clientY: y } = event;
+    const id = document.elementFromPoint(x, y)?.closest?.(".stage-item")
+      ?.dataset.id;
+    const element = elements.find((e) => e.id === id);
+    if (element?.type === "text") openBox(element, { x, y });
+  });
+  // A gesture does not change the focus or select page text, and a press in
+  // the open box keeps the focus in its field. This is on mousedown and not on
+  // pointerdown, because a cancelled pointerdown also ends dblclick.
+  stage.addEventListener("mousedown", (event) => {
+    const id = event.target.closest?.(".stage-item")?.dataset.id;
+    const inBox = boxOpen && id === draft?.elementId;
+    if (gesture || inBox) event.preventDefault();
+    if (inBox) input.focus({ preventScroll: true });
+  });
 
   // Toolbar.
   for (const kind of ["text", "label", "rectangle", "ellipse", "arrow"])
@@ -261,11 +686,9 @@ export function createElementEditor({
         ).toLowerCase();
       else input.value = fieldValue(input.dataset.key, element);
     }
-    const text = $("#el-text");
-    if (element.type === "text" && !busy(text)) {
-      text.value = element.text;
-      text.dataset.dirty = "";
-    }
+    // Writing the same value would move the caret.
+    const text = draft?.elementId === element.id ? draft.text : element.text;
+    if (element.type === "text" && field.value !== text) field.value = text;
     for (const key of COLOR_KEYS) {
       const value = element[key];
       if (value === undefined) continue;
@@ -281,10 +704,10 @@ export function createElementEditor({
           : "";
     $("#el-fade-in-note").textContent = fadeNote(element, "fadeIn");
     $("#el-fade-out-note").textContent = fadeNote(element, "fadeOut");
-    checkFit(element);
+    checkFit({ ...element, text });
   }
 
-  // Text that is larger than its box extends outside the box in the video.
+  // The box cuts text that is larger than it, in the video and in the draft.
   // The check measures the text with the same font and pixel size.
   let measure;
   function checkFit(element) {
@@ -321,7 +744,7 @@ export function createElementEditor({
     note.dataset.scale = fit.scale;
     if (!fit.fits)
       $("#el-fit-text").textContent =
-        `The text is larger than its box (${Math.round(Math.max(fit.widthRatio, fit.heightRatio) * 100)}% of the box). In the video, it extends outside the box. Make the text smaller, add line breaks, or make the box larger.`;
+        `The text is larger than its box (${Math.round(Math.max(fit.widthRatio, fit.heightRatio) * 100)}% of the box). In the video, the box cuts it. Make the text smaller, add line breaks, or make the box larger.`;
   }
   $("#el-fit-button").addEventListener("click", () => {
     const element = selected();
@@ -391,13 +814,6 @@ export function createElementEditor({
       update({ [key]: none.checked ? "none" : color.value.toUpperCase() }),
     );
   }
-  const text = $("#el-text");
-  text.addEventListener("input", () => (text.dataset.dirty = "1"));
-  text.addEventListener("change", () => {
-    const element = selected();
-    text.dataset.dirty = "";
-    if (element && text.value !== element.text) update({ text: text.value });
-  });
   for (const key of ["start", "end"])
     $(`#el-${key}-now`).addEventListener("click", () => {
       if (!isReady())
@@ -421,6 +837,7 @@ export function createElementEditor({
           )
         : null;
     stage.hidden = !rect;
+    view.layout(rect);
     if (!rect) return;
     Object.assign(stage.style, {
       left: `${rect.left}px`,
@@ -439,7 +856,7 @@ export function createElementEditor({
         e.id === selectedId ||
         (e.visibility !== "none" && now >= e.start && now < e.end),
     );
-    const key = JSON.stringify([selectedId, shown]);
+    const key = JSON.stringify([selectedId, boxOpen, shown]);
     if (!force && key === stageKey) return;
     stageKey = key;
     stage.replaceChildren(...shown.map(stageItem));
@@ -503,10 +920,13 @@ export function createElementEditor({
     item.setAttribute("role", "button");
     item.setAttribute("aria-label", `Select ${nameOf(element.id)}`);
     item.tabIndex = -1;
+    if (element.type === "text") item.title = "Double-click to edit the text";
+    const editing = boxOpen && draft?.elementId === element.id;
+    item.classList.toggle("editing", editing);
     item.addEventListener("pointerdown", (event) =>
       begin(event, element, "move"),
     );
-    if (active)
+    if (active && !editing)
       for (const name of HANDLES) {
         const handle = document.createElement("span");
         handle.className = "handle";
@@ -544,8 +964,9 @@ export function createElementEditor({
 
   function begin(event, element, mode, handle) {
     if (event.button !== 0 || !video) return;
-    event.preventDefault();
     event.stopPropagation();
+    // In the open box, the pointer belongs to the text.
+    if (boxOpen && draft?.elementId === element.id) return;
     // Selection draws the stage again and replaces the item under the
     // pointer. The stage itself stays, so it holds the pointer capture.
     if (element.id !== selectedId) select(element.id);
@@ -560,6 +981,7 @@ export function createElementEditor({
       start: point(event),
       origin: geometry(element),
       current: geometry(element),
+      moved: false,
       target,
       pointerId: event.pointerId,
     };
@@ -574,6 +996,14 @@ export function createElementEditor({
     const dx = p.x - gesture.start.x,
       dy = p.y - gesture.start.y;
     const { origin, mode, handle } = gesture;
+    const { width, height } = stage.getBoundingClientRect();
+    if (
+      mode === "move" &&
+      !gesture.moved &&
+      Math.hypot(dx * width, dy * height) < DRAG_PIXELS
+    )
+      return;
+    gesture.moved = true;
     gesture.current =
       gesture.type === "arrow"
         ? mode === "end"
@@ -585,9 +1015,10 @@ export function createElementEditor({
     draw(gesture.current);
   }
 
-  // Show the gesture on the outline only. The video does not render until
-  // the gesture ends.
+  // Show the gesture on the outline, and on a text draft if its images are
+  // ready. The video does not render until the gesture ends.
   function draw(value) {
+    if (gesture.type === "text") paintDraft();
     const item = stage.querySelector(
       `.stage-item[data-id="${CSS.escape(gesture.id)}"]`,
     );
@@ -621,10 +1052,26 @@ export function createElementEditor({
     const done = gesture;
     release();
     gesture = null;
+    // A click changes nothing. The item under the pointer must stay, or
+    // Chromium does not send click and dblclick.
+    if (!done.moved) return;
     const changes = changedKeys(done.origin, done.current);
-    if (!Object.keys(changes).length || video?.id !== done.videoId)
+    if (!Object.keys(changes).length || video?.id !== done.videoId) {
+      paintDraft();
       return renderStage({ force: true });
-    command("element.update", { elementId: done.id, ...changes });
+    }
+    // The text stays at its new place until the reply of the save. Then the
+    // saved values take over.
+    if (done.type === "text")
+      hold = { id: done.id, seconds: playhead(), moved: done.current };
+    paintDraft();
+    command("element.update", { elementId: done.id, ...changes }).finally(
+      () => {
+        if (!hold?.moved) return;
+        hold = null;
+        paintDraft();
+      },
+    );
   }
 
   // Escape or a lost pointer cancels the gesture. Nothing is saved.
@@ -633,6 +1080,7 @@ export function createElementEditor({
     release();
     gesture = null;
     renderStage({ force: true });
+    paintDraft();
     return true;
   }
 
@@ -642,11 +1090,34 @@ export function createElementEditor({
     layout: () => {
       layout();
       renderStage();
+      prepareFrame();
     },
     timeChanged: () => {
       if (!gesture) renderStage();
     },
     selected: () => selectedId,
+    // The picture of the draft view, for the status: clean, plate, plain, or
+    // null when the exact preview shows.
+    draftMode: () => view.mode(),
+    // A session is open: an exact render waits, and playback must not move
+    // under its still picture.
+    typing: () => Boolean(draft),
+    // A change is on the picture, and its exact preview is not ready.
+    holding: () => Boolean(hold),
+    observe,
+    // The page has a text that is not saved in this video.
+    unsaved: () =>
+      (Boolean(draft) && draft.text !== draft.base) ||
+      [...parked.keys()].some((key) => key.startsWith(`${video?.id}/`)),
+    // The exact preview of the current edits is on the screen.
+    exactShown: () => {
+      hold = null;
+      paintDraft();
+    },
+    editSelected: () => {
+      const element = selected();
+      if (element?.type === "text") openBox(element);
+    },
     // Also without a selection, this makes a pending result unable to
     // select, for example when the user selects a caption during an add.
     // Returns true if an element was selected.

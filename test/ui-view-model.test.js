@@ -12,6 +12,7 @@ import {
   rangeCheck,
   saveState,
   shortcut,
+  playbackBlock,
 } from "../src/ui/view-model.js";
 
 test("the playhead time shows tenths and does not run ahead", () => {
@@ -553,4 +554,41 @@ test("Delete removes the selected element only outside text fields and dialogs",
   assert.equal(shortcut(key("Delete"), { ...editor, selected: null }), null);
   assert.equal(shortcut(key("Delete"), { ...editor, dialog: true }), null);
   assert.equal(shortcut(key("Delete"), { ...editor, view: "library" }), null);
+  // F2 opens the text box of the selection, with the preview ready or not.
+  assert.deepEqual(shortcut(key("F2"), editor), { local: "edit-text" });
+  assert.equal(shortcut(key("F2"), { ...editor, selected: null }), null);
+  assert.equal(shortcut(key("F2", { tagName: "TEXTAREA" }), editor), null);
+  assert.equal(shortcut(key("F2"), { ...editor, view: "library" }), null);
+});
+
+// Review U1: the picture of a text session or of a saved draft is a still
+// frame. Play and seek wait until the exact preview is on the screen, also in
+// the time after its data loads and before the draft view goes.
+test("playback waits for the picture that is on the screen", () => {
+  const ready = { ready: true, typing: false, holding: false };
+  for (const action of ["play", "seek"]) {
+    assert.equal(playbackBlock(action, ready), null);
+    assert.match(
+      playbackBlock(action, { ...ready, typing: true }),
+      /text edit is open/,
+    );
+    assert.match(
+      playbackBlock(action, { ...ready, holding: true }),
+      /being prepared/,
+    );
+    assert.match(
+      playbackBlock(action, { ...ready, ready: false }),
+      /being prepared/,
+    );
+    // An open session tells what to do, also while a render runs.
+    assert.match(
+      playbackBlock(action, { ready: false, typing: true, holding: true }),
+      /text edit is open/,
+    );
+  }
+  for (const action of ["pause", "configure", "fullscreen", "open"])
+    assert.equal(
+      playbackBlock(action, { ready: false, typing: true, holding: true }),
+      null,
+    );
 });

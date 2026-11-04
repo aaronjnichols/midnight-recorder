@@ -340,3 +340,62 @@ Changes after that run, so that run does not cover them:
 - README.md, QA.md, `docs/editing.md`, and `scripts/practice-transcription.mjs`. `npm test` does not read these files.
 
 Separate from the 13 findings: `scripts/practice-transcription.mjs` required exactly 6 transcript tools. The catalog now has 9, so `npm run practice:transcription` stopped before its workflow. It now checks for the named commands that it uses, and more tools are permitted. Against the real catalog, the old check fails with 9, and the new check passes: `.local/loom-next/logs/42-practice-catalog.log`. The practice script itself was not run again, because it starts its own app. The parent trial covers the real CLI and MCP path.
+
+## Direct text editing
+
+Baseline 1f27415. The backend is commit 5a51fa2. Plan and evidence: `.local/direct-text`. Logs: `.local/direct-text/logs`. Screenshots: `output/playwright/direct-text`. Full behavior: [Edit text on the video](docs/editing.md#edit-text-on-the-video).
+
+Added:
+
+- Double-click a text box or label on the video, or use **Edit on video** or F2, and type there. The box and the Text field are one draft, with visible **Done** and **Cancel**.
+- `preview.frame`, a read command: two images of one frame around one element, drawn by the same operations as the export.
+- `expectedText` on `element.update`: a guard, so a slow client cannot overwrite a newer text.
+- A draft view: the images, the browser text between them, and the video fade. It stays until the player shows the exact frame.
+
+Measured on `land90.mp4`, 1920 × 1080, 90 s, H.264, AAC, GOP 250, with a shape below, a label above, playhead at 45 s, window 1440 × 940:
+
+| Measured                                     | 1f27415                                 | Now                                |
+| -------------------------------------------- | --------------------------------------- | ---------------------------------- |
+| Key to the text on the screen, while typing  | Never. A key changes no pixel.          | 51 ms median, 65 ms worst, 20 keys |
+| The same in the box on the video             | No box                                  | 49 ms median, 66 ms worst, 20 keys |
+| The same with a frame reply that never comes | No box                                  | 52 ms median, 63 ms worst, 14 keys |
+| Apply to the correct text on the screen      | 13.9 s                                  | The text is already there          |
+| Picture during the exact render              | The source only. All elements are gone. | All layers, with the new text      |
+| Apply to the exact preview                   | 13.9 s                                  | 15.2 s                             |
+
+Read these numbers with care:
+
+- Key to screen is from the time stamp of the input event to the second animation frame after it. A screen capture confirmed changed pixels in at most 86 ms in the field and 54 ms in the box, and that time includes the capture.
+- The exact render is not faster. It has a 0.3 second wait, and this is one run of each. The gain is that the correct text no longer waits for it. The baseline first changed pixels after 80 ms, but that is the old picture going away. See `.local/direct-text/baseline.json`.
+- A frame pair takes 279 to 346 ms on this H.264 source, and 305 to 451 ms on a 1080p VP9 WebM with no cues and GOP 300. The app asks for it at selection, so typing does not wait for it. A cached pair takes at most 1 ms.
+- One machine, one window size for timing. The sources are generated test media, not real recordings.
+
+Tests:
+
+- Backend, at commit 5a51fa2: 182 tests in the affected suites, then 136 with the review fixes, and 70 with the final color rule.
+- Frame parity: a bar moves on each source frame, and the bar in the base image must be where it is in a real export. This covers cuts between frames, speeds 0.75 and 1.5, 24 and 60 fps, variable frame rate, long GOP, a nonzero start time, and a live WebM with no cues.
+- `test/text-edit-ui.test.js`, real pointer and keys: 27 tests. With `test/text-draft.test.js` and `test/ui-view-model.test.js`, that is 64 tests, and all pass on the final source.
+- `test/text-edit-visual.test.js`, real screen pixels: 12 tests, all pass, on the final source. This covers 1000 × 720, 1440 × 940, portrait, no old glyphs, other layers, layer order, placement against the exact render, colors against the real player, fades, fullscreen, the plate, and the export.
+- Other UI suites: 47 tests pass in 11 files before the last three small fixes. In that run, `test/ui-view-model.test.js` failed because its new red test was added during the run. Its helper came later, and it passes in the final run above. After the fixes, 26 tests pass in the 5 most exposed files. The other 6 files did not run again.
+- A full `npm test` was not run for this work.
+- An early run of the screenshot script stopped with no exact preview. This was a race in the script: it read the old Preview ready state before the page polled a CLI change. The next session then started from the old text, and the `expectedText` guard correctly refused the save. No production change came from this. The script now waits for the page to show the CLI text.
+
+Export: an edited video is compared with a control video that had the expected text from the start. The mean difference is under 0.05 of 255. Against the old text, it is over 0.5. There is no text recognition, so the control is the proof of the text.
+
+Findings from this work:
+
+- `drawtext` cuts text at the element box. The fit note, the guide, and the `element.add` description said that it extends outside. They are corrected. See `.local/direct-text/exp/overflow`.
+- The FFmpeg fade counts whole frames. It rounds the start and the length to frames, and a fade has at least one frame. Measured worst error against real exports: 0.006 of full level. A smooth line in seconds was wrong by up to 0.17 on a short fade.
+- Chromium shows the exact preview in other colors than a plain FFmpeg decode. #E02020 shows as 240,51,28 from 720 lines, and as 218,47,30 below, with no color tag. The draft follows the player. The export does not change.
+- A cancelled `pointerdown` also ends `click` and `dblclick` in Chromium, and so does a stage item that a redraw replaced. So the stage now cancels `mousedown`, and a click does not redraw the stage.
+- A screenshot found a bug that no test had found: a caret past the frame edge made the browser scroll the player, and the picture stayed moved. The editor layer now uses `overflow: clip`, with a regression test.
+
+Limits:
+
+- The draft text is a browser approximation of the exact text. Measured placement is within 3 pixels at both window sizes. Outline corners and hinting can differ.
+- In a vertical overflow, a `drawtext` outline can show a few pixels past the box.
+- A character that the font does not have can show in the draft and not in the exact preview.
+- Parity is proven for the listed sources only. Colors are measured on this machine with Electron 45. Another Chromium can differ.
+- IME is tested through the Chrome DevTools protocol, not with a real input method.
+- A draft that is not applied is lost if the app closes.
+- A render that already runs is not cancelled. It finishes, and the page ignores its result.

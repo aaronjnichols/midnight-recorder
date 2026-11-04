@@ -129,6 +129,8 @@ export async function forwardCommands(app, root) {
         (_, [name, value]) => (globalThis.stubs[name] = value),
         [command, result],
       ),
+    unstub: (command) =>
+      app.evaluate((_, name) => delete globalThis.stubs[name], command),
     // Page and test commands with their arguments, in order. Without a
     // command name, all commands.
     log: (command) =>

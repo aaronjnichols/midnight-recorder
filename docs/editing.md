@@ -17,7 +17,7 @@ Open a video in the library. The editor fills the window. The library sidebar do
 
 - **Top bar.** Library goes back to the library. The title and the video size. The save state and the preview state. Undo, Redo, and Export MP4. Exporting… shows while an export runs. Select it to open Details.
 - **Add buttons above the video.** Text, Label, Rectangle, Ellipse, and Arrow add an element at the playhead. The element shows for 3 seconds, or less if the video is shorter. Label adds text with a dark background that is easy to read.
-- **Video.** The rendered preview is the exact result. Dashed outlines show the elements at the playhead. Select an element to see its handles. Drag the element to move it. Drag a square handle to change its size. For an arrow, drag the round handles: the yellow handle is the tip. Press Esc during a drag to cancel it. Nothing is saved until you release the pointer. Each drag is one undo step.
+- **Video.** The rendered preview is the exact result. Dashed outlines show the elements at the playhead. Select an element to see its handles. Drag the element to move it. Drag a square handle to change its size. For an arrow, drag the round handles: the yellow handle is the tip. Press Esc during a drag to cancel it. Nothing is saved until you release the pointer. Each drag is one undo step. Double-click a text box to type on the video. See [Edit text on the video](#edit-text-on-the-video).
 - **Timeline dock.** One control row, the ruler, the track, and the lanes. See [Timeline](#timeline).
 - **Inspector and tool rail.** Six tools. Only one tool shows at a time. The rail is at the far right. The inspector scrolls by itself, so the video and the timeline stay in view. A video opens with Trim & cut.
   - **Trim & cut:** the fields for the exact selection start and end, and what Keep and Remove do. The line below the fields gives the selection, or tells you why the actions are not available. If the video has two or more parts, the Parts list shows here. See [Split and parts](#split-and-parts).
@@ -170,25 +170,97 @@ Units in the panel:
 - Times are seconds in the edited video. Set to playhead sets the start or end to the playhead time.
 - Fades are seconds.
 
-Keys: Delete and Backspace remove the selected element or caption of the open tool. A selection in another tool stays and does not change. Esc cancels a drag, then clears the selected element or caption, then clears the timeline selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. I and O do the same as Set start and Set end, in every tool. S splits at the playhead. + and - zoom the timeline, and 0 fits the video. On a tool tab, the arrow keys, Home, and End move between the tools. Keys in text fields and dialogs do not change elements.
+Keys: Delete and Backspace remove the selected element or caption of the open tool. A selection in another tool stays and does not change. Esc cancels a drag, then clears the selected element or caption, then clears the timeline selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. I and O do the same as Set start and Set end, in every tool. S splits at the playhead. F2 opens the selected text box on the video. + and - zoom the timeline, and 0 fits the video. On a tool tab, the arrow keys, Home, and End move between the tools. Keys in text fields and dialogs do not change elements.
 
-After a change, the app makes a new exact preview. While it does this, the video area shows the original video at the same time, without elements, and the element outlines. A note on the video tells you this. The preview replaces it when it is ready, at the same playhead time. Changes from the CLI or MCP show in the editor in the same way.
+After a change, the app makes a new exact preview. While it does this, the video area shows the original video at the same time, without elements, and the element outlines. A note on the video tells you this. The preview replaces it when it is ready, at the same playhead time. Changes from the CLI or MCP show in the editor in the same way. A change to the selected text box is different: see [Edit text on the video](#edit-text-on-the-video).
 
-Text does not wrap. If the text is larger than its box, the panel tells you, and **Make the text fit the box** makes the font size smaller. You can also add line breaks or make the box larger. In the video, text that is too large extends outside its box.
+Text does not wrap. If the text is larger than its box, the panel tells you, and **Make the text fit the box** makes the font size smaller. You can also add line breaks or make the box larger. In the video, the box cuts text that is too large.
+
+### Edit text on the video
+
+Text elements and labels use these rules. Captions use the Captions tool.
+
+To type on the video, do one of these:
+
+- Double-click the text box on the video. The caret goes to the point that you clicked.
+- Select **Edit on video** next to the Text field, or press F2. The caret goes to the end of the text.
+
+You can also type in the Text field. The box on the video and the Text field are two views of one draft, so you can go from one to the other in the same session. The video pauses. If the frame does not show the element, or shows it at less than half of its fade, the playhead moves to a frame that shows it.
+
+A click selects a box. A drag moves it, and the handles change its size. A press that moves less than 3 pixels is a click, so a double-click does not move the box. While the box is open, its handles do not show, and a press in the box places the caret.
+
+| Action                                          | Result                                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Enter                                           | Adds a line.                                                                                                                               |
+| Ctrl+Enter, or **Done**                         | Applies the draft.                                                                                                                         |
+| Click outside, Tab away, or go to another place | Applies the draft. This includes another element, tool, video, and the library. Going to another window does not end the session.          |
+| Esc, or **Cancel**                              | Cancels the draft. The saved text comes back, and nothing is saved. In fullscreen, the first Esc cancels only the edit.                    |
+| Ctrl+Z and Ctrl+Y in the text                   | Native undo and redo of your typing. They do not change the edit history.                                                                  |
+| Paste                                           | Pastes plain text. Other line separators become lines, and other control characters are removed. Paste does not cut the text at the limit. |
+| Copy, cut, select all, and input method (IME)   | Native. During an IME composition, Enter and Esc go to the composition.                                                                    |
+
+**Done** and **Cancel** show with the draft, in fullscreen also. A press on them does not end the draft first. Tab goes to them from the text.
+
+One session is one `element.update`, so it is one undo step. The draft saves once, when you apply it. A key press saves nothing and starts no render. If the text did not change, nothing is saved. After Apply, Ctrl+Z outside the text undoes all of the session.
+
+The limits are the limits of `element.add`: 1 to 500 characters, at most 10 lines, and at least one visible character. An empty field is normal while you type. A draft over a limit shows the reason at once. Apply refuses a draft that is not valid, and the draft stays.
+
+If the save fails, the draft stays. The top bar shows **Not saved**, and the controls change to **Try again** and **Discard**. If the text changed in another client after you started, the save does not overwrite it. The controls change to **Save my text** and **Discard**. **Save my text** reads the saved text again and saves your text over it. If you go to another element or video, a draft that failed waits in memory. It comes back when you select its element.
+
+#### Draft view
+
+The exact preview needs a full render, so a text change does not wait for it. The app shows the change in a draft view:
+
+- The first change of the text replaces the picture of that frame. The preview state shows **Draft view**, never **Preview ready**.
+- FFmpeg draws two images of the frame without the text box, with `preview.frame`: the layers below it, and the layers above it with the captions. The browser draws only the text box between them. So the old text is gone, other elements and captions stay, and an upper layer stays in front of the text.
+- The app asks for the images when you select a text box, so they are normally ready before you type. Typing never asks for images.
+- A saved change of the selected text box also uses the draft view, from any client. This includes the font, the size, the colors, a move, a resize, and Undo. A drag shows the text at its new place if the images are ready.
+- After Apply, the text stays on the picture until the player shows the exact preview at the same frame. Then the draft view goes.
+
+If the images are not ready, or fail, and the text changed, an opaque plate covers the box and its edge, with the new text on it. A note tells you this. The plate covers the other layers inside its area until the images or the exact preview arrive. Outside the plate, the picture does not change, also after Apply.
+
+No full-video render starts during a session. Only the two images of the frame can render, and only when the frame or the layers around the box change. One exact render starts after each Apply, after a wait of 0.3 seconds, so quick changes start one render. A render that already runs goes on, and the app ignores its result. Its file stays in the cache for Undo.
+
+The draft view is an approximation:
+
+- The browser draws the text, with the same font, size, alignment, outline, and box as the export. Small differences in the letters and outline corners are normal. The box cuts text in the same way. Exact preview and export are the true result.
+- A character that the font does not have can show in the draft and show as an empty box in the exact preview. The browser uses another font for it. FFmpeg does not.
+- The picture is one still frame. Play and seek wait until the exact preview shows, and `playback.status` gives `ready: false` until then. This applies to the page, the CLI, and MCP. If a text edit is open, the error tells you to select Done or Cancel.
+- The caret can go past the box or the frame in long text, and then you cannot see it on the video. The Text field shows all of the text.
+- The colors follow what the player shows for the exact preview. See `preview.frame` under [Commands](#commands).
+- The app does not keep a draft that you did not apply when you close the app. It does not keep a failed draft after a restart.
 
 ## Commands
 
-| Command             | Result                                                                                        |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `element.add`       | Adds a `text`, `rectangle`, `ellipse`, or `arrow` element. Returns `video` and `element`.     |
-| `element.update`    | Changes the properties that you give. Other properties stay the same. The type cannot change. |
-| `element.duplicate` | Copies an element. The copy has a new `id` and is directly above the original.                |
-| `element.order`     | Moves an element to a layer `index`. Index 0 is the bottom layer.                             |
-| `element.remove`    | Removes an element. Returns `video` and `removed`.                                            |
-| `element.list`      | Gives all elements, bottom layer first, with edited times, actual fades, and the `revision`.  |
-| `edit.configure`    | Also sets the video fades `fadeIn` and `fadeOut` in seconds. The result gives `videoFades`.   |
+| Command             | Result                                                                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `element.add`       | Adds a `text`, `rectangle`, `ellipse`, or `arrow` element. Returns `video` and `element`.                                                                            |
+| `element.update`    | Changes the properties that you give. Other properties stay the same. The type cannot change. An optional `expectedText` saves only if the stored text is that text. |
+| `element.duplicate` | Copies an element. The copy has a new `id` and is directly above the original.                                                                                       |
+| `element.order`     | Moves an element to a layer `index`. Index 0 is the bottom layer.                                                                                                    |
+| `element.remove`    | Removes an element. Returns `video` and `removed`.                                                                                                                   |
+| `element.list`      | Gives all elements, bottom layer first, with edited times, actual fades, and the `revision`.                                                                         |
+| `edit.configure`    | Also sets the video fades `fadeIn` and `fadeOut` in seconds. The result gives `videoFades`.                                                                          |
+| `preview.frame`     | Reads the picture around one element at one frame. Poll `export.status` for its job.                                                                                 |
 
 A property that the element type does not use is an error. For example, an arrow does not use `fill`.
+
+`expectedText` is a guard. If the stored text is not this text, `element.update` fails, saves nothing, and adds no history step. It is not stored. Text elements only.
+
+`preview.frame` takes `id`, `seconds`, `elementId`, and an optional `revision`. It only reads. It runs beside the command queue, so a save does not wait for it. The result has:
+
+- `under`: a PNG of the source frame and the layers below the element.
+- `over`: a transparent PNG of the layers above the element, then the captions. It is `null` if nothing is above the element.
+- `seconds`, `frameIndex`, and `baseRevision`: the output frame, and the revision of all that is around the element.
+- `frame` and `image`: the size of the rendered frame and of the images. The long edge of an image is at most 1920 pixels.
+- `fadeOpacity`: the black level of the video fades at this frame, from 0 to 1. The video fades are not in the images, so a client puts one black layer over all layers.
+- `displayColor`: `bt709`, `smpte170m`, or `null`.
+
+The element is in neither image, so the images stay valid while its text, style, or box changes. The images show the same source frame as the export, by the same output clock.
+
+The PNG colors are the colors that Chromium shows for the exact preview, so they can differ from a plain FFmpeg RGB decode of the same frame. FFmpeg draws on a video without a color tag as BT.601, and the exact preview has no tag either. Chromium shows that H.264 video with the BT.709 matrix from 720 lines (`bt709`). Below 720 lines, it uses BT.601 and converts the SMPTE 170M primaries to sRGB (`smpte170m`). A source with a color tag gives `null`, or `smpte170m` for that primaries tag. The export does not change. It stays the true result.
+
+The service runs at most 4 frame renders at one time, and refuses more with an error. A render has a 20 second limit. The cache keeps the last 6 frames of each video, and deleting the video removes them. Results give paths, not image data.
 
 Each change is one step in the edit history. `edit.undo` and `edit.redo` use the same history as trim, cut, split, speed, mute, video fades, and captions. The history keeps the last 100 steps. An older step cannot be undone. `edit.reset` has an optional `scope`:
 
