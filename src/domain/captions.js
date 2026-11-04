@@ -609,6 +609,34 @@ export function updateCue(timeline, sourceDuration, cueId, args) {
   return withCaptions(timeline, { ...captions, cues: checkTrack(cues) });
 }
 
+// Edited times are rounded to microseconds, so a time exactly at a limit can
+// map just past a source time. A limit stays this far inside.
+const LIMIT_MARGIN = 1e-5;
+
+// The edited times that a cue can reach. It stops at the captions around it
+// in source time, also at a caption that a cut hides: an overlap in source
+// time is not valid, and the next kept time is after that hidden caption.
+export function cueLimits(timeline, cueId) {
+  const cues = captionsOf(timeline)?.cues ?? [];
+  const index = cues.findIndex((cue) => cue.id === cueId);
+  const before = cues[index - 1]?.sourceEnd;
+  const after = cues[index + 1]?.sourceStart;
+  const { segments, speed } = timeline;
+  let lower = before === undefined ? 0 : null,
+    upper = after === undefined ? duration(timeline) : null,
+    elapsed = 0;
+  for (const segment of segments) {
+    if (lower === null && segment.end > before)
+      lower =
+        elapsed + Math.max(0, before - segment.start) / speed + LIMIT_MARGIN;
+    if (upper === null && segment.end >= after)
+      upper =
+        elapsed + Math.max(0, after - segment.start) / speed - LIMIT_MARGIN;
+    elapsed += (segment.end - segment.start) / speed;
+  }
+  return { lower: lower ?? elapsed, upper: upper ?? elapsed };
+}
+
 // Add one cue, for example for speech that recognition missed. It makes a
 // caption track with the default style if the video has none.
 export function addCue(timeline, sourceDuration, id, args) {

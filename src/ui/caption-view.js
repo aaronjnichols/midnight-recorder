@@ -29,6 +29,8 @@ export function cueRows(timeline, selectedId, now = -1) {
       timeText: visible
         ? cueTimeText(shown.start, shown.end)
         : "Cut from the video",
+      // The short time at the start of a row, as in a transcript.
+      startText: visible ? clockTenths(shown.start) : "Cut",
       selected: cue.id === selectedId,
       current: visible && now >= shown.start && now < shown.end,
     };

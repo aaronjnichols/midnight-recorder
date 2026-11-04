@@ -13,7 +13,7 @@ import {
   captionList,
 } from "../test-support/electron.js";
 
-const SHOTS = path.resolve("output/playwright/claude-editing-ux");
+const SHOTS = path.resolve("output/playwright/loom-redesign/tests");
 const TOOLS = [
   "Trim & cut",
   "Text & shapes",

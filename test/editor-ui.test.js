@@ -8,7 +8,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { frameAt, region } from "../test-support/frames.js";
 
 // The current editor layout. Earlier stage files in claude-editing stay.
-const SHOTS = path.resolve("output/playwright/claude-editing-ux");
+const SHOTS = path.resolve("output/playwright/loom-redesign/tests");
 
 async function launch(t, prefix) {
   await mkdir(".local/claude-editing", { recursive: true });
@@ -102,6 +102,12 @@ const ready = async (page, call) => {
 };
 const list = (call, id) => call("element.list", { id });
 const stored = async (call, id) => (await call("library.get", { id })).timeline;
+// Advanced numbers are in a disclosure. A user opens it with a click.
+async function openDisclosure(page, field) {
+  const details = page.locator(`details:has(${field})`);
+  if (!(await details.evaluate((node) => node.open)))
+    await details.locator("summary").click();
+}
 
 // Drag with real mouse events from a point by an offset.
 async function drag(page, from, dx, dy, { cancel = false } = {}) {
@@ -201,6 +207,7 @@ test(
 
     // A rejected value shows an error and does not change the saved state.
     const before = await stored(call, video.id);
+    await openDisclosure(page, "#el-x");
     await page.locator("#el-x").fill("90");
     await page.locator("#el-x").press("Enter");
     await page.waitForSelector("#message.error:not([hidden])");
@@ -315,6 +322,7 @@ test(
     await page
       .locator(`.layer-row[data-id="${label.id}"] .layer-select`)
       .click();
+    await openDisclosure(page, "#el-fade-in");
     await page.locator("#el-fade-in").fill("5");
     await page.locator("#el-fade-in").press("Enter");
     await until(
@@ -479,6 +487,17 @@ test(
     await page.locator("#video-title").focus();
     await page.keyboard.press("f");
     await page.waitForSelector(".player-shell.fullscreen");
+    // The page changes first, then the window. Measure after the window.
+    await until(
+      () =>
+        app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().endsWith("/ui/index.html"))
+            .isFullScreen(),
+        ),
+      "The window did not enter fullscreen.",
+    );
+    await page.waitForTimeout(300);
     const big = await until(async () => {
       const b = await page.locator("#stage").boundingBox();
       return b && b.height > stage.height * 1.2 ? b : null;
@@ -540,6 +559,7 @@ test(
       await setSize(app, width, height);
       await page.waitForTimeout(300);
       // The text element is selected. Its lowest field is the opacity.
+      await openDisclosure(page, "#el-opacity");
       await page.locator("#el-opacity").focus();
       await page.waitForTimeout(200);
       assert.equal(

@@ -187,3 +187,50 @@ The Edit video panel now has five tools: Trim & cut (the first tool), Text & sha
 Tests: `test/editor-navigation.test.js` checks, with real clicks and keys at 1000 × 720 and 1440 × 940, that the tools, selection fields, both actions, the reason, Undo, Redo, Export, and the video are in view and not covered. It also checks the keyboard trim and cut flow with one undo step each, the exact fractional end, tool changes, tab keys, the inspector on selection, the first-click caption seek, the Delete rule, and held add and apply replies. Mutation runs with each new guard removed failed. Earlier UI tests now open the tool of a moved control. Their assertions did not change.
 
 Three independent review findings (first-click seek, both actions at 1000 × 720, Delete in another tool) have regressions and were cleared. The full `npm test` run had 212 tests. All passed, none were skipped. Logs: `.local/claude-editing-ux/logs.md`. Screenshots before and after: `output/playwright/claude-editing-ux`.
+
+## Focused editor and direct timeline
+
+A user did not like the editor, and asked for an editor like Loom in the Midnight style. The earlier pass only moved the forms into tabs. This pass changes the workflow. The layout follows the actual Loom editor: compact header, video, context panel, slim tool rail, and a wide timeline. It uses the Midnight colors and new line icons. No Loom image or logo is in the app.
+
+| Measured at the window size | 593bcda at 1000 × 720 | Now at 1000 × 720 | 593bcda at 1440 × 940 | Now at 1440 × 940 |
+| --------------------------- | --------------------- | ----------------- | --------------------- | ----------------- |
+| Video area                  | 411 × 231             | 643 × 364         | 765 × 430             | 1019 × 560        |
+| Timeline width              | 413                   | 928               | 767                   | 1368              |
+| Page height, in a viewport  | 847 in 681            | 681 in 681        | 983 in 901            | 901 in 901        |
+
+What changed:
+
+- A focused workspace when a video is open. The library sidebar, large heading, repeated instructions, and second player bar do not show. Library goes back. The top bar has the save and preview state. The library and recorder pages did not change.
+- A timeline dock with a ruler, a playhead, gold handles, direct selection, zoom, Fit, and one control row. A drag changes only the draft selection. Keep and Remove are explicit, one undo step each.
+- Real context on the track: sampled frames and a sound wave from the source. New shared commands `overview.start`, `overview.cancel`, and `overview.result`, through the CLI and MCP. The app has 61 shared commands.
+- Timing lanes for elements and captions, with direct move and duration handles. One drag is one command and one undo step.
+- A compact palette, advanced numbers in disclosures, a caption list that reads like a transcript and follows the playhead, and Select on timeline for a caption. Delete caption does not change the video. Select on timeline makes a draft only.
+
+Measured read cost, on this computer: the sound of a 58.5 second AAC video in 132 ms, and of a 20 minute WebM without cues in 1.1 seconds. 48 frames at 1080p in 6.2 seconds. So the sound shows first, and the frames follow. In the tutorial workflow the wave showed about 1.5 seconds after the click, and the frames after about 8 seconds, with the preview load in the same time.
+
+Tests. Each new test failed first, or was written with its slice. Logs and an index are in `.local/loom-redesign/logs` and `.local/loom-redesign/evidence.md`.
+
+- Pure: `test/timeline-view.test.js` (pixels and times, zoom, ruler, drags, snapping, lanes, real `updateCue` and `updateElement` limits at fractional speeds), `test/overview.test.js` (bounds, identity, level and frame mapping through cuts and speed).
+- Real media: `test/overview-media.test.js` (known sound and color pattern, decoded frame times, a file with a nonzero start time, cache, damaged cache, cancel, time limits, portrait, no sound, silence).
+- Service, CLI, and MCP: `test/overview-agent.test.js` (nonblocking reads, one read at a time, shared reads, cancel, delete during a read, retained jobs, changed source, MCP default without images), `test/timeline-overview.test.js` (the page loader and late replies).
+- Desktop, with real clicks, keys, and drag coordinates: `test/editor-workspace.test.js`, `test/timeline-lanes.test.js`, `test/timeline-visual.test.js` (canvas pixels of real sound and frames).
+
+Earlier UI tests keep their assertions. They now open a disclosure, use the ruler instead of the removed seek slider, read the end from `#range-end`, and wait for the real fullscreen window. Their screenshots go to a new folder, so earlier evidence did not change.
+
+Independent reviews gave 17 numbered findings, all closed with regressions. They include endpoint precision at fractional speeds, source-aware caption limits, frames from removed parts, the frame clock of a file with a nonzero start, cache recovery through Retry, shared-read ownership, and scrub and save state ownership. A real first-click regression also came from the new caption form, and the old test found it. The real tutorial workflow found a missing callback for caption bars, after a late refactor. The focused lane tests then passed 5 of 5.
+
+The full `npm test` run had 300 tests. All passed, none failed, and none were skipped, in 680 seconds: `.local/loom-redesign/logs/30-full.log`. After this run, only comments and documents changed.
+
+Real tutorial workflow, in a separate library, with a 40 second excerpt of "First Steps" (Mike Newbon, Blender Studio, CC-BY): trim with the handles, remove a selection, add a label and set its duration on the lane, make 8 captions with the local speech engine, select a caption on the lane, select it on the timeline, remove it (5.57 seconds), set speed 1.25, and export. The exported MP4 is 17.97 seconds for an edited length of 17.94 seconds. Report: `.local/loom-redesign/workflow-report.json`.
+
+Screenshots at 1440 × 940 and 1000 × 720, before and after, with selected, zoomed, portrait, long list, and no-sound states: `output/playwright/loom-redesign`. They were inspected. An independent reviewer accepted the final states.
+
+Limits:
+
+- The frames and the wave come from the source. They do not show elements, captions, or fades. The rendered preview shows them. A mute shows as a gray wave.
+- At most 48 frames for a video. A long video has few frames for each minute, so a short kept part in it can have no frame. It then stays empty. It does not show a frame from a removed part.
+- On a long WebM without cues, each seek reads the file from the start. The 60 second frame limit can then give some frames only. The track says so. The 20 minute test file took about 150 ms for each seek, and a longer file was not measured.
+- Timing bars have no keyboard control. Use the fields in the inspector. The selection handles and the playhead have keyboard access.
+- More than two overlapping elements share a lane row without their names. Layers lists all of them.
+- There is no stitch, no second video track, no crop, no generated voice, and no background effect. These were not requested.
+- This pass does not change the open desktop capture and physical device checks above.

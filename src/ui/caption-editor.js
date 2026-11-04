@@ -3,6 +3,7 @@
 // command. Caption commands return a summary, so the page reads the video
 // again after a change. showVideo shows it only if the same video is open.
 import { duration } from "../domain/timeline.js";
+import { cueLimits } from "../domain/captions.js";
 import {
   cueRows,
   captionState,
@@ -13,6 +14,8 @@ import {
 } from "./caption-view.js";
 
 const POLL_MS = 400;
+// A manual scroll stops the list from following the playhead for this time.
+const BROWSE_MS = 4000;
 const round = (value) => Math.round(value * 1000) / 1000;
 
 export function createCaptionEditor({
@@ -25,7 +28,9 @@ export function createCaptionEditor({
   seek,
   isReady,
   range,
+  selectRange,
   onSelect,
+  onChange,
 }) {
   let video = null,
     rows = [],
@@ -37,11 +42,19 @@ export function createCaptionEditor({
     checking = null,
     listKey = "",
     restoring = false,
+    pressing = false,
+    browsedAt = 0,
     currentId = null,
     // The last caption job: { jobId, videoId, status }. It continues when
     // another video is open, and shows only with its own video.
     job = null;
   const form = $("#caption-form");
+  // A press that ends away from the row is not a click.
+  for (const type of ["pointerup", "pointercancel"])
+    document.addEventListener(type, () => setTimeout(() => (pressing = false)));
+  $("#tool-panels").addEventListener("wheel", () => (browsedAt = Date.now()), {
+    passive: true,
+  });
   const total = () => (video ? duration(video.timeline) : 0);
   const selected = () => rows.find((r) => r.id === selectedId) || null;
   const cueOf = (id) => video?.timeline.captions?.cues.find((c) => c.id === id);
@@ -102,12 +115,30 @@ export function createCaptionEditor({
     if (video) rows = cueRows(video.timeline, selectedId, playhead());
     renderList();
     renderForm();
+    onChange?.();
     const row = selected();
+    if (row) showRow(row.id);
     // Show the selected caption: move the playhead to its start.
     if (reveal && row && row.visibility !== "none" && isReady()) {
       const now = playhead();
       if (now < row.start || now >= row.end) seek(row.start);
     }
+  }
+
+  // Scrolls a row into the free part of the panel, above the selected
+  // caption. The next row also shows if there is room, so the user can read
+  // on.
+  function showRow(id) {
+    const row = $(`.caption-row[data-id="${CSS.escape(id)}"]`);
+    if (!row || row.closest("[hidden]")) return;
+    const panel = $("#tool-panels");
+    const view = panel.getBoundingClientRect();
+    const box = row.getBoundingClientRect();
+    const bottom = form.hidden ? view.bottom : form.getBoundingClientRect().top;
+    const last = (row.nextElementSibling ?? row).getBoundingClientRect().bottom;
+    if (box.top < view.top) panel.scrollTop -= view.top - box.top + 4;
+    else if (last > bottom)
+      panel.scrollTop += Math.min(last - bottom + 4, box.top - view.top);
   }
 
   // Runs one shared caption command for the open video, then reads the
@@ -160,16 +191,20 @@ export function createCaptionEditor({
         button.type = "button";
         button.className = "layer-select caption-select";
         button.setAttribute("aria-pressed", String(row.selected));
-        const number = document.createElement("span");
-        number.className = "caption-number";
-        number.textContent = String(index + 1);
         const time = document.createElement("span");
         time.className = "layer-time";
-        time.textContent = row.timeText;
+        time.textContent = row.startText;
+        time.title = row.timeText;
         const text = document.createElement("span");
         text.className = "layer-name caption-text";
         text.textContent = row.text;
-        button.append(number, time, text);
+        button.append(time, text);
+        button.setAttribute(
+          "aria-label",
+          `Caption ${index + 1}, ${row.timeText}: ${row.text}`,
+        );
+        const badges = document.createElement("span");
+        badges.className = "caption-badges";
         for (const [show, label, kind] of [
           [row.check, "Check", "check"],
           [row.visibility === "partial", "Part cut", "partial"],
@@ -179,14 +214,21 @@ export function createCaptionEditor({
             const badge = document.createElement("span");
             badge.className = `caption-badge ${kind}`;
             badge.textContent = label;
-            button.append(badge);
+            badges.append(badge);
           }
+        if (badges.childElementCount) button.append(badges);
+        // Selection follows the keyboard focus. A press also gives focus, but
+        // it selects at the click: the selected caption shows at the bottom
+        // of the panel, and it must not move under the pointer before the
+        // release, or the click does not occur.
+        button.addEventListener("pointerdown", () => (pressing = true));
         button.addEventListener("focus", () => {
-          if (!restoring && selectedId !== row.id) select(row.id);
+          if (!restoring && !pressing && selectedId !== row.id) select(row.id);
         });
-        button.addEventListener("click", () =>
-          select(row.id, { reveal: true }),
-        );
+        button.addEventListener("click", () => {
+          pressing = false;
+          select(row.id, { reveal: true });
+        });
         item.append(button);
         return item;
       }),
@@ -216,8 +258,15 @@ export function createCaptionEditor({
     for (const node of $("#caption-list").querySelectorAll(".current"))
       node.classList.remove("current");
     currentId = id;
-    if (id)
-      $(`.caption-row[data-id="${CSS.escape(id)}"]`)?.classList.add("current");
+    if (!id) return;
+    $(`.caption-row[data-id="${CSS.escape(id)}"]`)?.classList.add("current");
+    if (following()) showRow(id);
+  }
+
+  // The list follows the playhead, but not while the user reads or types.
+  function following() {
+    if (form.contains(document.activeElement)) return false;
+    return Date.now() - browsedAt > BROWSE_MS;
   }
 
   const editing = (node, force) =>
@@ -297,6 +346,7 @@ export function createCaptionEditor({
       input.value = row.visibility === "none" ? "" : String(round(row[key]));
       input.dataset.dirty = "";
     }
+    $("#cap-select-range").disabled = row.visibility === "none";
     $("#cap-check").hidden = !row.check;
     $("#cap-check").textContent =
       "Check this caption. Speech recognition was not sure of a word, or a cut removed part of a word.";
@@ -316,7 +366,10 @@ export function createCaptionEditor({
   function scope() {
     if (!$("#caption-range-only").checked) return {};
     const { start, end, valid } = range();
-    if (!valid) throw new Error("Set a valid range in Range first.");
+    if (!valid)
+      throw new Error(
+        "Select a valid part of the video on the timeline first.",
+      );
     return { start, end };
   }
   function closeConfirmation() {
@@ -424,7 +477,8 @@ export function createCaptionEditor({
     const current = job;
     if (!current || video?.id !== current.videoId) return;
     queue(async () => {
-      await call("captions.apply", { jobId: current.jobId });
+      // This command has a job ID, so the page tells whose edit this is.
+      await call("captions.apply", { jobId: current.jobId }, current.videoId);
       const status = await call("captions.status", { jobId: current.jobId });
       if (job !== current) return;
       job.status = status;
@@ -578,6 +632,12 @@ export function createCaptionEditor({
     );
   }
   $("#cap-delete").addEventListener("click", () => deleteSelected());
+  // A draft selection on the timeline. The video changes only with Keep or
+  // Remove. Delete caption changes only the caption.
+  $("#cap-select-range").addEventListener("click", () => {
+    const row = selected();
+    if (row && row.visibility !== "none") selectRange(row.start, row.end);
+  });
   form.addEventListener("submit", (event) => event.preventDefault());
 
   return {
@@ -601,5 +661,20 @@ export function createCaptionEditor({
       selection++;
     },
     deleteSelected,
+    // The timeline bars: captions in the edited video.
+    timelineItems: () =>
+      rows
+        .filter((row) => row.visibility !== "none")
+        .map(({ id, text, start, end }) => ({
+          id,
+          name: text,
+          start,
+          end,
+          selected: id === selectedId,
+        })),
+    selectItem: (id, options) => select(id, options),
+    limits: (id) => cueLimits(video.timeline, id),
+    setTimes: (id, changes) =>
+      command("captions.update", { cueId: id, ...changes }),
   };
 }

@@ -122,9 +122,8 @@ test(
         () =>
           page.evaluate(
             (s) =>
-              Math.abs(
-                Number(document.querySelector("#preview-seek").max) - s,
-              ) < 1e-6,
+              Math.abs(Number(document.querySelector("#range-end").max) - s) <
+              1e-6,
             seconds,
           ),
         `The page did not show ${seconds} seconds.`,

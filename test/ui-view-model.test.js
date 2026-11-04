@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   clock,
+  clockTenths,
   libraryView,
   exportRows,
   finishedExports,
@@ -9,8 +10,61 @@ import {
   readableError,
   playheadValue,
   rangeCheck,
+  saveState,
   shortcut,
 } from "../src/ui/view-model.js";
+
+test("the playhead time shows tenths and does not run ahead", () => {
+  assert.equal(clockTenths(0), "0:00.0");
+  assert.equal(clockTenths(3.5), "0:03.5");
+  assert.equal(clockTenths(1.99), "0:01.9");
+  assert.equal(clockTenths(3661.25), "1:01:01.2");
+  assert.equal(clockTenths(Number.NaN), "0:00.0");
+});
+
+test("the save state tells only what is true", () => {
+  const state = (values) =>
+    saveState({ saving: false, failed: false, dirty: false, ...values });
+  assert.equal(state({}).text, "Saved");
+  assert.equal(state({ saving: true }).text, "Saving…");
+  assert.equal(state({ dirty: true }).text, "Not saved yet");
+  assert.equal(state({ failed: true }).text, "Not saved");
+  // A running save comes first. A field with a change comes before an old
+  // failure, because it tells the user what to do.
+  assert.equal(state({ saving: true, dirty: true }).state, "saving");
+  assert.equal(state({ dirty: true, failed: true }).state, "dirty");
+  for (const values of [
+    {},
+    { saving: true },
+    { dirty: true },
+    { failed: true },
+  ])
+    assert.ok(state(values).detail.length > 10);
+});
+
+test("zoom keys work in the editor and not in a text field or the library", () => {
+  const editor = {
+    view: "editor",
+    ready: false,
+    paused: true,
+    seconds: 0,
+    duration: 10,
+    canUndo: false,
+    canRedo: false,
+  };
+  const press = (key, values = {}) => ({ key, target: {}, ...values });
+  assert.deepEqual(shortcut(press("+", { shiftKey: true }), editor), {
+    local: "zoom-in",
+  });
+  assert.deepEqual(shortcut(press("="), editor), { local: "zoom-in" });
+  assert.deepEqual(shortcut(press("-"), editor), { local: "zoom-out" });
+  assert.deepEqual(shortcut(press("0"), editor), { local: "zoom-fit" });
+  const text = { tagName: "INPUT", type: "number" };
+  assert.equal(shortcut(press("-", { target: text }), editor), null);
+  assert.equal(shortcut(press("0", { target: text }), editor), null);
+  assert.equal(shortcut(press("0"), { ...editor, view: "library" }), null);
+  assert.equal(shortcut(press("-", { ctrlKey: true }), editor), null);
+});
 
 test("clock shows minutes, seconds, and hours", () => {
   assert.equal(clock(0), "0:00");

@@ -84,7 +84,7 @@ test(
             "\n",
         );
     });
-    await page.waitForSelector("h1");
+    await page.waitForSelector("#library-view h1");
     assert.match(
       await page.locator("#library-view h1").innerText(),
       /Your video workspace/,
@@ -158,8 +158,13 @@ test(
     assert.ok(Math.abs((await call("playback.status")).seconds - 0.5) < 0.05);
     await call("playback.play");
     await call("playback.pause");
-    await page.locator("#preview-seek").fill("0.6");
-    await page.locator("#preview-seek").dispatchEvent("change");
+    // The timeline ruler is the seek control. The edited video is 1 second.
+    const ruler = await page.locator("#timeline-ruler").boundingBox();
+    await page.mouse.click(ruler.x + ruler.width * 0.6, ruler.y + 4);
+    for (let i = 0; i < 50; i++) {
+      if (Math.abs((await call("playback.status")).seconds - 0.6) < 0.05) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     assert.ok(Math.abs((await call("playback.status")).seconds - 0.6) < 0.05);
     await call("playback.configure", { volume: 0.25 });
     assert.equal((await call("playback.status")).volume, 0.25);

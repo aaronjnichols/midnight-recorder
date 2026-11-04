@@ -36,6 +36,7 @@ const HANDLE_NAMES = {
 };
 const COLOR_KEYS = ["background", "outline", "fill", "stroke"];
 const MIN_SIZE = 0.01;
+const SVG = "http://www.w3.org/2000/svg";
 
 export function createElementEditor({
   $,
@@ -48,6 +49,7 @@ export function createElementEditor({
   isReady,
   frameSize,
   onSelect,
+  onChange,
 }) {
   let video = null,
     elements = [],
@@ -100,6 +102,7 @@ export function createElementEditor({
     renderForm();
     renderStage();
     renderToolbar();
+    onChange?.();
     const element = selected();
     // Show the selected element: move the playhead into its time.
     if (reveal && element && element.visibility !== "none" && isReady()) {
@@ -175,6 +178,8 @@ export function createElementEditor({
     const element = selected();
     for (const id of ["text", "label", "rectangle", "ellipse", "arrow"])
       $(`#add-${id}`).disabled = !video;
+    // The actions show with the element that they change.
+    $("#element-actions").hidden = !element;
     $("#duplicate-element").disabled = !element;
     $("#delete-element").disabled = !element;
     $("#raise-element").disabled =
@@ -203,29 +208,19 @@ export function createElementEditor({
         button.type = "button";
         button.className = "layer-select";
         button.setAttribute("aria-pressed", String(row.selected));
-        const icon = document.createElement("span");
-        icon.className = `layer-icon type-${row.type}`;
+        const icon = document.createElementNS(SVG, "svg");
+        icon.setAttribute("class", `icon layer-icon type-${row.type}`);
         icon.setAttribute("aria-hidden", "true");
-        icon.textContent = {
-          text: "T",
-          rectangle: "▭",
-          ellipse: "◯",
-          arrow: "↗",
-        }[row.type];
+        const use = document.createElementNS(SVG, "use");
+        use.setAttribute("href", `#i-${row.type}`);
+        icon.append(use);
         const name = document.createElement("span");
         name.className = "layer-name";
         name.textContent = row.name;
         const time = document.createElement("span");
         time.className = "layer-time";
         time.textContent = row.timeText;
-        const track = document.createElement("span");
-        track.className = "layer-track";
-        track.setAttribute("aria-hidden", "true");
-        const bar = document.createElement("i");
-        bar.style.left = `${row.left}%`;
-        bar.style.width = `${row.width}%`;
-        track.append(bar);
-        button.append(icon, name, time, track);
+        button.append(icon, name, time);
         // Selection follows the keyboard focus. A click also moves the
         // playhead into the element's time.
         button.addEventListener("focus", () => {
@@ -668,5 +663,19 @@ export function createElementEditor({
     deleteSelected,
     cancelGesture,
     typeLabel: (type) => TYPE_LABELS[type],
+    // The timeline bars: elements in the edited video.
+    timelineItems: () =>
+      layerRows(elements, selectedId, total())
+        .filter((row) => row.visibility !== "none")
+        .map(({ id, name, start, end, selected }) => ({
+          id,
+          name,
+          start,
+          end,
+          selected,
+        })),
+    selectItem: (id, options) => select(id, options),
+    setTimes: (id, changes) =>
+      command("element.update", { elementId: id, ...changes }),
   };
 }

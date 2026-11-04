@@ -25,6 +25,9 @@ export function createTools({ onChange } = {}) {
         tab.tabIndex = on ? 0 : -1;
         panelOf(tab).hidden = !on;
       }
+      // All tools share one scroll area. A new tool starts at its top.
+      const area = panelOf(next).parentElement;
+      if (area) area.scrollTop = 0;
       onChange?.(name);
     }
     if (focus) next.focus();
@@ -32,12 +35,16 @@ export function createTools({ onChange } = {}) {
 
   for (const [index, tab] of tabs.entries()) {
     tab.addEventListener("click", () => show(tab.dataset.tool));
-    // Left and Right go around the tabs. Home and End go to the first and
-    // last tab. The page shortcuts ignore these keys on a tab.
+    // The arrow keys go around the tabs of the rail. Home and End go to the
+    // first and last tab. The page shortcuts ignore these keys on a tab.
     tab.addEventListener("keydown", (event) => {
+      const next = (index + 1) % tabs.length;
+      const previous = (index - 1 + tabs.length) % tabs.length;
       const target = {
-        ArrowRight: (index + 1) % tabs.length,
-        ArrowLeft: (index - 1 + tabs.length) % tabs.length,
+        ArrowRight: next,
+        ArrowDown: next,
+        ArrowLeft: previous,
+        ArrowUp: previous,
         Home: 0,
         End: tabs.length - 1,
       }[event.key];

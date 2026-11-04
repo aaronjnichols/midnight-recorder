@@ -19,7 +19,7 @@ import { frameAt, region, isWhite } from "../test-support/frames.js";
 
 const TUTORIAL = path.resolve(".local/transcript-validation/blender.mp4");
 // The current editor layout. Earlier stage files in claude-editing stay.
-const SHOTS = path.resolve("output/playwright/claude-editing-ux");
+const SHOTS = path.resolve("output/playwright/loom-redesign/tests");
 const available = await access(TUTORIAL).then(
   () => true,
   () => false,

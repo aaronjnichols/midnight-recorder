@@ -25,19 +25,25 @@ Use Import video to add an existing MP4, WebM, MOV, or MKV file. The app copies 
 
 Type in Search by title to find a video. The library count always shows all videos. If no title matches, select Clear search. An Edited label shows on a video that has edits.
 
-Open a video to edit it. The Edit video panel has five tools: **Trim & cut**, **Text & shapes**, **Captions**, **Speed & sound**, and **Details**. A video opens with Trim & cut. Undo, Redo, and Export MP4 are always in the top bar.
+Open a video to edit it. The editor fills the window, and the page does not scroll. The top bar has Library, the title, the save and preview state, Undo, Redo, and Export MP4. The Add buttons are above the video. The inspector is to the right of the video, and the tool rail is at the far right. The tools are **Trim & cut**, **Text & shapes**, **Captions**, **Speed & sound**, and **Details**. A video opens with Trim & cut. The timeline is below the video and is as wide as the window.
 
-To trim or cut, set the start and the end of a selection. Move the playhead, then press I for the start and O for the end, or select Set to playhead, or type the times. **Keep only the selection** removes the video before and after the selection. **Remove the selection** removes it and joins the parts around it. Each is one undo step. If the actions are not available, the line above them tells you why. All times refer to the current edited video. The fields show two decimals. At some speeds, the edited end has more decimals. For example, a 10 second video at 1.5x speed ends at 6.666... seconds. A playhead at the end, or an end value up to 0.005 seconds after the end, selects the exact end.
+To trim or cut, drag on the timeline to select a part of the video. Drag a gold handle to change the selection, or drag the selection to move it. A drag changes only the draft selection. The video does not change until you select an action. **Keep** (Keep only the selection) removes the video before and after the selection. **Remove** (Remove the selection) removes it and joins the parts around it. Each is one undo step. Esc during a drag restores the earlier selection. After a drag, Esc first clears a selected element or caption. If none is selected, Esc clears the selection on the timeline. The X beside the selection also clears it.
 
-The timeline shows the kept parts of the video, the playhead, and the selection. Select a point on the timeline to move the playhead. When a selection is set, the timeline shows it in every tool, and its button opens Trim & cut. The selection stays when you change elements or captions. A trim, cut, or speed change resets it. Speed, mute, and the video fades are in Speed & sound and also apply to export. The title, Reset all edits, and Delete video are in Details. Undo, Redo, and Reset all edits keep the source file unchanged. A tool change does not change the video or the undo history.
+You can also press I for the start and O for the end at the playhead, or type exact times in Trim & cut. With a handle in focus, the arrow keys move it 0.1 seconds, and Shift with an arrow key moves it 1 second. All times refer to the current edited video. The fields show two decimals. At some speeds, the edited end has more decimals. For example, a 10 second video at 1.5x speed ends at 6.666... seconds. A handle at the end of the track, a playhead at the end, or an end value up to 0.005 seconds after the end selects the exact end.
+
+The timeline has a time ruler, the kept parts of the video, real frames, a real sound wave, the playhead, the selection, and one bar for each element and caption. Select a point on the ruler or the track to move the playhead, or drag the ruler. Use Zoom in, Zoom out, and Fit, or hold Ctrl and turn the mouse wheel over the timeline. A selection shows in every tool, and its button opens Trim & cut. The selection stays when you change elements or captions. A trim, cut, or speed change resets it. Speed, mute, and the video fades are in Speed & sound and also apply to export. The title, the Exports list, the keyboard shortcuts, Reset all edits, and Delete video are in Details. Undo, Redo, and Reset all edits keep the source file unchanged. A tool change does not change the video or the undo history.
+
+The frames and the sound wave on the track come from the source video, mapped through your cuts and speed. They do not show text, shapes, or captions. The rendered preview above the timeline shows those. The track tells you when the app reads the source, when a video has no sound, when the sound is silent or muted, or when a read failed. Retry reads the source again. Trimming works in all of these states. See [timeline overview](docs/editing.md#timeline-overview).
+
+The top bar shows Saved only when all edits to the open video are saved. It shows Saving… during a change, Not saved yet when a field has a change, and Not saved after a rejected change. The app saves each change to the library at once. A draft selection is not an edit.
 
 The app prepares edited previews in the background. The preview and export use the same FFmpeg renderer. The app also prepares a compatible preview if it cannot play an imported source codec. Preview controls become available when the preview is ready.
 
-Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not replace an existing file. The Exports list below the editor shows the file name, folder, and state of each export of the open video. A message shows when an export is complete or fails.
+Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not replace an existing file. The top bar shows Exporting… while an export runs. The Exports list in Details shows the file name, folder, and state of each export of the open video. A message shows when an export is complete or fails.
 
 ### Keyboard shortcuts
 
-Editor keys do not operate when a text field or a list has focus. A key that you press during an operation applies after the operation is complete. On a tool tab, Left arrow, Right arrow, Home, and End move between the tools and do not move the playhead. Delete and Backspace change only the selection of the open tool. A selection in another tool stays and does not change.
+Editor keys do not operate when a text field or a list has focus. A key that you press during an operation applies after the operation is complete. On a tool tab, the arrow keys, Home, and End move between the tools and do not move the playhead. On a selection handle, the arrow keys, Page Up, Page Down, Home, and End move the handle and do not move the playhead. Delete and Backspace change only the selection of the open tool. A selection in another tool stays and does not change.
 
 | Key                                       | Action                                                                    | Shared command                      |
 | ----------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------- |
@@ -45,6 +51,8 @@ Editor keys do not operate when a text field or a list has focus. A key that you
 | Left arrow or Right arrow                 | Move the playhead 5 seconds                                               | `playback.seek`                     |
 | Shift + Left arrow or Shift + Right arrow | Move the playhead 1 second                                                | `playback.seek`                     |
 | I or O                                    | Set the selection start or end to the playhead, in any tool               | None. This changes a form value.    |
+| + or -                                    | Zoom the timeline in or out                                               | None. This changes the page view.   |
+| 0                                         | Fit the video in the timeline                                             | None. This changes the page view.   |
 | Ctrl + Z                                  | Undo an edit                                                              | `edit.undo`                         |
 | Ctrl + Shift + Z or Ctrl + Y              | Redo an edit                                                              | `edit.redo`                         |
 | F                                         | Enter or leave fullscreen preview                                         | `playback.fullscreen`               |
@@ -59,7 +67,7 @@ The default data folder is `.local/data` in this project folder. The app, CLI, a
 - `library.json`, the video records and edit history.
 - `media`, the source video copies.
 - `pending`, recording files that the app has not yet imported.
-- `previews`, cached copies of edited videos. Deleting a library video also removes its previews.
+- `previews`, cached copies of edited videos and timeline overviews. Deleting a library video also removes them.
 - `connection.json`, the local agent connection and token.
 - `electron`, the desktop session data.
 
@@ -161,7 +169,7 @@ For label placement, inspect the start, middle, and end of the proposed interval
 
 Add text, labels, rectangles, ellipses, and arrows to the edited video. Each element has a start and end time, a layer, an opacity, and an optional fade in and fade out. The video can also fade in from black and fade out to black. The preview, the export, and frame inspection show the same result. The original file does not change.
 
-In the desktop editor, use the Add buttons above the video to add an element at the playhead. Select an element in the video or in Layers: the Text & shapes tool opens with its properties. Drag it to move it, or drag a handle to change its size or an arrow end. Change exact values in the properties. Duplicate, Forward, Backward, and Delete are above Layers. Each change is one undo step.
+In the desktop editor, use the Add buttons above the video to add an element at the playhead. Select an element in the video, on the timeline, or in Layers: the Text & shapes tool opens with its properties. Drag it to move it, or drag a handle to change its size or an arrow end. On the timeline, drag its bar to move its time, or drag a handle of the selected bar to change its start or end. Change exact values in the properties. Position, size, fades, and opacity are in disclosures. Duplicate, Forward, Backward, and Delete are in the Layers heading. Each change is one undo step.
 
 Agents use `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`, and `edit.configure` for video fades:
 
@@ -180,9 +188,11 @@ The only transition effects are an element fade in and fade out (an opacity chan
 
 Make captions from the English speech in a video. Speech recognition runs on this computer. In the editor, open the Captions tool and select Make captions from speech. The tool shows the progress, and Cancel stops the job. When recognition is complete, the captions are added as one undo step. Labels and shapes do not change.
 
-The caption list in the Captions tool shows each caption with its time and text. Select a caption to move the playhead to it and to show its text, start, and end below the list. Correct the text, or use Set to playhead to change a time. Check marks the captions where recognition was not sure of a word, or where a cut removed part of a word. Caption style for all captions sets the size, position, color, and an optional background band. Show captions turns the captions on or off in the preview and export. + Caption at playhead adds a caption by hand. Delete removes the selected caption. Remove all captions removes the track. Each change is one undo step.
+The caption list in the Captions tool reads like a transcript: each caption with its time and text. It follows the playhead, and stops following while you type or scroll. Select a caption in the list or on the timeline to move the playhead to it and to show its text, start, and end below the list. Correct the text, drag its bar on the timeline, or use Set to playhead to change a time. Check marks the captions where recognition was not sure of a word, or where a cut removed part of a word. Caption style for all captions sets the size, position, color, and an optional background band. Show captions turns the captions on or off in the preview and export. Add caption adds a caption by hand at the playhead. Delete caption removes the selected caption, and does not change the video. Remove all captions removes the track. Each change is one undo step.
 
-If the video has captions, Make new captions from speech asks you to confirm the replacement first. Only the selection uses the selection times from Trim & cut, so the other captions stay. The confirmation shows the exact scope.
+To cut the speech of a caption, select the caption and select **Select on timeline**. This makes a draft selection. Then select Remove. The video changes only at that step.
+
+If the video has captions, Make new captions from speech asks you to confirm the replacement first. Only the selection uses the selection on the timeline, so the other captions stay. The confirmation shows the exact scope.
 
 Agents use the same commands:
 
@@ -239,17 +249,18 @@ The agent connection binds to `127.0.0.1` on a random port. It requires a random
 | Export             | `export.start`, `export.status`                                                                                                                                                                               |
 | Preview rendering  | `preview.start`, with job state from `export.status`                                                                                                                                                          |
 | Frame inspection   | `inspect.start`, `inspect.result`, with job state from `export.status`                                                                                                                                        |
+| Timeline overview  | `overview.start`, `overview.cancel`, `overview.result`, with job state from `export.status`                                                                                                                   |
 | Timed speech       | `transcript.capabilities`, `transcript.start`, `transcript.status`, `transcript.read`, `transcript.search`, `transcript.cancel`                                                                               |
 | Captions           | `captions.generate`, `captions.status`, `captions.cancel`, `captions.draft`, `captions.apply`, `captions.list`, `captions.update`, `captions.add`, `captions.delete`, `captions.configure`, `captions.remove` |
 | Preview            | `playback.open`, `playback.play`, `playback.pause`, `playback.seek`, `playback.status`, `playback.configure`, `playback.fullscreen`                                                                           |
 
 ## Code structure
 
-- `src/domain` has time-range edits, time conversion, timed elements, captions from words, and the render plans. It has no Electron or file-system dependencies.
+- `src/domain` has time-range edits, time conversion, timed elements, captions from words, the render plans, and the overview plan and mapping. It has no Electron or file-system dependencies.
 - `src/application` has command schemas, validation, and workflow state. It uses injected adapters.
-- `src/adapters` has file storage and FFmpeg operations.
+- `src/adapters` has file storage and FFmpeg operations. `src/adapters/overview.js` reads the sound levels and frames of a source.
 - `src/desktop` has Electron setup, capture, permissions, and IPC.
-- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. `src/ui/caption-view.js` has the caption panel rules. These have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles. `src/ui/caption-editor.js` has the caption jobs, list, and panel. `src/ui/tools.js` has the editing tool tabs.
+- `src/ui` has the desktop page and styles. `src/ui/view-model.js` has the page state rules and keyboard map. `src/ui/stage.js` has the geometry for direct editing on the video, and `src/ui/element-view.js` has the element panel rules. `src/ui/caption-view.js` has the caption panel rules. These have no DOM or Electron dependencies, so `node:test` checks them directly. `src/ui/timeline-view.js` has the timeline rules: pixels and times, zoom, the ruler, drags, snapping, and lanes. `src/ui/element-editor.js` has the element toolbar, layers, panel, and handles. `src/ui/caption-editor.js` has the caption jobs, list, and panel. `src/ui/tools.js` has the editing tool rail. `src/ui/timeline.js` has the timeline dock and its pointer gestures. `src/ui/timeline-overview.js` loads the overview of the open video.
 - `src/agent` has the local server, CLI, and MCP adapters.
 
 The command service serializes changes. Exports run as background jobs. Each export uses the edit state from the time the job starts.

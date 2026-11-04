@@ -9,8 +9,10 @@ import { recordedSeconds } from "../domain/recording.js";
 import { createElementEditor } from "./element-editor.js";
 import { createCaptionEditor } from "./caption-editor.js";
 import { createTools } from "./tools.js";
+import { createTimeline } from "./timeline.js";
 import {
   clock,
+  clockTenths,
   libraryView,
   exportRows,
   finishedExports,
@@ -18,10 +20,41 @@ import {
   readableError,
   playheadValue,
   rangeCheck,
+  saveState,
   shortcut,
 } from "./view-model.js";
 const $ = (selector) => document.querySelector(selector);
-const call = (name, args = {}) => window.midnight.execute(name, args);
+// Commands that change saved edits. The top bar shows their true state.
+const SAVED_EDIT =
+  /^(edit\.|element\.(add|update|remove|duplicate|order)$|captions\.(add|update|delete|configure|remove|apply)$|library\.rename$)/;
+// Each state belongs to one video, so a late reply cannot change the state of
+// another open video.
+const pendingEdits = new Map(),
+  failedEdits = new Set();
+function call(name, args = {}, id = args.id) {
+  const result = window.midnight.execute(name, args);
+  if (!SAVED_EDIT.test(name)) return result;
+  pendingEdits.set(id, (pendingEdits.get(id) ?? 0) + 1);
+  renderSaveState();
+  const done = (failed) => {
+    const left = pendingEdits.get(id) - 1;
+    if (left) pendingEdits.set(id, left);
+    else pendingEdits.delete(id);
+    if (failed) failedEdits.add(id);
+    else failedEdits.delete(id);
+    renderSaveState();
+  };
+  return result.then(
+    (value) => {
+      done(false);
+      return value;
+    },
+    (error) => {
+      done(true);
+      throw error;
+    },
+  );
+}
 let selectedVideo,
   sources = [],
   currentRecording = "idle",
@@ -145,10 +178,9 @@ const tools = createTools({
 // scrolls only if the properties are not already in view.
 function reveal(selector) {
   const node = $(selector),
-    panel = $(".edit-panel");
+    panel = $("#tool-panels");
   if (!node || node.closest("[hidden]")) return;
-  const top = $(".tool-head").getBoundingClientRect().bottom;
-  const bottom = Math.min(panel.getBoundingClientRect().bottom, innerHeight);
+  const { top, bottom } = panel.getBoundingClientRect();
   const box = node.getBoundingClientRect();
   if (box.top < top || box.top > bottom - 160)
     panel.scrollTop += box.top - top - 8;
@@ -194,6 +226,7 @@ const editor = createElementEditor({
     captions.deselect();
     showSelection("elements", "#element-heading");
   },
+  onChange: () => timeline.renderLanes(),
 });
 const captions = createCaptionEditor({
   $,
@@ -205,12 +238,75 @@ const captions = createCaptionEditor({
   seek,
   isReady: () => previewReady,
   range: () => checkRange(),
+  selectRange: (start, end) =>
+    writeRange({ start: String(start), end: String(end) }),
   onSelect: () => {
     editor.deselect();
     showSelection("captions", "#caption-form");
   },
+  onChange: () => timeline.renderLanes(),
+});
+// Moves the playhead for a click on the timeline. It waits for the current
+// action, so the click is not lost.
+function seekFromTimeline(time) {
+  if (!selectedVideo) return;
+  if (!previewReady) {
+    notice("Wait for the preview. Then select a point on the timeline.");
+    return;
+  }
+  const id = selectedVideo.id;
+  enqueue(async () => {
+    if (selectedVideo?.id !== id || !previewReady) return;
+    await call("playback.seek", { seconds: time });
+  });
+}
+// A drag on the ruler sends many times. One seek runs at a time, and only the
+// latest time waits. A waiting time belongs to its view and its time mapping,
+// so it cannot move another video, or a video that a trim or cut changed.
+let scrubTarget = null,
+  scrubbing = false;
+async function scrub(time) {
+  if (!selectedVideo) return;
+  scrubTarget = { time, timing: rangeKey, view: viewGeneration };
+  if (scrubbing) return;
+  scrubbing = true;
+  while (scrubTarget) {
+    const target = scrubTarget;
+    scrubTarget = null;
+    if (target.timing !== rangeKey || target.view !== viewGeneration) continue;
+    await call("playback.seek", { seconds: target.time }).catch(() => {});
+  }
+  scrubbing = false;
+}
+const timeline = createTimeline({
+  $,
+  call,
+  seek: seekFromTimeline,
+  scrub,
+  isReady: () => previewReady,
+  playhead,
+  range: {
+    read: () => checkRange(),
+    fields: () => ({
+      start: $("#range-start").value,
+      end: $("#range-end").value,
+    }),
+    write: writeRange,
+    restore: writeRange,
+  },
+  items: {
+    elements: () => editor.timelineItems(),
+    captions: () => captions.timelineItems(),
+    limits: (id) => captions.limits(id),
+    select: (kind, id, options) =>
+      (kind === "caption" ? captions : editor).selectItem(id, options),
+    commit: (kind, id, changes) =>
+      (kind === "caption" ? captions : editor).setTimes(id, changes),
+  },
 });
 $("#selection-chip").addEventListener("click", () => tools.show("trim"));
+$("#selection-clear").addEventListener("click", () => clearRange());
+$("#export-progress").addEventListener("click", () => tools.show("details"));
 async function refreshSources() {
   sources = await call("capture.sources");
   const before = $("#source").value;
@@ -341,9 +437,7 @@ function showLibrary({ restoreFocus = false } = {}) {
   const previous = selectedVideo?.id;
   viewGeneration++;
   $("#player").pause();
-  $("#editor").hidden = true;
-  $("#editor-actions").hidden = true;
-  $("#library-view").hidden = false;
+  showEditorFrame(false);
   $("#crumb").textContent = "Video library";
   selectedVideo = null;
   previewKey = "";
@@ -353,6 +447,8 @@ function showLibrary({ restoreFocus = false } = {}) {
   previewVideoId = "";
   editor.clear();
   captions.clear();
+  timeline.clear();
+  failedEdits.delete(previous);
   hideSourceFrame();
   $(".player-shell").classList.remove("fullscreen");
   if (restoreFocus) {
@@ -361,6 +457,17 @@ function showLibrary({ restoreFocus = false } = {}) {
     );
     (card || $("#search")).focus();
   }
+}
+// The editor is a focused workspace: the library sidebar and the page heading
+// do not show. The top bar has the title and the editor actions.
+function showEditorFrame(open) {
+  document.body.classList.toggle("editing", open);
+  $("#editor").hidden = !open;
+  $("#library-view").hidden = open;
+  $("#breadcrumb").hidden = open;
+  $("#local-badge").hidden = open;
+  for (const id of ["#editor-heading", "#editor-status", "#editor-actions"])
+    $(id).hidden = !open;
 }
 function focusRecorder() {
   const recorder = $("#recorder");
@@ -383,13 +490,33 @@ async function openVideo(id, { focus = false } = {}) {
   renderVideo(video);
   if (focus) $("#video-title").focus();
 }
-function previewStatus(text, state) {
+function previewStatus(text, state, detail = text) {
   $("#preview-state").textContent = text;
   $("#preview-state").dataset.state = state;
+  $("#preview-state").title = detail;
 }
+// The true state of the edits: a command in progress, a field that is not
+// saved yet, or a rejected change. A draft selection is not an edit.
+function renderSaveState() {
+  const title = $("#rename-title").value.trim();
+  const view = saveState({
+    saving: pendingEdits.has(selectedVideo?.id),
+    failed: failedEdits.has(selectedVideo?.id),
+    dirty:
+      Boolean($("#editor [data-dirty='1']")) ||
+      (Boolean(selectedVideo) &&
+        Boolean(title) &&
+        title !== selectedVideo.title),
+  });
+  const node = $("#save-state");
+  if (node.textContent !== view.text) node.textContent = view.text;
+  node.dataset.state = view.state;
+  node.title = view.detail;
+}
+$("#editor").addEventListener("input", renderSaveState);
+$("#editor").addEventListener("change", renderSaveState);
 function renderVideoInfo(video) {
   const parts = [
-    element("span", "", clock(seconds(video))),
     element("span", "", `${video.metadata.width} × ${video.metadata.height}`),
   ];
   if (video.metadata.hasAudio === false)
@@ -408,14 +535,16 @@ function renderVideoInfo(video) {
 function renderVideo(video) {
   // A video opens with Trim & cut. A new state of the open video, for
   // example after an edit or a status update, keeps the user's tool.
-  if (selectedVideo?.id !== video.id) tools.show("trim");
+  if (selectedVideo?.id !== video.id) {
+    tools.show("trim");
+    failedEdits.delete(video.id);
+  }
   selectedVideo = video;
   const id = video.id;
-  $("#library-view").hidden = true;
-  $("#editor").hidden = false;
-  $("#editor-actions").hidden = false;
+  showEditorFrame(true);
   $("#crumb").textContent = "Video editor";
   $("#video-title").textContent = video.title;
+  $("#video-title").title = video.title;
   const title = $("#rename-title");
   if (title.dataset.videoId !== id || title.value === title.dataset.rendered)
     title.value = video.title;
@@ -444,8 +573,9 @@ function renderVideo(video) {
       setPreview(video.url, true);
     } else {
       previewStatus(
-        "Preparing edited preview. You can continue to edit.",
+        "Preparing preview",
         "preparing",
+        "Preparing the edited preview. You can continue to edit.",
       );
       showSourceFrame(video);
       Promise.resolve().then(() => preparePreview(video, key));
@@ -463,11 +593,11 @@ function renderVideo(video) {
     $("#range-start").value = 0;
     $("#range-end").value = total;
   }
+  // The dock shows the length. This line adds what it does not show.
   const parts = segments.length;
+  $("#kept-parts").hidden = parts === 1;
   $("#kept-parts").textContent =
-    parts === 1
-      ? `The edited video is ${clock(total)} long. Undo restores a removed part.`
-      : `The edited video has ${parts} kept parts and is ${clock(total)} long. Undo restores a removed part.`;
+    `The edited video has ${parts} kept parts. Undo restores a removed part.`;
   $("#range-start").max = total;
   $("#range-end").max = total;
   $("#speed").value = video.timeline.speed;
@@ -478,20 +608,15 @@ function renderVideo(video) {
   $("#undo").disabled = !video.timeline.past.length;
   $("#redo").disabled = !video.timeline.future.length;
   $("#duration").textContent = clock(total);
-  $("#preview-seek").max = total;
-  $("#timeline-bars").replaceChildren(
-    ...video.timeline.segments.map((s) => {
-      const bar = document.createElement("i");
-      bar.style.flex = s.end - s.start;
-      return bar;
-    }),
-  );
+  timeline.render(video);
   renderRange();
   renderExports();
   renderVideoFades(video);
   editor.render(video);
   captions.render(video);
+  timeline.renderLanes();
   syncPreview();
+  renderSaveState();
 }
 function renderVideoFades(video) {
   const fades = videoFades(video.timeline);
@@ -571,7 +696,7 @@ function setPreview(url, original = false) {
   player.muted = selectedVideo.timeline.muted;
   player.currentTime = Math.min(resumeAt, seconds(selectedVideo));
   previewReady = false;
-  previewStatus("Loading preview.", "preparing");
+  previewStatus("Loading preview", "preparing");
   syncPreview();
 }
 async function preparePreview(video, key) {
@@ -591,7 +716,7 @@ async function preparePreview(video, key) {
   } catch (error) {
     if (selectedVideo && previewKey === key) {
       previewError = error.message;
-      previewStatus(`Preview failed: ${error.message}`, "failed");
+      previewStatus("Preview failed", "failed", error.message);
       notice(error.message, true);
     }
   }
@@ -644,32 +769,42 @@ window.midnight.onPlayback(async ({ id, action, args }) => {
 function syncPreview() {
   if (!selectedVideo) return;
   const player = $("#player");
-  const total = seconds(selectedVideo);
   const playing = !player.paused;
-  $("#preview-play .icon").textContent = playing ? "❚❚" : "▶";
-  $("#preview-play .label").textContent = playing ? "Pause" : "Play";
+  $("#preview-play use").setAttribute("href", playing ? "#i-pause" : "#i-play");
   $("#preview-play").setAttribute(
     "aria-label",
     playing ? "Pause preview" : "Play preview",
   );
   $("#preview-play").disabled = !previewReady;
-  $("#preview-seek").disabled = !previewReady;
-  $("#preview-seek").value = player.currentTime;
-  $("#preview-time").textContent =
-    `${clock(player.currentTime)} / ${clock(total)}`;
+  showTime();
   $("#preview-volume").value = player.volume;
-  $("#timeline-playhead").style.left =
-    `${Math.min(100, (player.currentTime / total) * 100)}%`;
-  $("#timeline-track").classList.toggle("ready", previewReady);
   $("#range-start-now").disabled = !previewReady;
   $("#range-end-now").disabled = !previewReady;
   const fullscreen = $(".player-shell").classList.contains("fullscreen");
   const label = fullscreen ? "Exit fullscreen" : "Fullscreen";
-  $("#preview-fullscreen .label").textContent = label;
   $("#preview-fullscreen").setAttribute("aria-label", label);
+  $("#preview-fullscreen").title = `${label} (F)`;
+  $("#preview-fullscreen use").setAttribute(
+    "href",
+    fullscreen ? "#i-fullscreen-exit" : "#i-fullscreen",
+  );
   editor.layout();
   captions.timeChanged();
 }
+// The time and the playhead. A new preview starts at 0, so until it is ready
+// the page shows the time that the preview resumes at.
+function showTime() {
+  const time = playhead();
+  $("#preview-time").textContent = clockTenths(time);
+  timeline.setPlayhead(time);
+}
+// timeupdate is too slow for a smooth playhead during playback.
+function followPlayback() {
+  if ($("#player").paused || !selectedVideo) return;
+  showTime();
+  requestAnimationFrame(followPlayback);
+}
+$("#player").addEventListener("play", followPlayback);
 new ResizeObserver(() => editor.layout()).observe($(".player-wrap"));
 for (const event of ["play", "pause", "volumechange", "timeupdate", "seeked"])
   $("#player").addEventListener(event, syncPreview);
@@ -678,7 +813,11 @@ $("#player").addEventListener("loadeddata", () => {
   previewReady = true;
   previewError = null;
   hideSourceFrame();
-  previewStatus("Preview ready. Your edits match the exported video.", "ready");
+  previewStatus(
+    "Preview ready",
+    "ready",
+    "Preview ready. Your edits match the exported video.",
+  );
   syncPreview();
 });
 $("#player").addEventListener("error", () => {
@@ -687,12 +826,16 @@ $("#player").addEventListener("error", () => {
   previewReady = false;
   if (player.dataset.original === "true") {
     player.dataset.original = "false";
-    previewStatus("Preparing a compatible preview.", "preparing");
+    previewStatus(
+      "Preparing preview",
+      "preparing",
+      "Preparing a compatible preview.",
+    );
     preparePreview(selectedVideo, previewKey);
   } else {
     previewError =
       "Cannot play this preview. Check the source file and FFmpeg.";
-    previewStatus(previewError, "failed");
+    previewStatus("Preview failed", "failed", previewError);
   }
   syncPreview();
 });
@@ -703,9 +846,6 @@ new MutationObserver(syncPreview).observe($(".player-shell"), {
 handle("#preview-play", "click", () =>
   call($("#player").paused ? "playback.play" : "playback.pause"),
 );
-handle("#preview-seek", "change", () =>
-  call("playback.seek", { seconds: Number($("#preview-seek").value) }),
-);
 handle("#preview-volume", "change", () =>
   call("playback.configure", { volume: Number($("#preview-volume").value) }),
 );
@@ -714,23 +854,6 @@ handle("#preview-fullscreen", "click", () =>
     enabled: !$(".player-shell").classList.contains("fullscreen"),
   }),
 );
-$("#timeline-track").addEventListener("click", (event) => {
-  if (!selectedVideo) return;
-  if (!previewReady) {
-    notice("Wait for the preview. Then select a point on the timeline.");
-    return;
-  }
-  const box = event.currentTarget.getBoundingClientRect();
-  const fraction = Math.min(
-    1,
-    Math.max(0, (event.clientX - box.left) / box.width),
-  );
-  const id = selectedVideo.id;
-  enqueue(async () => {
-    if (selectedVideo?.id !== id || !previewReady) return;
-    await call("playback.seek", { seconds: fraction * seconds(selectedVideo) });
-  });
-});
 function checkRange() {
   return rangeCheck(
     $("#range-start").value,
@@ -744,39 +867,52 @@ function rangeValues() {
 }
 function renderRange() {
   if (!selectedVideo) return;
-  const total = seconds(selectedVideo);
   const { start, end, valid, full, maximum } = checkRange();
   const summary = $("#range-summary");
-  // The summary is next to the actions and also tells why they are not
-  // available.
+  // The summary is in Trim & cut and tells why the actions are not available.
   summary.classList.toggle("invalid", !valid || full);
   summary.textContent = !valid
     ? `Set an end time after the start time. The maximum is ${maximum}.`
     : full
-      ? "The selection is the full video. First set its start (I) and end (O) at the playhead, or type the times."
+      ? "The selection is the full video. Drag on the timeline, press I and O at the playhead, or type the times."
       : `Selection: ${start.toFixed(2)} s to ${end.toFixed(2)} s, ${(end - start).toFixed(2)} s long.`;
-  $("#trim").disabled = !valid || full;
-  $("#cut").disabled = !valid || full;
-  $("#timeline-range").hidden = !valid || full;
-  // The timeline shows the selection in every tool. Its button opens
-  // Trim & cut.
+  const usable = valid && !full;
+  $("#trim").disabled = !usable;
+  $("#cut").disabled = !usable;
+  $("#range-hint").hidden = usable;
+  $("#range-hint").textContent = valid
+    ? "Drag on the timeline to select a part."
+    : "The end must be after the start.";
+  // The dock shows the selection in every tool. Its button opens Trim & cut.
   const chip = $("#selection-chip");
-  chip.hidden = !valid || full;
-  if (valid && !full) {
-    $("#timeline-range").style.left = `${(start / total) * 100}%`;
-    $("#timeline-range").style.width = `${((end - start) / total) * 100}%`;
-    chip.textContent = `Selection ${start.toFixed(2)} to ${end.toFixed(2)} s · Trim & cut`;
-  }
+  chip.hidden = !usable;
+  $("#selection-group").hidden = !usable;
+  if (usable)
+    chip.textContent = `Selection ${start.toFixed(2)} to ${end.toFixed(2)} s`;
+  timeline.renderRange();
 }
 for (const id of ["#range-start", "#range-end"])
   $(id).addEventListener("input", renderRange);
+// Changes the draft selection. The input event reaches all that depend on it,
+// for example the caption replace confirmation. No edit command runs.
+function writeRange({ start, end }) {
+  $("#range-start").value = start;
+  $("#range-end").value = end;
+  $("#range-start").dispatchEvent(new Event("input", { bubbles: true }));
+}
+// Returns true if a selection was cleared.
+function clearRange() {
+  if (!selectedVideo || checkRange().full) return false;
+  writeRange({ start: "0", end: String(seconds(selectedVideo)) });
+  return true;
+}
 function setRangeFromPlayhead(which) {
   if (!selectedVideo || !previewReady) return;
   $(`#range-${which}`).value = playheadValue(
     $("#player").currentTime,
     seconds(selectedVideo),
   );
-  renderRange();
+  $(`#range-${which}`).dispatchEvent(new Event("input", { bubbles: true }));
 }
 $("#range-start-now").addEventListener("click", () =>
   setRangeFromPlayhead("start"),
@@ -786,7 +922,10 @@ $("#range-end-now").addEventListener("click", () =>
 );
 document.addEventListener("keydown", (event) => {
   // Escape cancels a drag first. Nothing is saved.
-  if (event.key === "Escape" && editor.cancelGesture()) {
+  if (
+    event.key === "Escape" &&
+    (timeline.cancelGesture() || editor.cancelGesture())
+  ) {
     event.preventDefault();
     return;
   }
@@ -804,7 +943,7 @@ document.addEventListener("keydown", (event) => {
     !$("#editor").hidden &&
     !$("#confirm-delete").open &&
     !["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) &&
-    (editor.deselect() || captions.deselect())
+    (editor.deselect() || captions.deselect() || clearRange())
   )
     return;
   const context = shortcutContext();
@@ -869,6 +1008,9 @@ function perform(action) {
     $("#search").select();
   } else if (action.local === "range-start") setRangeFromPlayhead("start");
   else if (action.local === "range-end") setRangeFromPlayhead("end");
+  else if (action.local === "zoom-in") timeline.zoomIn();
+  else if (action.local === "zoom-out") timeline.zoomOut();
+  else if (action.local === "zoom-fit") timeline.zoomFit();
   else if (action.command.startsWith("edit."))
     return edit(action.command.slice(5));
   else return call(action.command, action.args);
@@ -1013,6 +1155,9 @@ $("#recording-pill").addEventListener("click", () => showView("recorder"));
 function renderExports() {
   const rows = selectedVideo ? exportRows(lastJobs, selectedVideo.id) : [];
   $("#exports").hidden = !rows.length;
+  const running = rows.some((row) => row.state === "running");
+  $("#export-progress").hidden = !running;
+  $("#export-progress").textContent = "Exporting…";
   $("#export-jobs").replaceChildren(
     ...rows.map((row) => {
       const item = element("div", "export-row");

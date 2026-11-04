@@ -11,6 +11,146 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <!-- Editor icons: one line style on a 20 px grid. -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-back" viewBox="0 0 20 20">
+        <path d="M16 10H4.5M9.5 5l-5 5 5 5" />
+      </symbol>
+      <symbol id="i-undo" viewBox="0 0 20 20">
+        <path d="M7.5 5.5 4 9l3.5 3.5" />
+        <path d="M4.5 9h7.25a4 4 0 0 1 0 8H9" />
+      </symbol>
+      <symbol id="i-redo" viewBox="0 0 20 20">
+        <path d="M12.5 5.5 16 9l-3.5 3.5" />
+        <path d="M15.5 9H8.25a4 4 0 0 0 0 8H11" />
+      </symbol>
+      <symbol id="i-export" viewBox="0 0 20 20">
+        <path d="M10 12.5v-9M6.5 7 10 3.5 13.5 7" />
+        <path d="M4 12.5V15a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 16 15v-2.5" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 20 20">
+        <path
+          fill="currentColor"
+          stroke="none"
+          d="M6 4.4v11.2a.8.8 0 0 0 1.2.7l9-5.6a.8.8 0 0 0 0-1.4l-9-5.6A.8.8 0 0 0 6 4.4Z"
+        />
+      </symbol>
+      <symbol id="i-pause" viewBox="0 0 20 20">
+        <rect
+          fill="currentColor"
+          stroke="none"
+          x="5.5"
+          y="4"
+          width="3.2"
+          height="12"
+          rx="1"
+        />
+        <rect
+          fill="currentColor"
+          stroke="none"
+          x="11.3"
+          y="4"
+          width="3.2"
+          height="12"
+          rx="1"
+        />
+      </symbol>
+      <symbol id="i-volume" viewBox="0 0 20 20">
+        <path d="M3.5 8v4h2.8l4 3.2V4.8l-4 3.2H3.5Z" />
+        <path d="M13.2 7.5a3.5 3.5 0 0 1 0 5M15.2 5.5a6.4 6.4 0 0 1 0 9" />
+      </symbol>
+      <symbol id="i-fullscreen" viewBox="0 0 20 20">
+        <path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4" />
+      </symbol>
+      <symbol id="i-fullscreen-exit" viewBox="0 0 20 20">
+        <path d="M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4" />
+      </symbol>
+      <symbol id="i-keep" viewBox="0 0 20 20">
+        <path d="M5.5 2.5v12h12M2.5 5.5h12v12" />
+      </symbol>
+      <symbol id="i-cut" viewBox="0 0 20 20">
+        <circle cx="5.75" cy="6" r="2.25" />
+        <circle cx="5.75" cy="14" r="2.25" />
+        <path d="m7.6 7.4 9 7.6M7.6 12.6l9-7.6" />
+      </symbol>
+      <symbol id="i-zoom-in" viewBox="0 0 20 20">
+        <circle cx="9" cy="9" r="5.5" />
+        <path d="m13 13 3.5 3.5M9 6.75v4.5M6.75 9h4.5" />
+      </symbol>
+      <symbol id="i-zoom-out" viewBox="0 0 20 20">
+        <circle cx="9" cy="9" r="5.5" />
+        <path d="m13 13 3.5 3.5M6.75 9h4.5" />
+      </symbol>
+      <symbol id="i-text" viewBox="0 0 20 20">
+        <path d="M4.5 6V4h11v2M10 4v12M7.75 16h4.5" />
+      </symbol>
+      <symbol id="i-label" viewBox="0 0 20 20">
+        <rect x="2.75" y="5.5" width="14.5" height="9" rx="2" />
+        <path d="M6 10h8" />
+      </symbol>
+      <symbol id="i-rectangle" viewBox="0 0 20 20">
+        <rect x="3.5" y="5" width="13" height="10" rx="1.5" />
+      </symbol>
+      <symbol id="i-ellipse" viewBox="0 0 20 20">
+        <ellipse cx="10" cy="10" rx="7" ry="5.5" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 20 20">
+        <path d="M4.5 15.5 15 5M8 5h7v7" />
+      </symbol>
+      <symbol id="i-shapes" viewBox="0 0 20 20">
+        <rect x="3" y="3" width="9" height="9" rx="1.5" />
+        <circle cx="12.75" cy="12.75" r="4.25" />
+      </symbol>
+      <symbol id="i-captions" viewBox="0 0 20 20">
+        <rect x="2.75" y="4.5" width="14.5" height="11" rx="2" />
+        <path d="M8.9 8.6a2 2 0 1 0 0 2.8M14.4 8.6a2 2 0 1 0 0 2.8" />
+      </symbol>
+      <symbol id="i-speed" viewBox="0 0 20 20">
+        <path d="M3.6 14.5a7.25 7.25 0 1 1 12.8 0" />
+        <path d="m10 12 3.5-4.5" />
+      </symbol>
+      <symbol id="i-details" viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="7.25" />
+        <path d="M10 9.25v4.25M10 6.5v.01" />
+      </symbol>
+      <symbol id="i-duplicate" viewBox="0 0 20 20">
+        <rect x="7" y="7" width="10" height="10" rx="1.75" />
+        <path
+          d="M13 7V4.75A1.75 1.75 0 0 0 11.25 3h-6.5A1.75 1.75 0 0 0 3 4.75v6.5A1.75 1.75 0 0 0 4.75 13H7"
+        />
+      </symbol>
+      <symbol id="i-forward" viewBox="0 0 20 20">
+        <path d="M10 16V4.5M5.5 9 10 4.5 14.5 9" />
+      </symbol>
+      <symbol id="i-backward" viewBox="0 0 20 20">
+        <path d="M10 4v11.5M5.5 11l4.5 4.5 4.5-4.5" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 20 20">
+        <path
+          d="M4 6h12M8 6V4.5h4V6M6 6l.7 10h6.6L14 6M8.75 9v4.5M11.25 9v4.5"
+        />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 20 20">
+        <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 20 20">
+        <path d="M10 4.5v11M4.5 10h11" />
+      </symbol>
+      <symbol id="i-retry" viewBox="0 0 20 20">
+        <path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9l1.6 1.6" />
+        <path d="M15.5 3.75v4h-4" />
+      </symbol>
+      <symbol id="i-film" viewBox="0 0 20 20">
+        <rect x="3" y="4.5" width="14" height="11" rx="1.5" />
+        <path
+          d="M6.5 4.5v11M13.5 4.5v11M3 8h3.5M3 12h3.5M13.5 8H17M13.5 12H17"
+        />
+      </symbol>
+      <symbol id="i-layers" viewBox="0 0 20 20">
+        <path d="m10 3.5-7 4 7 4 7-4-7-4Z" />
+        <path d="m3 12 7 4 7-4" />
+      </symbol>
+    </svg>
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-icon" aria-hidden="true">◉</span
@@ -38,11 +178,41 @@
     </aside>
     <main>
       <header class="topbar">
-        <div class="breadcrumb">
+        <div id="breadcrumb" class="breadcrumb">
           Workspace <span aria-hidden="true">/</span>
           <span id="crumb">Video library</span>
         </div>
+        <div id="editor-heading" class="editor-heading" hidden>
+          <button
+            id="back"
+            class="back-button"
+            aria-label="Back to library"
+            title="Back to library"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-back" /></svg>
+            <span>Library</span>
+          </button>
+          <h1 id="video-title" tabindex="-1">Video</h1>
+          <p id="video-info" class="video-info"></p>
+        </div>
         <div class="topbar-end">
+          <div id="editor-status" class="editor-status" hidden>
+            <span id="save-state" class="save-state" data-state="saved"
+              >Saved</span
+            ><span
+              id="preview-state"
+              class="preview-state"
+              role="status"
+              data-state="ready"
+              >Preview ready</span
+            ><button
+              id="export-progress"
+              type="button"
+              class="export-progress"
+              title="Show the exports in Details"
+              hidden
+            ></button>
+          </div>
           <div
             id="editor-actions"
             class="editor-actions"
@@ -52,20 +222,27 @@
           >
             <button
               id="undo"
-              class="button secondary compact"
+              class="icon-button"
+              aria-label="Undo"
               aria-keyshortcuts="Control+Z"
               title="Undo the last edit (Ctrl+Z)"
             >
-              <span aria-hidden="true">↶</span> Undo</button
-            ><button
+              <svg class="icon" aria-hidden="true"><use href="#i-undo" /></svg>
+            </button>
+            <button
               id="redo"
-              class="button secondary compact"
+              class="icon-button"
+              aria-label="Redo"
               aria-keyshortcuts="Control+Shift+Z"
               title="Redo (Ctrl+Shift+Z)"
             >
-              <span aria-hidden="true">↷</span> Redo</button
-            ><button id="export" class="button primary compact">
-              <span aria-hidden="true">↑</span> Export MP4
+              <svg class="icon" aria-hidden="true"><use href="#i-redo" /></svg>
+            </button>
+            <button id="export" class="button primary compact">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-export" />
+              </svg>
+              Export MP4
             </button>
           </div>
           <button
@@ -78,7 +255,7 @@
             ><span id="pill-label">Recording</span
             ><span id="pill-time" class="pill-time"></span>
           </button>
-          <span class="badge"><i></i> LOCAL ONLY</span>
+          <span id="local-badge" class="badge"><i></i> LOCAL ONLY</span>
         </div>
       </header>
       <section id="library-view">
@@ -237,233 +414,96 @@
         </div>
       </section>
       <section id="editor" hidden>
-        <div class="page-heading editor-heading">
-          <div class="title-block">
-            <button id="back" class="text-button back">
-              <span aria-hidden="true">←</span> Video library
+        <div class="stage-area">
+          <div
+            class="element-toolbar"
+            role="toolbar"
+            aria-label="Add text and shapes at the playhead"
+          >
+            <span class="toolbar-label" aria-hidden="true">Add</span>
+            <button
+              id="add-text"
+              class="tool"
+              aria-label="Add text"
+              title="Add text at the playhead"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-text" /></svg>
+              <span class="tool-text">Text</span>
             </button>
-            <h1 id="video-title" tabindex="-1">Video</h1>
-            <p id="video-info" class="video-info"></p>
+            <button
+              id="add-label"
+              class="tool"
+              aria-label="Add label"
+              title="Add a label at the playhead"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-label" /></svg>
+              <span class="tool-text">Label</span>
+            </button>
+            <button
+              id="add-rectangle"
+              class="tool"
+              aria-label="Add rectangle"
+              title="Add a rectangle at the playhead"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-rectangle" />
+              </svg>
+              <span class="tool-text">Rectangle</span>
+            </button>
+            <button
+              id="add-ellipse"
+              class="tool"
+              aria-label="Add ellipse"
+              title="Add an ellipse at the playhead"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-ellipse" />
+              </svg>
+              <span class="tool-text">Ellipse</span>
+            </button>
+            <button
+              id="add-arrow"
+              class="tool"
+              aria-label="Add arrow"
+              title="Add an arrow at the playhead"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow" /></svg>
+              <span class="tool-text">Arrow</span>
+            </button>
+          </div>
+          <div class="player-shell">
+            <div class="player-wrap">
+              <video
+                id="player"
+                disablepictureinpicture
+                disableremoteplayback
+              ></video>
+              <video
+                id="source-frame"
+                class="source-frame"
+                muted
+                preload="auto"
+                aria-hidden="true"
+                hidden
+              ></video>
+              <div id="stage" class="stage" hidden></div>
+              <p id="stage-note" class="stage-note" hidden></p>
+            </div>
           </div>
         </div>
-        <div class="editor-grid">
-          <div class="editor-main">
-            <div class="stage-column">
-              <div
-                class="element-toolbar"
-                role="toolbar"
-                aria-label="Add text and shapes at the playhead"
-              >
-                <span class="toolbar-label" aria-hidden="true">Add</span>
-                <div class="tool-group" aria-label="Add at the playhead">
-                  <button id="add-text" class="tool" aria-label="Add text">
-                    <span aria-hidden="true">T</span> Text
-                  </button>
-                  <button id="add-label" class="tool" aria-label="Add label">
-                    <span aria-hidden="true">▤</span> Label
-                  </button>
-                  <button
-                    id="add-rectangle"
-                    class="tool"
-                    aria-label="Add rectangle"
-                  >
-                    <span aria-hidden="true">▭</span> Rectangle
-                  </button>
-                  <button
-                    id="add-ellipse"
-                    class="tool"
-                    aria-label="Add ellipse"
-                  >
-                    <span aria-hidden="true">◯</span> Ellipse
-                  </button>
-                  <button id="add-arrow" class="tool" aria-label="Add arrow">
-                    <span aria-hidden="true">↗</span> Arrow
-                  </button>
-                </div>
-              </div>
-              <div class="player-shell">
-                <div class="player-wrap">
-                  <video
-                    id="player"
-                    disablepictureinpicture
-                    disableremoteplayback
-                  ></video>
-                  <video
-                    id="source-frame"
-                    class="source-frame"
-                    muted
-                    preload="auto"
-                    aria-hidden="true"
-                    hidden
-                  ></video>
-                  <div id="stage" class="stage" hidden></div>
-                  <p id="stage-note" class="stage-note" hidden></p>
-                </div>
-                <div class="player-controls">
-                  <button
-                    id="preview-play"
-                    class="control-button"
-                    aria-label="Play preview"
-                    aria-keyshortcuts="Space"
-                  >
-                    <span class="icon" aria-hidden="true">▶</span
-                    ><span class="label">Play</span></button
-                  ><span id="preview-time" class="preview-time"
-                    >0:00 / 0:00</span
-                  ><input
-                    id="preview-seek"
-                    type="range"
-                    min="0"
-                    max="1"
-                    value="0"
-                    step="0.01"
-                    aria-label="Preview time"
-                  /><label class="volume"
-                    ><span>Volume</span
-                    ><input
-                      id="preview-volume"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value="1"
-                      aria-label="Preview volume" /></label
-                  ><button
-                    id="preview-fullscreen"
-                    class="control-button"
-                    aria-label="Fullscreen"
-                    aria-keyshortcuts="F"
-                  >
-                    <span class="icon" aria-hidden="true">⛶</span
-                    ><span class="label">Fullscreen</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="timeline">
-              <div class="timeline-head">
-                <span>Edited video</span>
-                <button
-                  id="selection-chip"
-                  type="button"
-                  class="selection-chip"
-                  title="Open Trim & cut"
-                  hidden
-                ></button>
-                <span id="duration" class="timeline-duration">0:00</span>
-              </div>
-              <div
-                id="timeline-track"
-                class="timeline-track"
-                title="Select a point to move the playhead"
-              >
-                <div id="timeline-bars"></div>
-                <div id="timeline-range" class="timeline-range" hidden></div>
-                <div id="timeline-playhead" class="timeline-playhead"></div>
-              </div>
-              <p class="timeline-note">
-                Each bar is a kept part of the video. Select a point to move the
-                playhead. Press <kbd>I</kbd> and <kbd>O</kbd> to set the start
-                and end of a selection.
-              </p>
-            </div>
-            <p
-              id="preview-state"
-              class="preview-state"
-              role="status"
-              data-state="ready"
-            >
-              Preview ready.
-            </p>
-            <ul class="shortcuts" aria-label="Keyboard shortcuts">
-              <li><kbd>Space</kbd> Play or pause</li>
-              <li><kbd>←</kbd><kbd>→</kbd> Move 5 s</li>
-              <li><kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> Move 1 s</li>
-              <li><kbd>I</kbd><kbd>O</kbd> Set selection start or end</li>
-              <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
-              <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo</li>
-              <li><kbd>F</kbd> Fullscreen</li>
-              <li>
-                <kbd>Delete</kbd> Delete the selected element or caption of the
-                open tool
-              </li>
-              <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
-            </ul>
-            <section
-              id="exports"
-              class="exports"
-              aria-labelledby="exports-heading"
-              hidden
-            >
-              <h2 id="exports-heading">Exports</h2>
-              <div id="export-jobs" class="jobs" aria-live="polite"></div>
-            </section>
-          </div>
-          <section class="panel edit-panel" aria-labelledby="edit-heading">
-            <div class="tool-head">
-              <h2 id="edit-heading" class="visually-hidden">Edit video</h2>
-              <div class="tool-tabs" role="tablist" aria-label="Editing tools">
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-trim"
-                  data-tool="trim"
-                  aria-controls="tool-trim"
-                  aria-selected="true"
-                >
-                  Trim &amp; cut</button
-                ><button
-                  type="button"
-                  role="tab"
-                  id="tab-elements"
-                  data-tool="elements"
-                  aria-controls="tool-elements"
-                  aria-selected="false"
-                  tabindex="-1"
-                >
-                  Text &amp; shapes</button
-                ><button
-                  type="button"
-                  role="tab"
-                  id="tab-captions"
-                  data-tool="captions"
-                  aria-controls="tool-captions"
-                  aria-selected="false"
-                  tabindex="-1"
-                >
-                  Captions</button
-                ><button
-                  type="button"
-                  role="tab"
-                  id="tab-sound"
-                  data-tool="sound"
-                  aria-controls="tool-sound"
-                  aria-selected="false"
-                  tabindex="-1"
-                >
-                  Speed &amp; sound</button
-                ><button
-                  type="button"
-                  role="tab"
-                  id="tab-details"
-                  data-tool="details"
-                  aria-controls="tool-details"
-                  aria-selected="false"
-                  tabindex="-1"
-                >
-                  Details
-                </button>
-              </div>
-            </div>
+        <section class="edit-panel" aria-labelledby="edit-heading">
+          <h2 id="edit-heading" class="visually-hidden">Edit video</h2>
+          <div id="tool-panels" class="tool-panels">
             <div
               role="tabpanel"
               id="tool-trim"
-              class="tool-panel trim-panel"
+              class="tool-panel"
               aria-labelledby="tab-trim"
             >
-              <p class="hint trim-intro">
-                Select a part of the video with a start and an end. Then keep
-                only that part, or remove it.
+              <h3 class="tool-title">Trim &amp; cut</h3>
+              <p class="hint">
+                Drag on the timeline to select a part of the video. Drag the
+                gold handles to change it.
               </p>
               <div class="two-cols">
                 <div class="field">
@@ -505,28 +545,30 @@
                 class="range-summary"
                 aria-live="polite"
               ></p>
-              <div class="trim-actions">
-                <button
-                  id="trim"
-                  class="button secondary trim-action"
-                  aria-describedby="trim-help range-summary"
-                >
-                  <span aria-hidden="true">▣</span> Keep only the selection
-                </button>
-                <p id="trim-help" class="hint">
-                  Removes the video before and after it.
-                </p>
-                <button
-                  id="cut"
-                  class="button secondary trim-action"
-                  aria-describedby="cut-help range-summary"
-                >
-                  <span aria-hidden="true">✂</span> Remove the selection
-                </button>
-                <p id="cut-help" class="hint">
-                  Removes it and joins the parts around it.
-                </p>
-              </div>
+              <dl class="action-legend">
+                <div>
+                  <dt>
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#i-keep" />
+                    </svg>
+                    Keep
+                  </dt>
+                  <dd id="trim-help">
+                    Removes the video before and after the selection.
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#i-cut" />
+                    </svg>
+                    Remove
+                  </dt>
+                  <dd id="cut-help">
+                    Removes the selection and joins the parts around it.
+                  </dd>
+                </div>
+              </dl>
               <p id="kept-parts" class="hint kept-parts"></p>
             </div>
             <div
@@ -536,59 +578,64 @@
               aria-labelledby="tab-elements"
               hidden
             >
-              <div
-                class="tool-group arrange-group"
-                role="toolbar"
-                aria-label="Selected element"
-              >
-                <button
-                  id="duplicate-element"
-                  class="tool"
-                  aria-label="Duplicate element"
-                  title="Duplicate"
-                >
-                  <span aria-hidden="true">⧉</span
-                  ><span class="tool-text">Duplicate</span>
-                </button>
-                <button
-                  id="raise-element"
-                  class="tool"
-                  aria-label="Bring element forward"
-                  title="Bring forward"
-                >
-                  <span aria-hidden="true">↑</span
-                  ><span class="tool-text">Forward</span>
-                </button>
-                <button
-                  id="lower-element"
-                  class="tool"
-                  aria-label="Send element backward"
-                  title="Send backward"
-                >
-                  <span aria-hidden="true">↓</span
-                  ><span class="tool-text">Backward</span>
-                </button>
-                <button
-                  id="delete-element"
-                  class="tool danger"
-                  aria-label="Delete element"
-                  aria-keyshortcuts="Delete"
-                  title="Delete"
-                >
-                  <span aria-hidden="true">✕</span
-                  ><span class="tool-text">Delete</span>
-                </button>
-              </div>
               <section
                 id="layers"
                 class="layers"
                 aria-labelledby="layers-heading"
               >
-                <div class="timeline-head">
-                  <h3 id="layers-heading">Layers</h3>
-                  <span id="layer-count" class="timeline-duration"
+                <div class="section-head">
+                  <h3 id="layers-heading" class="tool-title">Layers</h3>
+                  <span id="layer-count" class="section-count"
                     >No elements</span
                   >
+                  <div
+                    id="element-actions"
+                    class="icon-group"
+                    role="toolbar"
+                    aria-label="Selected element"
+                  >
+                    <button
+                      id="duplicate-element"
+                      class="icon-button small"
+                      aria-label="Duplicate element"
+                      title="Duplicate"
+                    >
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#i-duplicate" />
+                      </svg>
+                    </button>
+                    <button
+                      id="raise-element"
+                      class="icon-button small"
+                      aria-label="Bring element forward"
+                      title="Bring forward"
+                    >
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#i-forward" />
+                      </svg>
+                    </button>
+                    <button
+                      id="lower-element"
+                      class="icon-button small"
+                      aria-label="Send element backward"
+                      title="Send backward"
+                    >
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#i-backward" />
+                      </svg>
+                    </button>
+                    <button
+                      id="delete-element"
+                      class="icon-button small danger"
+                      aria-label="Delete element"
+                      aria-keyshortcuts="Delete"
+                      title="Delete"
+                    >
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#i-trash" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <p id="layers-empty" class="hint">
                   Use Add above the video to add text, a label, a shape, or an
@@ -596,17 +643,13 @@
                 </p>
                 <ol id="layer-list" class="layer-list"></ol>
               </section>
-              <div id="element-panel" class="edit-section element-panel">
+              <div id="element-panel" class="element-panel">
                 <h3 id="element-heading">Element</h3>
                 <p id="element-empty" class="hint">
-                  Select an element in the video or in Layers to change it.
+                  Select an element in the video, on the timeline, or in Layers
+                  to change it.
                 </p>
                 <form id="element-form" class="element-form" hidden novalidate>
-                  <p class="hint">
-                    Changes save when you leave a field or press Enter. Times
-                    are seconds in the edited video. Positions and sizes are
-                    percent of the video.
-                  </p>
                   <div class="field-group" data-types="text">
                     <label for="el-text">Text</label>
                     <textarea id="el-text" rows="2" maxlength="500"></textarea>
@@ -637,10 +680,6 @@
                           step="0.1"
                       /></label>
                     </div>
-                    <label class="check"
-                      ><input type="checkbox" id="el-bold" data-key="bold" />
-                      Bold</label
-                    >
                     <div class="two-cols">
                       <label
                         >Align<select id="el-align" data-key="align">
@@ -659,6 +698,10 @@
                         </select></label
                       >
                     </div>
+                    <label class="check"
+                      ><input type="checkbox" id="el-bold" data-key="bold" />
+                      Bold</label
+                    >
                   </div>
                   <div class="field-group color-grid">
                     <label data-types="text arrow"
@@ -739,94 +782,6 @@
                         step="0.1"
                     /></label>
                   </div>
-                  <fieldset
-                    class="field-group"
-                    data-types="text rectangle ellipse"
-                  >
-                    <legend>Position and size, % of the video</legend>
-                    <div class="two-cols">
-                      <label
-                        >Left (X)<input
-                          id="el-x"
-                          data-key="x"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1" /></label
-                      ><label
-                        >Top (Y)<input
-                          id="el-y"
-                          data-key="y"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                      /></label>
-                    </div>
-                    <div class="two-cols">
-                      <label
-                        >Width<input
-                          id="el-width"
-                          data-key="width"
-                          type="number"
-                          min="1"
-                          max="100"
-                          step="0.1" /></label
-                      ><label
-                        >Height<input
-                          id="el-height"
-                          data-key="height"
-                          type="number"
-                          min="1"
-                          max="100"
-                          step="0.1"
-                      /></label>
-                    </div>
-                  </fieldset>
-                  <fieldset class="field-group" data-types="arrow">
-                    <legend>Arrow points, % of the video</legend>
-                    <div class="two-cols">
-                      <label
-                        >Tail X<input
-                          id="el-x1"
-                          data-key="x1"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1" /></label
-                      ><label
-                        >Tail Y<input
-                          id="el-y1"
-                          data-key="y1"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                      /></label>
-                    </div>
-                    <div class="two-cols">
-                      <label
-                        >Tip X<input
-                          id="el-x2"
-                          data-key="x2"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1" /></label
-                      ><label
-                        >Tip Y<input
-                          id="el-y2"
-                          data-key="y2"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                      /></label>
-                    </div>
-                    <p class="hint">
-                      The tip is the point that the arrow shows.
-                    </p>
-                  </fieldset>
                   <fieldset class="field-group">
                     <legend>Time, seconds</legend>
                     <div class="two-cols">
@@ -867,11 +822,101 @@
                     </div>
                     <p id="el-visibility" class="hint"></p>
                   </fieldset>
-                  <fieldset class="field-group">
-                    <legend>Fade, seconds</legend>
+                  <details
+                    class="disclosure"
+                    data-types="text rectangle ellipse"
+                  >
+                    <summary>Position and size</summary>
+                    <p class="hint">Percent of the video.</p>
                     <div class="two-cols">
                       <label
-                        >Fade in<input
+                        >Left (X)<input
+                          id="el-x"
+                          data-key="x"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Top (Y)<input
+                          id="el-y"
+                          data-key="y"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <div class="two-cols">
+                      <label
+                        >Width<input
+                          id="el-width"
+                          data-key="width"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Height<input
+                          id="el-height"
+                          data-key="height"
+                          type="number"
+                          min="1"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                  </details>
+                  <details class="disclosure" data-types="arrow">
+                    <summary>Arrow points</summary>
+                    <p class="hint">
+                      Percent of the video. The tip is the point that the arrow
+                      shows.
+                    </p>
+                    <div class="two-cols">
+                      <label
+                        >Tail X<input
+                          id="el-x1"
+                          data-key="x1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Tail Y<input
+                          id="el-y1"
+                          data-key="y1"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                    <div class="two-cols">
+                      <label
+                        >Tip X<input
+                          id="el-x2"
+                          data-key="x2"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1" /></label
+                      ><label
+                        >Tip Y<input
+                          id="el-y2"
+                          data-key="y2"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                      /></label>
+                    </div>
+                  </details>
+                  <details class="disclosure">
+                    <summary>Fade and opacity</summary>
+                    <div class="two-cols">
+                      <label
+                        >Fade in, s<input
                           id="el-fade-in"
                           data-key="fadeIn"
                           type="number"
@@ -879,7 +924,7 @@
                           max="10"
                           step="0.1" /></label
                       ><label
-                        >Fade out<input
+                        >Fade out, s<input
                           id="el-fade-out"
                           data-key="fadeOut"
                           type="number"
@@ -899,7 +944,7 @@
                         max="100"
                         step="1"
                     /></label>
-                  </fieldset>
+                  </details>
                 </form>
               </div>
             </div>
@@ -911,41 +956,14 @@
               hidden
             >
               <div id="caption-panel" class="caption-panel">
-                <h3 id="caption-heading" class="visually-hidden">Captions</h3>
-                <p id="caption-setup" class="hint warn" hidden></p>
-                <button
-                  id="caption-generate"
-                  type="button"
-                  class="button secondary full"
-                >
-                  Make captions from speech
-                </button>
-                <label class="check"
-                  ><input type="checkbox" id="caption-range-only" /> Only the
-                  selection (set it in Trim &amp; cut)</label
-                >
-                <p class="hint">
-                  Speech recognition runs on this computer. The words and times
-                  are estimates, so check the captions before you export.
-                </p>
-                <div id="caption-replace" class="confirm-note" hidden>
-                  <p id="caption-replace-text"></p>
-                  <div class="two-cols">
-                    <button
-                      id="caption-replace-yes"
-                      type="button"
-                      class="button primary"
-                    >
-                      Replace captions</button
-                    ><button
-                      id="caption-replace-no"
-                      type="button"
-                      class="button secondary"
-                    >
-                      Keep captions
-                    </button>
-                  </div>
+                <div class="section-head">
+                  <h3 id="caption-heading" class="tool-title">Captions</h3>
+                  <span id="caption-count" class="section-count"
+                    >No captions</span
+                  >
                 </div>
+                <p id="caption-setup" class="hint warn" hidden></p>
+                <p id="caption-audio" class="hint warn" hidden></p>
                 <div id="caption-job" class="caption-job" hidden>
                   <p id="caption-job-text" role="status" aria-live="polite"></p>
                   <progress
@@ -975,10 +993,13 @@
                   <button
                     id="caption-add"
                     type="button"
-                    class="button secondary"
+                    class="text-button small with-icon"
                     aria-label="Add a caption at the playhead"
                   >
-                    + Caption at playhead</button
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#i-plus" />
+                    </svg>
+                    Add caption</button
                   ><label class="check"
                     ><input type="checkbox" id="caption-enabled" /> Show
                     captions</label
@@ -987,15 +1008,8 @@
                 <section
                   id="captions"
                   class="layers captions"
-                  aria-labelledby="captions-heading"
+                  aria-label="Caption list"
                 >
-                  <div class="timeline-head">
-                    <h4 id="captions-heading">Caption list</h4>
-                    <span id="caption-count" class="timeline-duration"
-                      >No captions</span
-                    >
-                  </div>
-                  <p id="caption-audio" class="hint warn" hidden></p>
                   <p id="captions-empty" class="hint">
                     Make captions from the speech, or add a caption at the
                     playhead. Captions are separate from labels and shapes.
@@ -1007,8 +1021,18 @@
                   ></ol>
                 </section>
                 <form id="caption-form" class="caption-form" hidden novalidate>
-                  <h4 id="caption-cue-heading">Selected caption</h4>
-                  <label for="cap-text">Text</label>
+                  <div class="section-head">
+                    <h4 id="caption-cue-heading">Selected caption</h4>
+                    <button
+                      id="cap-select-range"
+                      type="button"
+                      class="text-button small"
+                      title="Selects the time of this caption on the timeline. The video does not change until you select Keep or Remove."
+                    >
+                      Select on timeline
+                    </button>
+                  </div>
+                  <label for="cap-text" class="visually-hidden">Text</label>
                   <textarea id="cap-text" rows="2" maxlength="200"></textarea>
                   <p id="cap-check" class="hint warn" hidden></p>
                   <div class="two-cols">
@@ -1051,12 +1075,45 @@
                   <button
                     id="cap-delete"
                     type="button"
-                    class="text-button danger"
+                    class="text-button small danger"
+                    title="Deletes this caption only. The video does not change."
                   >
                     Delete caption
                   </button>
                 </form>
-                <details id="caption-style" class="caption-style">
+                <div class="caption-make">
+                  <button
+                    id="caption-generate"
+                    type="button"
+                    class="button secondary full"
+                    title="Speech recognition runs on this computer. The words and times are estimates, so check the captions before you export."
+                  >
+                    Make captions from speech
+                  </button>
+                  <label class="check"
+                    ><input type="checkbox" id="caption-range-only" /> Only the
+                    selection on the timeline</label
+                  >
+                </div>
+                <div id="caption-replace" class="confirm-note" hidden>
+                  <p id="caption-replace-text"></p>
+                  <div class="two-cols">
+                    <button
+                      id="caption-replace-yes"
+                      type="button"
+                      class="button primary"
+                    >
+                      Replace captions</button
+                    ><button
+                      id="caption-replace-no"
+                      type="button"
+                      class="button secondary"
+                    >
+                      Keep captions
+                    </button>
+                  </div>
+                </div>
+                <details id="caption-style" class="caption-style disclosure">
                   <summary>Caption style for all captions</summary>
                   <div class="two-cols">
                     <label
@@ -1102,7 +1159,7 @@
                 <button
                   id="caption-remove"
                   type="button"
-                  class="text-button danger"
+                  class="text-button small danger"
                 >
                   Remove all captions
                 </button>
@@ -1115,6 +1172,7 @@
               aria-labelledby="tab-sound"
               hidden
             >
+              <h3 class="tool-title">Speed &amp; sound</h3>
               <label
                 >Playback speed<select id="speed">
                   <option value="0.5">0.5×</option>
@@ -1157,12 +1215,44 @@
               aria-labelledby="tab-details"
               hidden
             >
+              <h3 class="tool-title">Details</h3>
               <label
                 >Video title<input id="rename-title" autocomplete="off"
               /></label>
               <button id="rename" class="button secondary full">
                 Save title
               </button>
+              <section
+                id="exports"
+                class="exports"
+                aria-labelledby="exports-heading"
+                hidden
+              >
+                <h4 id="exports-heading">Exports</h4>
+                <div id="export-jobs" class="jobs" aria-live="polite"></div>
+              </section>
+              <details class="disclosure">
+                <summary>Keyboard shortcuts</summary>
+                <ul class="shortcuts" aria-label="Keyboard shortcuts">
+                  <li><kbd>Space</kbd> Play or pause</li>
+                  <li><kbd>←</kbd><kbd>→</kbd> Move 5 s</li>
+                  <li><kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> Move 1 s</li>
+                  <li><kbd>I</kbd><kbd>O</kbd> Set selection start or end</li>
+                  <li>
+                    <kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom in, out, Fit
+                  </li>
+                  <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
+                  <li>
+                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo
+                  </li>
+                  <li><kbd>F</kbd> Fullscreen</li>
+                  <li>
+                    <kbd>Delete</kbd> Delete the selected element or caption of
+                    the open tool
+                  </li>
+                  <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
+                </ul>
+              </details>
               <p class="hint">
                 Reset all edits returns to the original video: it removes trim,
                 cuts, speed, mute, fades, elements, and captions. You can undo
@@ -1173,8 +1263,304 @@
                 Delete video
               </button>
             </div>
-          </section>
-        </div>
+          </div>
+          <div
+            class="tool-tabs"
+            role="tablist"
+            aria-label="Editing tools"
+            aria-orientation="vertical"
+          >
+            <button
+              type="button"
+              role="tab"
+              id="tab-trim"
+              data-tool="trim"
+              aria-controls="tool-trim"
+              aria-selected="true"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-cut" /></svg>
+              Trim &amp; cut</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-elements"
+              data-tool="elements"
+              aria-controls="tool-elements"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-shapes" />
+              </svg>
+              Text &amp; shapes</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-captions"
+              data-tool="captions"
+              aria-controls="tool-captions"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-captions" />
+              </svg>
+              Captions</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-sound"
+              data-tool="sound"
+              aria-controls="tool-sound"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-speed" /></svg>
+              Speed &amp; sound</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-details"
+              data-tool="details"
+              aria-controls="tool-details"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-details" />
+              </svg>
+              Details
+            </button>
+          </div>
+        </section>
+        <section class="timeline-dock" aria-label="Timeline">
+          <div class="dock-bar">
+            <div class="dock-transport">
+              <button
+                id="preview-play"
+                class="play-button"
+                aria-label="Play preview"
+                aria-keyshortcuts="Space"
+                title="Play or pause (Space)"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-play" />
+                </svg>
+              </button>
+              <span class="timecode"
+                ><span id="preview-time" class="timecode-now">0:00.0</span
+                ><span class="timecode-gap" aria-hidden="true">/</span
+                ><span id="duration">0:00</span></span
+              >
+            </div>
+            <div class="dock-selection">
+              <p id="range-hint" class="range-hint"></p>
+              <div id="selection-group" class="selection-group" hidden>
+                <button
+                  id="selection-chip"
+                  type="button"
+                  class="selection-chip"
+                  title="Open Trim &amp; cut to change the exact times"
+                  hidden
+                ></button
+                ><button
+                  id="selection-clear"
+                  type="button"
+                  class="selection-clear"
+                  aria-label="Clear the selection"
+                  title="Clear the selection (Esc)"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-close" />
+                  </svg>
+                </button>
+              </div>
+              <button
+                id="trim"
+                class="dock-action"
+                aria-label="Keep only the selection"
+                aria-describedby="trim-help range-summary"
+                title="Keep only the selection. Removes the video before and after it."
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-keep" />
+                </svg>
+                Keep
+              </button>
+              <button
+                id="cut"
+                class="dock-action"
+                aria-label="Remove the selection"
+                aria-describedby="cut-help range-summary"
+                title="Remove the selection. Joins the parts around it."
+              >
+                <svg class="icon" aria-hidden="true"><use href="#i-cut" /></svg>
+                Remove
+              </button>
+            </div>
+            <div class="dock-view">
+              <label class="volume" title="Preview volume"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-volume" /></svg
+                ><input
+                  id="preview-volume"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value="1"
+                  aria-label="Preview volume"
+              /></label>
+              <button
+                id="preview-fullscreen"
+                class="icon-button"
+                aria-label="Fullscreen"
+                aria-keyshortcuts="F"
+                title="Fullscreen (F)"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-fullscreen" />
+                </svg>
+              </button>
+              <div class="zoom-group" role="group" aria-label="Timeline zoom">
+                <button
+                  id="zoom-out"
+                  class="icon-button"
+                  aria-label="Zoom out"
+                  aria-keyshortcuts="-"
+                  title="Zoom out (-)"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-zoom-out" />
+                  </svg>
+                </button>
+                <output id="zoom-level" class="zoom-level">1×</output>
+                <button
+                  id="zoom-in"
+                  class="icon-button"
+                  aria-label="Zoom in"
+                  aria-keyshortcuts="+"
+                  title="Zoom in (+)"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-zoom-in" />
+                  </svg>
+                </button>
+                <button
+                  id="zoom-fit"
+                  class="fit-button"
+                  aria-label="Fit the video in the timeline"
+                  aria-keyshortcuts="0"
+                  title="Fit the video in the timeline (0)"
+                >
+                  Fit
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="timeline-body">
+            <div class="timeline-gutter" aria-hidden="true">
+              <span class="gutter-ruler"></span>
+              <span class="gutter-track" title="Video and sound"
+                ><svg class="icon"><use href="#i-film" /></svg
+              ></span>
+              <span class="gutter-elements" title="Text and shapes"
+                ><svg class="icon"><use href="#i-layers" /></svg
+              ></span>
+              <span class="gutter-captions" title="Captions"
+                ><svg class="icon"><use href="#i-captions" /></svg
+              ></span>
+            </div>
+            <p id="timeline-note" class="timeline-note" hidden>
+              <span id="timeline-note-text"></span
+              ><button
+                id="overview-retry"
+                type="button"
+                class="text-button small"
+                hidden
+              >
+                Retry
+              </button>
+            </p>
+            <div id="timeline-scroll" class="timeline-scroll">
+              <div id="timeline-content" class="timeline-content">
+                <div
+                  id="timeline-ruler"
+                  class="timeline-ruler"
+                  data-zone="ruler"
+                  title="Select or drag to move the playhead"
+                ></div>
+                <div
+                  id="timeline-track"
+                  class="timeline-track"
+                  data-zone="track"
+                  title="Drag to select a part. The frames and the sound come from the source video, without text and shapes."
+                >
+                  <div id="timeline-bars"></div>
+                  <canvas id="timeline-canvas"></canvas>
+                  <div
+                    id="timeline-shade-before"
+                    class="timeline-shade"
+                    hidden
+                  ></div>
+                  <div
+                    id="timeline-shade-after"
+                    class="timeline-shade"
+                    hidden
+                  ></div>
+                  <div
+                    id="timeline-range"
+                    class="timeline-range"
+                    data-zone="range"
+                    title="Drag to move the selection"
+                  >
+                    <span
+                      id="range-handle-start"
+                      class="range-handle start"
+                      role="slider"
+                      tabindex="0"
+                      data-zone="start"
+                      aria-label="Selection start"
+                      aria-valuemin="0"
+                      title="Drag to change the selection start. Arrow keys move it 0.1 s."
+                    ></span>
+                    <span
+                      id="range-handle-end"
+                      class="range-handle end"
+                      role="slider"
+                      tabindex="0"
+                      data-zone="end"
+                      aria-label="Selection end"
+                      aria-valuemin="0"
+                      title="Drag to change the selection end. Arrow keys move it 0.1 s."
+                    ></span>
+                  </div>
+                </div>
+                <div
+                  id="timeline-lanes"
+                  class="timeline-lanes"
+                  data-zone="track"
+                >
+                  <div id="lane-elements" class="lane lane-elements"></div>
+                  <div id="lane-captions" class="lane lane-captions"></div>
+                </div>
+                <div
+                  id="timeline-playhead"
+                  class="timeline-playhead"
+                  role="slider"
+                  tabindex="0"
+                  aria-label="Playhead"
+                  aria-valuemin="0"
+                  aria-keyshortcuts="ArrowLeft ArrowRight"
+                >
+                  <span id="timeline-playhead-line" class="playhead-line"></span
+                  ><span class="playhead-cap" data-zone="ruler"></span>
+                </div>
+                <span id="timeline-tip" class="timeline-tip" hidden></span>
+              </div>
+            </div>
+          </div>
+        </section>
       </section>
       <div id="message" class="message" hidden>
         <span id="message-text" role="status"></span>

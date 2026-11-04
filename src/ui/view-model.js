@@ -11,7 +11,41 @@ export function clock(value) {
     : `${minutes}:${seconds}`;
 }
 
+// Edited time as m:ss.t. The tenth is cut, not rounded, so 0:01.9 never shows
+// 0:02.0 before the second changes.
+export function clockTenths(value) {
+  const time = Number.isFinite(value) && value > 0 ? value : 0;
+  return `${clock(time)}.${Math.floor((time - Math.floor(time)) * 10)}`;
+}
+
 const count = (value, word) => `${value} ${word}${value === 1 ? "" : "s"}`;
+
+// The true state of the edits for the top bar. A command in progress comes
+// first. A field that the user changed is not saved until it loses focus. A
+// rejected command stays until the next change is saved.
+export function saveState({ saving, failed, dirty }) {
+  if (saving)
+    return { state: "saving", text: "Saving…", detail: "Saving your change." };
+  if (dirty)
+    return {
+      state: "dirty",
+      text: "Not saved yet",
+      detail:
+        "A field has a change. Leave the field or press Enter to save it.",
+    };
+  if (failed)
+    return {
+      state: "failed",
+      text: "Not saved",
+      detail: "The last change was not saved. The message tells the reason.",
+    };
+  return {
+    state: "saved",
+    text: "Saved",
+    detail:
+      "All edits are saved in the library. The source file does not change.",
+  };
+}
 
 export function libraryView({ total, shown, query = "" }) {
   const search = query.trim();
@@ -311,7 +345,11 @@ export function shortcut(event, context) {
     );
     return { command: "playback.seek", args: { seconds } };
   }
+  // Zoom is a page view. Plus has Shift on many keyboards.
+  if (key === "+" || key === "=") return { local: "zoom-in" };
   if (event.shiftKey) return null;
+  if (key === "-") return { local: "zoom-out" };
+  if (key === "0") return { local: "zoom-fit" };
   if (key === "i" || key === "o") {
     if (!context.ready) return null;
     return { local: key === "i" ? "range-start" : "range-end" };
