@@ -60,6 +60,21 @@ test("local transcriber caches source audio and keeps edit changes out of recogn
   );
 });
 
+test("the source fingerprint changes when the file changes", async () => {
+  await mkdir(".local", { recursive: true });
+  const root = await mkdtemp(path.resolve(".local", "transcriber-test-"));
+  const source = path.join(root, "source.mp4");
+  await writeFile(source, "source");
+  const engine = new adapter.LocalTranscriber(root, {}, { runner: {} });
+  const before = await engine.fingerprint({ path: source });
+  assert.equal(before.size, 6);
+  assert.ok(before.mtimeMs > 0);
+  await writeFile(source, "another source");
+  const after = await engine.fingerprint({ path: source });
+  assert.notDeepEqual(after, before);
+  await assert.rejects(engine.fingerprint({ path: `${source}.missing` }));
+});
+
 test("cancel reaches engine startup before audio extraction", async () => {
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "transcriber-cancel-"));

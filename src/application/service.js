@@ -4,11 +4,19 @@ import {
   inspectionPlan,
   editRevision,
   revisionMatches,
+  structureRevision,
 } from "../domain/inspection.js";
 import { recordedSeconds } from "../domain/recording.js";
 import { transcriptCommands, TranscriptJobs } from "./transcripts.js";
 import { captionCommands, CaptionJobs } from "./captions.js";
 import { overviewCommands, OverviewJobs } from "./overview.js";
+import {
+  partCommands,
+  describeParts,
+  editParts,
+  isPartEdit,
+  partResult,
+} from "./parts.js";
 import {
   elementCommands,
   executeElement,
@@ -37,6 +45,7 @@ const define = (name, description, properties = {}, required = []) => ({
 export const commands = [
   ...transcriptCommands,
   ...overviewCommands,
+  ...partCommands,
   define(
     "inspect.result",
     "Read a completed inspection. Returns PNG images and frame coordinates. Check stale before placing elements. Use includeImages false for paths only. Images total at most 8 MiB.",
@@ -127,7 +136,7 @@ export const commands = [
   ),
   define(
     "library.revision",
-    "Read the edit revision, title, and undo and redo counts of a video. The revision changes after each edit, including elements and captions. A small result for polling.",
+    "Read the edit revision, the structure revision, the title, and the undo and redo counts of a video. The revision changes after each edit that changes the rendered video, including elements and captions. The structure revision changes after a split, a cut, a trim, or a speed change. A small result for polling.",
     { id: string("Video ID.") },
     ["id"],
   ),
@@ -172,7 +181,7 @@ export const commands = [
   ...["undo", "redo"].map((action) =>
     define(
       `edit.${action}`,
-      `${action} video edits. Trim, cut, speed, mute, element, and caption changes use one history. The history keeps the last ${timeline.MAX_HISTORY} steps.`,
+      `${action} video edits. Trim, cut, split, speed, mute, element, and caption changes use one history. The history keeps the last ${timeline.MAX_HISTORY} steps.`,
       { id: string("Video ID.") },
       ["id"],
     ),
@@ -184,7 +193,7 @@ export const commands = [
       id: string("Video ID."),
       scope: field(
         "string",
-        "Default all. timeline resets trim, cut, speed, mute, and video fades. elements removes all labels and shapes. captions removes the captions.",
+        "Default all. timeline resets trim, cut, splits, speed, mute, and video fades. elements removes all labels and shapes. captions removes the captions.",
         { enum: timeline.RESET_SCOPES },
       ),
     },
@@ -396,6 +405,7 @@ export class Service {
         id: video.id,
         title: video.title,
         revision: editRevision(video),
+        structureRevision: structureRevision(video),
         history: {
           undo: video.timeline.past.length,
           redo: video.timeline.future.length,
@@ -470,10 +480,13 @@ export class Service {
         : this.inspection.images(result);
     }
     if (name.startsWith("element.")) return executeElement(this, name, args);
+    if (name === "parts.list")
+      return describeParts(await this.library.get(args.id));
     if (name.startsWith("edit.")) {
       const video = await this.library.get(args.id);
       const action = name.slice(5);
       let edited;
+      if (isPartEdit(action)) edited = editParts(action, video, args);
       if (action === "trim" || action === "cut")
         edited = timeline[action](video.timeline, args.start, args.end);
       if (action === "configure")
@@ -492,6 +505,7 @@ export class Service {
         ...saved,
         elementPlacement: elementPlacement(saved),
         videoFades: timeline.videoFades(saved.timeline),
+        ...(isPartEdit(action) ? partResult(action, saved, video) : {}),
       };
     }
     if (

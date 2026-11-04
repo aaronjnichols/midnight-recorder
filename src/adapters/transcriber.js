@@ -7,6 +7,7 @@ import {
   rename,
   rm,
   mkdtemp,
+  stat,
 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
@@ -29,6 +30,12 @@ export class LocalTranscriber {
     return path.join(this.root, digest(id));
   }
   capabilities() { return this.runner.capabilities(); }
+  // The size and time of the source file. A word cut compares them with the
+  // values from the start of its job.
+  async fingerprint(video) {
+    const { size, mtimeMs } = await stat(video.path);
+    return { size, mtimeMs };
+  }
   async remove(id) {
     await rm(this.directory(id), { recursive: true, force: true });
   }

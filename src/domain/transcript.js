@@ -1,5 +1,8 @@
 // Pure transcript operations. No file, process, or Electron access.
 import { duration } from "./timeline.js";
+import { mapWords } from "./words.js";
+
+export const MAX_WORD_PAGE = 1000;
 
 function mappedWords(words, timeline) {
   let offset = 0;
@@ -116,6 +119,50 @@ export function readTranscript(data, timeline, args = {}) {
     totalWords: all.length,
     nextOffset:
       offset + words.length < all.length ? offset + words.length : null,
+  };
+}
+
+// A page of the canonical words with the current timeline. Without a window
+// the list is the complete source, also removed words, so the same offset gives
+// the same words after any edit. A window gives the words kept in that range of
+// edited seconds. readTranscript is the frozen view of a job. This view is live.
+export function readWords(words, timeline, args = {}) {
+  const total = duration(timeline);
+  const limit = bounded(args.limit ?? 200, "limit", 1, MAX_WORD_PAGE, true),
+    offset = bounded(
+      args.offset ?? 0,
+      "offset",
+      0,
+      Number.MAX_SAFE_INTEGER,
+      true,
+    );
+  const start = bounded(args.start ?? 0, "start", 0, total),
+    end = bounded(args.end ?? total, "end", 0, total);
+  const windowed = args.start !== undefined || args.end !== undefined;
+  if (windowed && end <= start)
+    throw new Error("Select a window where the end is after the start.");
+  const view = mapWords(words, timeline);
+  const list = windowed
+    ? view.filter(
+        (w) => w.state !== "removed" && w.end > start && w.start < end,
+      )
+    : view;
+  const page = list.slice(offset, offset + limit);
+  const count = (state) => view.filter((w) => w.state === state).length;
+  return {
+    total: words.length,
+    matches: list.length,
+    offset,
+    limit,
+    nextOffset:
+      offset + page.length < list.length ? offset + page.length : null,
+    kept: count("kept"),
+    partial: count("partial"),
+    removed: count("removed"),
+    duration: total,
+    words: page.map(({ fragments, ...word }) =>
+      word.state === "partial" ? { ...word, fragments } : word,
+    ),
   };
 }
 

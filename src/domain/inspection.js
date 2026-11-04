@@ -48,6 +48,14 @@ export function timingRevision(video) {
   return JSON.stringify({ segments, speed, muted });
 }
 
+// Revision of the parts: the kept segments, the speed, and the split marks.
+// It is not in the two revisions above, so a split does not make a new preview
+// or a stale transcript. Part commands use it.
+export function structureRevision(video) {
+  const { segments, speed, splits = [] } = video.timeline;
+  return textHash(JSON.stringify({ segments, speed, splits }));
+}
+
 // True when a revision from a client still matches the video. An edit
 // revision checks all edits. A transcript revision (JSON text) checks the
 // time mapping only, so transcript times stay valid after element changes.

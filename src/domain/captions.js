@@ -24,6 +24,7 @@ import {
   VERTICAL_ALIGN,
   LIMITS,
 } from "./elements.js";
+import { completeWords, sentenceEnd, wordParts } from "./words.js";
 
 export const CAPTION_LIMITS = {
   cues: 500,
@@ -45,14 +46,6 @@ export const CAPTION_LIMITS = {
 const SHOW_MINIMUM = LIMITS.minSeconds;
 
 const round = (value) => Math.round(value * 1e6) / 1e6;
-
-// Recognized text can contain any character. Control characters and line
-// separators become spaces, so generated text obeys the same rules as typed
-// caption text.
-const clean = (text) =>
-  String(text)
-    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, " ")
-    .replace(/ {2,}/g, " ");
 
 // Text longer than the cue limit is shortened, ends with "…", and is marked
 // to check. More than three lines join on the last line.
@@ -84,37 +77,7 @@ function bounded(text) {
 // A token with spaces in it, which the speech engine does not usually give,
 // becomes one word for each part. The parts share the token time in
 // proportion to their length. These times are estimates, so the parts are
-// marked to check.
-// Complete words. A token without a leading space, for example 's or a
-// comma, joins the word before it. The cut policy applies to the complete
-// word, so a suffix cannot stay alone after its word was cut.
-function completeWords(words) {
-  const list = [];
-  for (const token of [...words].sort((a, b) => a.start - b.start)) {
-    const raw = clean(token.word);
-    const last = list.at(-1);
-    if (last && raw.trim() && !/^\s/.test(raw)) {
-      last.text += raw;
-      last.end = Math.max(last.end, token.end);
-      last.probability = Math.min(
-        last.probability ?? 1,
-        token.probability ?? 1,
-      );
-      last.tokens++;
-      continue;
-    }
-    list.push({
-      text: raw,
-      start: token.start,
-      end: token.end,
-      probability: token.probability,
-      segmentId: token.segmentId,
-      tokens: 1,
-    });
-  }
-  return list;
-}
-
+// marked to check. Complete words come from words.js.
 export function retainedWords(words, timeline) {
   const sorted = completeWords(words);
   const kept = [];
@@ -130,23 +93,17 @@ export function retainedWords(words, timeline) {
       if (to <= from) continue;
       placed += word.tokens;
       const raw = word.text;
-      const parts = raw.trim().split(" ").filter(Boolean);
-      const weight = parts.reduce((sum, p) => sum + p.length + 1, 0);
-      let at = from;
+      const parts = wordParts(raw, from, to);
       for (const [n, part] of parts.entries()) {
-        const until =
-          n === parts.length - 1
-            ? to
-            : at + ((to - from) * (part.length + 1)) / weight;
         kept.push({
-          text: part,
+          text: part.text,
           // A token without a leading space joins the word before it, for
           // example 's in It's.
           attach: n === 0 && !/^\s/.test(raw),
-          sourceStart: at,
-          sourceEnd: until,
-          start: (elapsed + at - segment.start) / timeline.speed,
-          end: (elapsed + until - segment.start) / timeline.speed,
+          sourceStart: part.start,
+          sourceEnd: part.end,
+          start: (elapsed + part.start - segment.start) / timeline.speed,
+          end: (elapsed + part.end - segment.start) / timeline.speed,
           segment: index,
           segmentStart: segment.start,
           elapsed,
@@ -155,7 +112,6 @@ export function retainedWords(words, timeline) {
           partial: from > word.start + 1e-9 || to < word.end - 1e-9,
           estimated: parts.length > 1,
         });
-        at = until;
       }
     }
     elapsed += segment.end - segment.start;
@@ -199,8 +155,6 @@ export function lineCharsFor(frame, style) {
     Math.min(CAPTION_LIMITS.lineChars, Math.floor(area / (0.52 * font))),
   );
 }
-
-const sentenceEnd = (text) => /[.?!]["')\]]*$/.test(text);
 
 // A word with its attached tokens, for example it + 's, or Yes + ",". A cue
 // boundary is never inside a unit. A unit does not cross a cut.

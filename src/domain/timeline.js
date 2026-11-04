@@ -1,6 +1,7 @@
-// One history entry. Entries from before elements, video fades, or captions
-// existed have no such keys. Those states had none, so restore() reads them
-// as empty, 0, or no captions.
+// One history entry. Entries from before elements, video fades, captions, or
+// split marks existed have no such keys. Those states had none, so restore()
+// reads them as empty, 0, or no captions. A state without marks has no splits
+// key, so old states stay equal.
 const snapshot = ({
   segments,
   speed,
@@ -9,6 +10,7 @@ const snapshot = ({
   fadeIn = 0,
   fadeOut = 0,
   captions = null,
+  splits = [],
 }) => ({
   segments: structuredClone(segments),
   speed,
@@ -17,17 +19,21 @@ const snapshot = ({
   fadeIn,
   fadeOut,
   captions: structuredClone(captions),
+  ...(splits.length ? { splits: structuredClone(splits) } : {}),
 });
-const restore = (timeline, state) => ({
-  ...timeline,
-  segments: state.segments,
-  speed: state.speed,
-  muted: state.muted,
-  elements: state.elements ?? [],
-  fadeIn: state.fadeIn ?? 0,
-  fadeOut: state.fadeOut ?? 0,
-  captions: state.captions ?? null,
-});
+function restore({ splits: _, ...timeline }, state) {
+  return {
+    ...timeline,
+    segments: state.segments,
+    speed: state.speed,
+    muted: state.muted,
+    elements: state.elements ?? [],
+    fadeIn: state.fadeIn ?? 0,
+    fadeOut: state.fadeOut ?? 0,
+    captions: state.captions ?? null,
+    ...(state.splits?.length ? { splits: state.splits } : {}),
+  };
+}
 
 export const MAX_VIDEO_FADE = 10;
 
@@ -98,13 +104,20 @@ export function withCaptions(timeline, captions) {
 export const MAX_HISTORY = 100;
 const remember = (past, state) => [...past, state].slice(-MAX_HISTORY);
 
-function change(timeline, value) {
-  return {
+function change({ splits, ...timeline }, value) {
+  const next = {
     ...timeline,
     ...value,
-    past: remember(timeline.past, snapshot(timeline)),
+    past: remember(timeline.past, snapshot({ ...timeline, splits })),
     future: [],
   };
+  // A mark that is not inside a kept segment has no use. Undo restores it.
+  const marks = (value.splits ?? splits ?? []).filter((mark) =>
+    next.segments.some((segment) => inside(mark.source, segment)),
+  );
+  if (marks.length) next.splits = marks;
+  else delete next.splits;
+  return next;
 }
 
 export function trim(timeline, start, end) {
@@ -179,8 +192,8 @@ export function configure(
 export const RESET_SCOPES = ["all", "timeline", "elements", "captions"];
 
 // Return to the original video. Scope "timeline" resets segments, speed,
-// mute, and video fades. Scope "elements" removes all labels and shapes.
-// Scope "captions" removes the captions. Scope "all" does all of these.
+// mute, video fades, and split marks. Scope "elements" removes all labels and
+// shapes. Scope "captions" removes the captions. Scope "all" does all of these.
 export function reset(timeline, sourceDuration, scope = "all") {
   if (!RESET_SCOPES.includes(scope))
     throw new Error("Invalid scope. Use all, timeline, elements, or captions.");
@@ -193,6 +206,7 @@ export function reset(timeline, sourceDuration, scope = "all") {
       muted: fresh.muted,
       fadeIn: 0,
       fadeOut: 0,
+      splits: [],
     });
   if (scope === "all" || scope === "elements") value.elements = [];
   if (scope === "all" || scope === "captions") value.captions = null;
@@ -214,6 +228,184 @@ export function cut(timeline, start, end) {
 // than 1 microsecond from a cut boundary is on the boundary. This also
 // removes floating-point error, for example 0.088 * 1.25 < 0.11.
 const BOUNDARY = 1e-6;
+
+// Split marks. A mark is a source time beside the kept segments. It removes
+// nothing, and the renderer, the transcript, and the captions do not read it,
+// so a split cannot change the output. A mark and a cut join divide the edited
+// video into parts. Parts are derived: they are never stored.
+export const MAX_SPLITS = 200;
+// The shortest part that a split can make, in edited seconds. It is the same
+// as the shortest selection. A later cut or speed change can make a part
+// shorter.
+export const MIN_PART = 0.05;
+
+const microseconds = (seconds) => Math.round(seconds * 1e6);
+const inside = (source, { start, end }) =>
+  source > start + BOUNDARY && source < end - BOUNDARY;
+
+export const splitsOf = (timeline) => timeline.splits ?? [];
+
+// The parts of the edited video, in order. A part ID has the source span of
+// the part, so an old ID cannot name other footage. seamBefore tells what is
+// at the start of a part: a cut join, a split mark, or nothing.
+export function timelineParts(timeline) {
+  const { segments, speed } = timeline;
+  const parts = [];
+  let elapsed = 0;
+  for (const [index, segment] of segments.entries()) {
+    const edges = [
+      { source: segment.start, seam: index ? "cut" : null, split: null },
+      ...splitsOf(timeline)
+        .filter((mark) => inside(mark.source, segment))
+        .map((mark) => ({
+          source: mark.source,
+          seam: "split",
+          split: mark.id,
+        })),
+      { source: segment.end, seam: null, split: null },
+    ];
+    const edited = (source) => (elapsed + source - segment.start) / speed;
+    for (const [n, from] of edges.slice(0, -1).entries()) {
+      const to = edges[n + 1];
+      // A floating-point rest of an earlier edit has no time to show.
+      if (to.source - from.source < BOUNDARY) continue;
+      parts.push({
+        id: `p${microseconds(from.source)}-${microseconds(to.source)}`,
+        index: parts.length,
+        start: edited(from.source),
+        end: edited(to.source),
+        sourceStart: from.source,
+        sourceEnd: to.source,
+        seamBefore: from.seam,
+        splitBefore: from.split,
+        splitAfter: to.split,
+      });
+    }
+    elapsed += segment.end - segment.start;
+  }
+  if (parts.length) parts.at(-1).end = duration(timeline);
+  return parts;
+}
+
+// Tells if a split can go at an edited time, and why not. The check uses edited
+// seconds, the same as the user sees, so a fractional speed cannot make a
+// repeated mark. The app disables its button with the same check.
+export function splitCheck(timeline, seconds) {
+  const refuse = (reason) => ({ ok: false, reason });
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < 0 ||
+    seconds > duration(timeline) + BOUNDARY
+  )
+    return refuse("Select a split time within the edited video.");
+  const parts = timelineParts(timeline);
+  if (!parts.length) return refuse("This video is too short to split.");
+  const part = parts.find((item) => seconds < item.end) ?? parts.at(-1);
+  const fromStart = seconds - part.start,
+    fromEnd = part.end - seconds;
+  const near = (distance) => distance < MIN_PART - 1e-9;
+  if (near(fromStart) || near(fromEnd)) {
+    const first = near(fromStart) && (!near(fromEnd) || fromStart <= fromEnd);
+    const seam = first ? part.seamBefore : parts[part.index + 1]?.seamBefore;
+    return refuse(
+      seam === "split"
+        ? "The video already has a split at this time."
+        : seam === "cut"
+          ? "This time is at a join between kept parts. Move the playhead."
+          : `This time is at the ${first ? "start" : "end"} of the video. Move the playhead.`,
+    );
+  }
+  if (splitsOf(timeline).length >= MAX_SPLITS)
+    return refuse(
+      `A video can have at most ${MAX_SPLITS} splits. Remove a split or use Undo.`,
+    );
+  const source = gridTime(part, seconds, timeline.speed);
+  return source === undefined
+    ? refuse("There is no room for a split at this time. Move the playhead.")
+    : { ok: true, source };
+}
+
+// A stored time has microsecond precision. Rounding can move a time just inside
+// the shortest part, so this takes the nearest microsecond with room on both
+// sides. Undefined when there is none.
+function gridTime(part, seconds, speed) {
+  const tick = (part.sourceStart + (seconds - part.start) * speed) * 1e6;
+  const room = (source) =>
+    (source - part.sourceStart) / speed >= MIN_PART - 1e-9 &&
+    (part.sourceEnd - source) / speed >= MIN_PART - 1e-9;
+  return [Math.round(tick), Math.ceil(tick), Math.floor(tick)]
+    .map((value) => value / 1e6)
+    .find(room);
+}
+
+// One history step. The kept segments do not change.
+export function addSplit(timeline, seconds) {
+  const check = splitCheck(timeline, seconds);
+  if (!check.ok) throw new Error(check.reason);
+  const mark = { id: `s${microseconds(check.source)}`, source: check.source };
+  return change(timeline, {
+    splits: [...splitsOf(timeline), mark].sort((a, b) => a.source - b.source),
+  });
+}
+
+export function removeSplit(timeline, splitId) {
+  const marks = splitsOf(timeline);
+  if (!marks.some((mark) => mark.id === splitId))
+    throw new Error("This split was not found. Read parts.list again.");
+  return change(timeline, {
+    splits: marks.filter((mark) => mark.id !== splitId),
+  });
+}
+
+// Subtract one source interval from the kept segments, as one history step.
+// It uses source times, so there is no round trip through edited time. A rest
+// shorter than the stored precision does not stay.
+export function removeSource(timeline, start, end) {
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+    throw new Error("Select a valid source time range.");
+  const segments = [];
+  let removed = 0;
+  for (const segment of timeline.segments) {
+    const from = Math.max(segment.start, start),
+      to = Math.min(segment.end, end);
+    if (to <= from) {
+      segments.push({ start: segment.start, end: segment.end });
+      continue;
+    }
+    removed += to - from;
+    if (from - segment.start >= BOUNDARY)
+      segments.push({ start: segment.start, end: from });
+    if (segment.end - to >= BOUNDARY)
+      segments.push({ start: to, end: segment.end });
+  }
+  if (removed < BOUNDARY)
+    throw new Error("This part of the video is already removed.");
+  if (!segments.length) throw new Error("A cut must leave some video.");
+  return change(timeline, { segments });
+}
+
+function findPart(timeline, partId) {
+  const part = timelineParts(timeline).find((item) => item.id === partId);
+  if (!part)
+    throw new Error(
+      "This part is not in the edited video. Read parts.list again.",
+    );
+  return part;
+}
+
+export function removePart(timeline, partId) {
+  const { sourceStart, sourceEnd } = findPart(timeline, partId);
+  return removeSource(timeline, sourceStart, sourceEnd);
+}
+
+export function keepPart(timeline, partId) {
+  const { sourceStart, sourceEnd } = findPart(timeline, partId);
+  if (timelineParts(timeline).length === 1)
+    throw new Error("This part is the full edited video.");
+  return change(timeline, {
+    segments: [{ start: sourceStart, end: sourceEnd }],
+  });
+}
 
 // Source time at an edited time. A time on a cut boundary maps to the first
 // source time after the cut.
