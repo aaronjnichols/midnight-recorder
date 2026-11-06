@@ -505,6 +505,9 @@ button.button.danger:hover:not(:disabled) {
   transform: translateY(-50%);
   pointer-events: none;
 }
+.search-field:has(kbd[data-long-key]) input:not(:focus):placeholder-shown {
+  padding-right: 108px;
+}
 .search-field input:focus + kbd,
 .search-field input:not(:placeholder-shown) + kbd {
   display: none;
@@ -2877,16 +2880,6 @@ body.editing .topbar {
   color: var(--red-text);
   overflow-wrap: anywhere;
 }
-.shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--muted);
-}
 #reset,
 #delete {
   display: block;
@@ -2949,6 +2942,44 @@ body.editing .topbar {
   .zoom-group {
     padding-left: 4px;
   }
+}
+
+.shortcuts-nav {
+  margin-bottom: 12px;
+}
+#shortcut-settings {
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100vh - 32px);
+}
+.shortcut-list {
+  overflow-y: auto;
+  max-height: min(52vh, 500px);
+  padding-right: 8px;
+}
+.shortcut-list h3 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-key {
+  min-width: 96px;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+}
+#shortcut-settings .shortcut-status {
+  min-height: 1.5em;
+}
+#shortcut-settings .shortcut-error {
+  color: var(--red-text);
 }
 
 /* Messages and dialog */

@@ -1,3 +1,8 @@
+import {
+  shortcutActions,
+  shortcutKey,
+  shortcutKeys,
+} from "../domain/shortcuts.js";
 // View logic for the desktop page. This module has no DOM or Electron
 // dependency, so node:test can check it directly.
 
@@ -306,73 +311,46 @@ export function playbackBlock(action, { ready, typing, holding }) {
   return null;
 }
 
-// Maps a key press to a shared command or a page action. Returns null when
-// the key belongs to a text field or a native control.
+// A key that belongs to a native control does not run an app action.
 export function shortcut(event, context) {
-  if (event.altKey || event.isComposing || context.dialog) return null;
+  if (event.defaultPrevented || context.dialog) return null;
+  const key = shortcutKey(event);
   const target = event.target || {};
-  if (textEntry(target)) return null;
+  if (!key || textEntry(target)) return null;
   const tag = String(target.tagName || "").toUpperCase();
-  const control = event.ctrlKey || event.metaKey;
-  const name = String(event.key || "");
-  const key = name.length === 1 ? name.toLowerCase() : name;
-  if (context.view === "library") {
-    if (
-      (key === "/" && !control) ||
-      (control && key === "f" && !event.shiftKey)
-    )
-      return { local: "search" };
+  const arrow = ["ArrowLeft", "ArrowRight"].includes(event.key);
+  if (arrow && (tag === "INPUT" || target.getAttribute?.("role") === "tab"))
     return null;
-  }
-  if (context.view !== "editor") return null;
-  // Text fields return before this line, so Delete while typing changes the
-  // text and not the layers.
-  if ((key === "Delete" || key === "Backspace") && !control)
-    return context.selected ? { local: "delete-element" } : null;
-  if (key === "F2") return context.selected ? { local: "edit-text" } : null;
-  if (control) {
-    if (key === "z" && !event.shiftKey)
-      return context.canUndo ? { command: "edit.undo" } : null;
-    if ((key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey))
-      return context.canRedo ? { command: "edit.redo" } : null;
+  if (event.key === " " && ["BUTTON", "INPUT", "SUMMARY", "A"].includes(tag))
     return null;
-  }
-  // An editing tool tab uses the arrow keys, Home, and End to move between
-  // the tabs, so these keys do not move the playhead there.
-  if (
-    target.getAttribute?.("role") === "tab" &&
-    ["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)
-  )
-    return null;
-  if (key === " " || key === "k") {
-    if (key === " " && ["BUTTON", "INPUT", "SUMMARY", "A"].includes(tag))
-      return null;
-    if (!context.ready) return null;
+  const binding = shortcutActions.find(
+    (item) =>
+      item.scope === context.view &&
+      shortcutKeys(item, context.shortcutOverrides).includes(key),
+  );
+  if (!binding) return null;
+  const id = binding.id;
+  if (id === "delete-element" || id === "edit-text")
+    return context.selected ? { local: id } : null;
+  if (id === "undo") return context.canUndo ? { command: "edit.undo" } : null;
+  if (id === "redo") return context.canRedo ? { command: "edit.redo" } : null;
+  if (id === "fullscreen")
+    return {
+      command: "playback.fullscreen",
+      args: { enabled: !context.fullscreen },
+    };
+  if (id === "search" || id.startsWith("zoom-")) return { local: id };
+  if (!context.ready) return null;
+  if (id === "play")
     return { command: context.paused ? "playback.play" : "playback.pause" };
-  }
-  if (key === "ArrowLeft" || key === "ArrowRight") {
-    if (tag === "INPUT" || !context.ready) return null;
-    const step = (event.shiftKey ? 1 : 5) * (key === "ArrowLeft" ? -1 : 1);
+  if (id.startsWith("seek-")) {
+    const step =
+      (id.endsWith("-small") ? 1 : 5) * (id.startsWith("seek-back") ? -1 : 1);
     const seconds = Math.min(
       context.duration,
       Math.max(0, context.seconds + step),
     );
     return { command: "playback.seek", args: { seconds } };
   }
-  // Zoom is a page view. Plus has Shift on many keyboards.
-  if (key === "+" || key === "=") return { local: "zoom-in" };
-  if (event.shiftKey) return null;
-  if (key === "-") return { local: "zoom-out" };
-  if (key === "0") return { local: "zoom-fit" };
-  if (key === "i" || key === "o") {
-    if (!context.ready) return null;
-    return { local: key === "i" ? "range-start" : "range-end" };
-  }
-  if (key === "s") return context.ready ? { local: "split" } : null;
-  if (key === "f")
-    return {
-      command: "playback.fullscreen",
-      args: { enabled: !context.fullscreen },
-    };
-  return null;
+  return { local: id };
 }

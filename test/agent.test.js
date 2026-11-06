@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import http from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { ShortcutStore } from "../src/adapters/shortcut-store.js";
 import { serve } from "../src/agent/server.js";
 import { Service, commands } from "../src/application/service.js";
 
@@ -14,6 +15,7 @@ test("authenticated HTTP, CLI, and MCP use the same service commands", async (t)
   await mkdir(".local", { recursive: true });
   const root = await mkdtemp(path.resolve(".local", "agent-"));
   const service = new Service({
+    shortcutStore: new ShortcutStore(root),
     // This test checks transport calls. Countdown timing has a separate test.
     scheduler: { setTimeout: () => 1, clearTimeout: () => {} },
     capture: {
@@ -74,6 +76,26 @@ test("authenticated HTTP, CLI, and MCP use the same service commands", async (t)
   );
   const result = await client.callTool({ name: "app.status", arguments: {} });
   assert.equal(JSON.parse(result.content[0].text).recording.state, "idle");
+  const shortcutChange = await promisify(execFile)(
+    process.execPath,
+    [
+      "src/agent/cli.js",
+      "shortcuts.set",
+      JSON.stringify({ action: "split", key: "B" }),
+    ],
+    { env },
+  );
+  assert.equal(JSON.parse(shortcutChange.stdout).overrides.split, "B");
+  const shortcutList = await client.callTool({
+    name: "shortcuts.list",
+    arguments: {},
+  });
+  assert.equal(JSON.parse(shortcutList.content[0].text).overrides.split, "B");
+  const shortcutReset = await client.callTool({
+    name: "shortcuts.reset",
+    arguments: {},
+  });
+  assert.deepEqual(JSON.parse(shortcutReset.content[0].text).overrides, {});
   const started = await client.callTool({
     name: "recording.start",
     arguments: { cameraOnly: true },

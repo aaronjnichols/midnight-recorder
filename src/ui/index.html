@@ -183,6 +183,9 @@
         </button>
       </nav>
       <div class="sidebar-bottom">
+        <button class="nav shortcuts-nav" type="button" data-open-shortcuts>
+          <span class="nav-icon" aria-hidden="true">⌨</span> Keyboard shortcuts
+        </button>
         <div class="storage"><span class="local-dot"></span> Local storage</div>
         <p>Your videos stay on this computer.</p>
       </div>
@@ -235,8 +238,9 @@
               id="undo"
               class="icon-button"
               aria-label="Undo"
-              aria-keyshortcuts="Control+Z"
-              title="Undo the last edit (Ctrl+Z)"
+              data-shortcut="undo"
+              data-shortcut-title="Undo the last edit"
+              title="Undo the last edit"
             >
               <svg class="icon" aria-hidden="true"><use href="#i-undo" /></svg>
             </button>
@@ -244,8 +248,9 @@
               id="redo"
               class="icon-button"
               aria-label="Redo"
-              aria-keyshortcuts="Control+Shift+Z"
-              title="Redo (Ctrl+Shift+Z)"
+              data-shortcut="redo"
+              data-shortcut-title="Redo"
+              title="Redo"
             >
               <svg class="icon" aria-hidden="true"><use href="#i-redo" /></svg>
             </button>
@@ -294,7 +299,7 @@
                   type="search"
                   placeholder="Search by title"
                   aria-label="Search videos"
-                  aria-keyshortcuts="/"
+                  data-shortcut="search"
                   autocomplete="off"
                 />
                 <kbd aria-hidden="true">/</kbd>
@@ -764,8 +769,9 @@
                       id="delete-element"
                       class="icon-button small danger"
                       aria-label="Delete element"
-                      aria-keyshortcuts="Delete"
-                      title="Delete"
+                      data-shortcut="delete-element"
+                      data-shortcut-title="Delete element"
+                      title="Delete element"
                     >
                       <svg class="icon" aria-hidden="true">
                         <use href="#i-trash" />
@@ -793,7 +799,8 @@
                         type="button"
                         id="edit-text"
                         class="text-button small"
-                        title="Type on the video. You can also double-click the text on the video, or press F2."
+                        data-shortcut="edit-text"
+                        data-shortcut-title="Type on the video. You can also double-click the text on the video."
                       >
                         Edit on video
                       </button>
@@ -1377,33 +1384,13 @@
                 <h4 id="exports-heading">Exports</h4>
                 <div id="export-jobs" class="jobs" aria-live="polite"></div>
               </section>
-              <details class="disclosure">
-                <summary>Keyboard shortcuts</summary>
-                <ul class="shortcuts" aria-label="Keyboard shortcuts">
-                  <li><kbd>Space</kbd> Play or pause</li>
-                  <li><kbd>←</kbd><kbd>→</kbd> Move 5 s</li>
-                  <li><kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> Move 1 s</li>
-                  <li><kbd>I</kbd><kbd>O</kbd> Set selection start or end</li>
-                  <li><kbd>S</kbd> Split at the playhead</li>
-                  <li>
-                    <kbd>Shift</kbd> + <kbd>←</kbd><kbd>→</kbd> In the
-                    transcript: select words
-                  </li>
-                  <li>
-                    <kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom in, out, Fit
-                  </li>
-                  <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> Undo</li>
-                  <li>
-                    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> Redo
-                  </li>
-                  <li><kbd>F</kbd> Fullscreen</li>
-                  <li>
-                    <kbd>Delete</kbd> Delete the selected element or caption of
-                    the open tool
-                  </li>
-                  <li><kbd>Esc</kbd> Cancel a drag or clear the selection</li>
-                </ul>
-              </details>
+              <button
+                class="button secondary"
+                type="button"
+                data-open-shortcuts
+              >
+                Keyboard shortcuts
+              </button>
               <p class="hint">
                 Reset all edits returns to the original video: it removes trim,
                 cuts, splits, speed, mute, fades, elements, and captions. You
@@ -1509,8 +1496,9 @@
                 id="preview-play"
                 class="play-button"
                 aria-label="Play preview"
-                aria-keyshortcuts="Space"
-                title="Play or pause (Space)"
+                data-shortcut="play"
+                data-shortcut-title="Play or pause"
+                title="Play or pause"
               >
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-play" />
@@ -1526,7 +1514,7 @@
                 type="button"
                 class="dock-mark dock-split"
                 aria-label="Split at playhead"
-                aria-keyshortcuts="S"
+                data-shortcut="split"
                 disabled
               >
                 <svg class="icon" aria-hidden="true">
@@ -1541,7 +1529,7 @@
               <p
                 id="range-hint"
                 class="range-hint"
-                title="Drag on the timeline to select a part. Or move the playhead, then use Set start and Set end (keys I and O)."
+                title="Drag on the timeline to select a part. Or move the playhead, then use Set start and Set end."
               ></p>
               <div id="selection-group" class="selection-group" hidden>
                 <button
@@ -1572,8 +1560,9 @@
                   class="dock-mark"
                   aria-label="Set start of the selection to the playhead"
                   aria-describedby="range-summary"
-                  aria-keyshortcuts="I"
-                  title="Set the selection start to the playhead. Shortcut: I"
+                  data-shortcut="range-start"
+                  data-shortcut-title="Set the selection start to the playhead"
+                  title="Set the selection start to the playhead"
                 >
                   <span class="dock-mark-label">Set start</span>
                   <kbd aria-hidden="true">I</kbd>
@@ -1584,8 +1573,9 @@
                   class="dock-mark"
                   aria-label="Set end of the selection to the playhead"
                   aria-describedby="range-summary"
-                  aria-keyshortcuts="O"
-                  title="Set the selection end to the playhead. Shortcut: O"
+                  data-shortcut="range-end"
+                  data-shortcut-title="Set the selection end to the playhead"
+                  title="Set the selection end to the playhead"
                 >
                   <span class="dock-mark-label">Set end</span>
                   <kbd aria-hidden="true">O</kbd>
@@ -1631,8 +1621,8 @@
                 id="preview-fullscreen"
                 class="icon-button"
                 aria-label="Fullscreen"
-                aria-keyshortcuts="F"
-                title="Fullscreen (F)"
+                data-shortcut="fullscreen"
+                title="Fullscreen"
               >
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-fullscreen" />
@@ -1643,8 +1633,9 @@
                   id="zoom-out"
                   class="icon-button"
                   aria-label="Zoom out"
-                  aria-keyshortcuts="-"
-                  title="Zoom out (-)"
+                  data-shortcut="zoom-out"
+                  data-shortcut-title="Zoom out"
+                  title="Zoom out"
                 >
                   <svg class="icon" aria-hidden="true">
                     <use href="#i-zoom-out" />
@@ -1655,8 +1646,9 @@
                   id="zoom-in"
                   class="icon-button"
                   aria-label="Zoom in"
-                  aria-keyshortcuts="+"
-                  title="Zoom in (+)"
+                  data-shortcut="zoom-in"
+                  data-shortcut-title="Zoom in"
+                  title="Zoom in"
                 >
                   <svg class="icon" aria-hidden="true">
                     <use href="#i-zoom-in" />
@@ -1666,8 +1658,9 @@
                   id="zoom-fit"
                   class="fit-button"
                   aria-label="Fit the video in the timeline"
-                  aria-keyshortcuts="0"
-                  title="Fit the video in the timeline (0)"
+                  data-shortcut="zoom-fit"
+                  data-shortcut-title="Fit the video in the timeline"
+                  title="Fit the video in the timeline"
                 >
                   Fit
                 </button>
@@ -1773,7 +1766,7 @@
                   tabindex="0"
                   aria-label="Playhead"
                   aria-valuemin="0"
-                  aria-keyshortcuts="ArrowLeft ArrowRight"
+                  data-shortcut="seek-back seek-forward seek-back-small seek-forward-small"
                 >
                   <span id="timeline-playhead-line" class="playhead-line"></span
                   ><span class="playhead-cap" data-zone="ruler"></span>
@@ -1809,6 +1802,18 @@
           Delete video
         </button>
       </div>
+    </dialog>
+    <dialog id="shortcut-settings" aria-labelledby="shortcut-heading">
+      <h2 id="shortcut-heading">Keyboard shortcuts</h2>
+      <p>Select a shortcut, then press the keys you want to use.</p>
+      <div id="shortcut-list" class="shortcut-list"></div>
+      <p id="shortcut-status" class="shortcut-status" role="status"></p>
+      <form class="dialog-actions" method="dialog">
+        <button class="button secondary" id="reset-shortcuts" type="button">
+          Restore defaults
+        </button>
+        <button class="button" autofocus>Done</button>
+      </form>
     </dialog>
     <script type="module" src="app.js"></script>
   </body>

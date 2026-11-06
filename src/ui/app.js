@@ -16,6 +16,7 @@ import { createElementEditor } from "./element-editor.js";
 import { createCaptionEditor } from "./caption-editor.js";
 import { createPartsPanel } from "./parts-panel.js";
 import { createRangePlayer } from "./range-player.js";
+import { createShortcutSettings } from "./shortcut-settings.js";
 import { createTools } from "./tools.js";
 import { createTimeline } from "./timeline.js";
 import { createTranscriptEditor } from "./transcript-editor.js";
@@ -973,7 +974,7 @@ function syncPreview() {
   const fullscreen = $(".player-shell").classList.contains("fullscreen");
   const label = fullscreen ? "Exit fullscreen" : "Fullscreen";
   $("#preview-fullscreen").setAttribute("aria-label", label);
-  $("#preview-fullscreen").title = `${label} (F)`;
+  $("#preview-fullscreen").title = shortcutSettings.label("fullscreen", label);
   $("#preview-fullscreen use").setAttribute(
     "href",
     fullscreen ? "#i-fullscreen-exit" : "#i-fullscreen",
@@ -995,7 +996,10 @@ function renderSplit() {
       };
   button.disabled = !check.ok;
   button.title = check.ok
-    ? `Split at ${clockTenths(time)}. This makes two parts and removes no time. Shortcut: S`
+    ? shortcutSettings.label(
+        "split",
+        `Split at ${clockTenths(time)}. This makes two parts and removes no time.`,
+      )
     : check.reason;
 }
 function splitAtPlayhead() {
@@ -1182,7 +1186,7 @@ function renderRange() {
   summary.textContent = !valid
     ? `Set an end time after the start time. The maximum is ${maximum}.`
     : full
-      ? "The selection is the full video. Drag on the timeline, use Set start and Set end (keys I and O), or type the times."
+      ? "The selection is the full video. Drag on the timeline, use Set start and Set end, or type the times."
       : `Selection: ${start.toFixed(2)} s to ${end.toFixed(2)} s, ${length}.`;
   // The dock buttons work in every tool, so the dock tells a screen reader.
   $("#selection-status").textContent = summary.textContent;
@@ -1246,7 +1250,18 @@ $("#range-start-now").addEventListener("click", () =>
 $("#range-end-now").addEventListener("click", () =>
   setRangeFromPlayhead("end"),
 );
+const shortcutDialog = $("#shortcut-settings");
+const shortcutSettings = createShortcutSettings(shortcutDialog, call, () => {
+  const fullscreen = $("#preview-fullscreen");
+  fullscreen.title = shortcutSettings.label(
+    "fullscreen",
+    fullscreen.getAttribute("aria-label"),
+  );
+  renderSplit();
+});
+shortcutSettings.sync({});
 document.addEventListener("keydown", (event) => {
+  if (shortcutDialog.open || event.defaultPrevented) return;
   // Escape cancels a drag first. Nothing is saved.
   if (
     event.key === "Escape" &&
@@ -1302,7 +1317,12 @@ document.addEventListener("keydown", (event) => {
   const id = selectedVideo?.id;
   enqueue(async () => {
     if (!selectedVideo || selectedVideo.id !== id) return;
-    const action = shortcut(keys, shortcutContext());
+    // Keep the binding from the key press. The action can wait behind another
+    // operation while the user or an agent changes the shortcut settings.
+    const action = shortcut(keys, {
+      ...shortcutContext(),
+      shortcutOverrides: context.shortcutOverrides,
+    });
     if (action) await perform(action);
   });
 });
@@ -1317,7 +1337,8 @@ function shortcutContext() {
     fullscreen: $(".player-shell").classList.contains("fullscreen"),
     canUndo: Boolean(selectedVideo?.timeline.past.length),
     canRedo: Boolean(selectedVideo?.timeline.future.length),
-    dialog: $("#confirm-delete").open,
+    dialog: $("#confirm-delete").open || shortcutDialog.open,
+    shortcutOverrides: shortcutSettings.overrides(),
     // Delete and Backspace use the selection of the open tool only. A
     // selection in a closed tool stays, but the keys do not change it.
     selected: activeSelection(),
@@ -1598,6 +1619,7 @@ function renderRecording(recording) {
 }
 async function refreshStatus() {
   const status = await call("app.status");
+  shortcutSettings.sync(status.shortcutOverrides);
   renderRecording(status.recording);
   lastJobs = status.jobs;
   for (const row of finishedExports(knownExports, status.jobs, loadedAt))
@@ -1631,6 +1653,11 @@ async function refreshStatus() {
     if (!video) showLibrary();
     else renderVideo(video);
   }
+}
+try {
+  shortcutSettings.sync((await call("shortcuts.list")).overrides);
+} catch (error) {
+  notice(error.message, true);
 }
 try {
   await refreshSources();

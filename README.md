@@ -47,6 +47,10 @@ Export MP4 writes a new H.264 MP4 file at 30 frames per second. It does not repl
 
 ### Keyboard shortcuts
 
+Open **Keyboard shortcuts** in the library sidebar or in the editor's **Details** tool. Select an action and press a new key combination. The app saves it for this computer. Select **Restore defaults** to restore all of the keys in the table.
+
+The CLI and MCP use the same settings. Use `shortcuts.list` to see action IDs and current keys. Use `shortcuts.set` with an `action` and a `key` such as `Control+Shift+B`. Use `shortcuts.reset` to restore the defaults.
+
 Editor keys do not operate when a text field or a list has focus. A key that you press during an operation applies after the operation is complete. On a tool tab, the arrow keys, Home, and End move between the tools and do not move the playhead. On a selection handle, the arrow keys, Page Up, Page Down, Home, and End move the handle and do not move the playhead. Delete and Backspace change only the selection of the open tool. A selection in another tool stays and does not change.
 
 | Key                                       | Action                                                                    | Shared command                      |
@@ -63,6 +67,7 @@ Editor keys do not operate when a text field or a list has focus. A key that you
 | F                                         | Enter or leave fullscreen preview                                         | `playback.fullscreen`               |
 | / or Ctrl + F                             | Go to the library search                                                  | None                                |
 | Delete or Backspace                       | Delete the selected element or caption of the open tool                   | `element.remove`, `captions.delete` |
+| F2                                        | Edit the selected text box or label on the video                          | `element.update`                    |
 | Esc                                       | Cancel a drag, clear the search, leave fullscreen, or clear the selection | `playback.fullscreen`               |
 
 When the words of the Transcript tool have focus, the arrow keys move a word caret. Up and Down go to the next paragraph. Shift with an arrow key selects words. Enter moves the playhead to the word. Esc clears the word selection. Delete does not cut words. Tab goes to Cut selected words.
@@ -72,6 +77,7 @@ When the words of the Transcript tool have focus, the arrow keys move a word car
 The default data folder is `.local/data` in this project folder. The app, CLI, and MCP use this same folder even when they start from another working folder. It contains:
 
 - `library.json`, the video records and edit history.
+- `shortcuts.json`, the custom keyboard shortcuts.
 - `media`, the source video copies.
 - `pending`, recording files that the app has not yet imported.
 - `previews`, cached copies of edited videos and timeline overviews. Deleting a library video also removes them.
@@ -178,7 +184,7 @@ Add text, labels, rectangles, ellipses, and arrows to the edited video. Each ele
 
 In the desktop editor, use the Add buttons above the video to add an element at the playhead. Select an element in the video, on the timeline, or in Layers: the Text & shapes tool opens with its properties. Drag it to move it, or drag a handle to change its size or an arrow end. On the timeline, drag its bar to move its time, or drag a handle of the selected bar to change its start or end. Change exact values in the properties. Position, size, fades, and opacity are in disclosures. Duplicate, Forward, Backward, and Delete are in the Layers heading. Each change is one undo step.
 
-To change a text box or a label, double-click it on the video and type, or select **Edit on video**, or press F2. You can also type in the Text field. The new text shows at once in a draft view, and the old text does not show under it. Other elements and captions stay in their layers. Enter adds a line. **Done** or Ctrl+Enter applies, and a click outside also applies. **Cancel** or Esc goes back to the saved text. The draft saves once, when you apply it, so one session is one undo step and one exact render. A key press saves nothing and starts no render. The text stays on the picture until the exact preview is ready. The draft view is an approximation. The exact preview and the export are the true result. See [Edit text on the video](docs/editing.md#edit-text-on-the-video).
+To change a text box or a label, double-click it on the video and type, or select **Edit on video**, or press the shortcut for **Edit selected text on the video**. The default is F2. You can also type in the Text field. The new text shows at once in a draft view, and the old text does not show under it. Other elements and captions stay in their layers. Enter adds a line. **Done** or Ctrl+Enter applies, and a click outside also applies. **Cancel** or Esc goes back to the saved text. The draft saves once, when you apply it, so one session is one undo step and one exact render. A key press saves nothing and starts no render. The text stays on the picture until the exact preview is ready. The draft view is an approximation. The exact preview and the export are the true result. See [Edit text on the video](docs/editing.md#edit-text-on-the-video).
 
 Agents use `element.add`, `element.update`, `element.duplicate`, `element.order`, `element.remove`, `element.list`, and `edit.configure` for video fades:
 

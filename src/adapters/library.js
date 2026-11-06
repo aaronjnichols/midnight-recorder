@@ -12,22 +12,7 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createTimeline } from "../domain/timeline.js";
 
-// Windows can refuse a rename for a short time while another program, for
-// example a virus scanner, reads the new file. Try again for about 4
-// seconds. Other errors fail at once.
-async function replaceFile(renameFile, from, to) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await renameFile(from, to);
-    } catch (error) {
-      if (!["EPERM", "EACCES", "EBUSY"].includes(error.code) || attempt >= 12)
-        throw error;
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(50 * 2 ** attempt, 400)),
-      );
-    }
-  }
-}
+import { replaceFile } from "./replace-file.js";
 
 export class Library {
   constructor(
@@ -56,7 +41,7 @@ export class Library {
   async save(records) {
     await mkdir(this.root, { recursive: true });
     await writeFile(this.index + ".tmp", JSON.stringify(records, null, 2));
-    await replaceFile(this.renameFile, this.index + ".tmp", this.index);
+    await replaceFile(this.index + ".tmp", this.index, this.renameFile);
   }
   async list(query = "") {
     return (await this.load()).filter((v) =>

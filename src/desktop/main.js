@@ -13,6 +13,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Service } from "../application/service.js";
+import { ShortcutStore } from "../adapters/shortcut-store.js";
 import { Library } from "../adapters/library.js";
 import { Media } from "../adapters/media.js";
 import { PreviewCache } from "../adapters/preview.js";
@@ -251,6 +252,7 @@ else
       const previews = new PreviewCache(root, media);
       const service = new Service({
         library: new Library(root),
+        shortcutStore: new ShortcutStore(root),
         media,
         previews,
         inspection: new FrameInspection(media, previews),

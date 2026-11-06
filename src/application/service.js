@@ -23,6 +23,13 @@ import {
   elementPlacement,
 } from "./elements.js";
 
+import {
+  setShortcut,
+  shortcutActions,
+  shortcutSettings,
+  validateShortcutOverrides,
+} from "../domain/shortcuts.js";
+
 const previewFrameEdge = 1920;
 // Finished draft frame jobs that stay readable. One job is about one key
 // press in the worst case, so they must not fill app.status.
@@ -83,6 +90,24 @@ export const commands = [
     ["id", "timestamps"],
   ),
   define("app.status", "Read recording state and export jobs."),
+  define(
+    "shortcuts.list",
+    "List actions and their current keyboard shortcuts.",
+  ),
+  define(
+    "shortcuts.set",
+    "Replace the shortcuts for one action. Use shortcuts.list to find actions and key names.",
+    {
+      action: field("string", "Shortcut action ID.", {
+        enum: shortcutActions.map(({ id }) => id),
+      }),
+      key: string(
+        "Key combination, for example B or Control+Shift+B. Use Plus for the plus key.",
+      ),
+    },
+    ["action", "key"],
+  ),
+  define("shortcuts.reset", "Restore all default keyboard shortcuts."),
   define("capture.sources", "List screens and windows."),
   define("capture.devices", "List microphones and cameras."),
   ...["start", "countdown"].map((action) =>
@@ -308,6 +333,7 @@ function validate(command, args) {
 export class Service {
   constructor({
     library,
+    shortcutStore,
     media,
     capture,
     playback,
@@ -321,6 +347,7 @@ export class Service {
   }) {
     Object.assign(this, {
       library,
+      shortcutStore,
       media,
       capture,
       playback,
@@ -338,6 +365,12 @@ export class Service {
     this.captionJobs = new CaptionJobs(this);
     this.overviewJobs = new OverviewJobs(this);
     this.queue = Promise.resolve();
+  }
+  async loadShortcuts() {
+    if (this.shortcutOverrides) return this.shortcutOverrides;
+    const stored = this.shortcutStore ? await this.shortcutStore.load() : {};
+    this.shortcutOverrides = validateShortcutOverrides(stored);
+    return stored;
   }
   execute(name, args = {}) {
     const command = commands.find((c) => c.name === name);
@@ -439,10 +472,22 @@ export class Service {
         },
       };
     }
+    if (name === "shortcuts.list")
+      return shortcutSettings(await this.loadShortcuts());
+    if (name === "shortcuts.set" || name === "shortcuts.reset") {
+      const next =
+        name === "shortcuts.reset"
+          ? {}
+          : setShortcut(await this.loadShortcuts(), args.action, args.key);
+      await this.shortcutStore?.save(next);
+      this.shortcutOverrides = next;
+      return shortcutSettings(next);
+    }
     if (name === "app.status")
       return {
         recording: this.recordingStatus(),
         jobs: [...this.jobs.values()],
+        shortcutOverrides: this.shortcutOverrides,
       };
     if (name === "app.view") return this.playback.request("view", args);
     if (name === "playback.open")

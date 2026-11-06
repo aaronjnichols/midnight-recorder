@@ -170,7 +170,7 @@ Units in the panel:
 - Times are seconds in the edited video. Set to playhead sets the start or end to the playhead time.
 - Fades are seconds.
 
-Keys: Delete and Backspace remove the selected element or caption of the open tool. A selection in another tool stays and does not change. Esc cancels a drag, then clears the selected element or caption, then clears the timeline selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. I and O do the same as Set start and Set end, in every tool. S splits at the playhead. F2 opens the selected text box on the video. + and - zoom the timeline, and 0 fits the video. On a tool tab, the arrow keys, Home, and End move between the tools. Keys in text fields and dialogs do not change elements.
+Use **Keyboard shortcuts** in **Details** to change the keys. By default, Delete and Backspace remove the selected element or caption of the open tool. A selection in another tool stays and does not change. Esc cancels a drag, then clears the selected element or caption, then clears the timeline selection. Ctrl+Z and Ctrl+Shift+Z undo and redo all edits. I and O do the same as Set start and Set end, in every tool. S splits at the playhead. F2 opens the selected text box on the video. + and - zoom the timeline, and 0 fits the video. On a tool tab, the arrow keys, Home, and End move between the tools. Keys in text fields and dialogs do not change elements.
 
 After a change, the app makes a new exact preview. While it does this, the video area shows the original video at the same time, without elements, and the element outlines. A note on the video tells you this. The preview replaces it when it is ready, at the same playhead time. Changes from the CLI or MCP show in the editor in the same way. A change to the selected text box is different: see [Edit text on the video](#edit-text-on-the-video).
 
@@ -183,7 +183,7 @@ Text elements and labels use these rules. Captions use the Captions tool.
 To type on the video, do one of these:
 
 - Double-click the text box on the video. The caret goes to the point that you clicked.
-- Select **Edit on video** next to the Text field, or press F2. The caret goes to the end of the text.
+- Select **Edit on video** next to the Text field, or press the shortcut for **Edit selected text on the video**. The default is F2. The caret goes to the end of the text.
 
 You can also type in the Text field. The box on the video and the Text field are two views of one draft, so you can go from one to the other in the same session. The video pauses. If the frame does not show the element, or shows it at less than half of its fade, the playhead moves to a frame that shows it.
 
